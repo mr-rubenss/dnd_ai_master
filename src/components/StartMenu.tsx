@@ -4,13 +4,16 @@ import type { GameState } from '../types/game'
 interface Props {
   /** Сохранённая игра, если есть. */
   save: GameState | null
+  /** Сколько героев в «Моих героях». */
+  heroCount: number
   onContinue: () => void
+  onHeroes: () => void
   onCreate: () => void
   onQuickStart: () => void
 }
 
 /** Стартовый экран: продолжить сохранённую игру, создать героя или начать за готового. */
-export function StartMenu({ save, onContinue, onCreate, onQuickStart }: Props) {
+export function StartMenu({ save, heroCount, onContinue, onHeroes, onCreate, onQuickStart }: Props) {
   const location = save ? locations[save.location.id] : undefined
   const hero = startingSheet.character
 
@@ -30,6 +33,12 @@ export function StartMenu({ save, onContinue, onCreate, onQuickStart }: Props) {
               </span>
             </button>
           )}
+          <button type="button" className="menu-option" onClick={onHeroes} data-testid="menu-heroes">
+            <span className="menu-option-title">Мои герои</span>
+            <span className="menu-option-text">
+              {heroCount === 0 ? 'Пока пусто.' : `Героев: ${heroCount}.`} Листы персонажей, новые истории и «Зал славы».
+            </span>
+          </button>
           <button type="button" className={`menu-option${save ? '' : ' menu-option--primary'}`} onClick={onCreate} data-testid="menu-create">
             <span className="menu-option-title">Создать нового героя</span>
             <span className="menu-option-text">Класс, предыстория, вид, характеристики и снаряжение по шагам.</span>
@@ -42,7 +51,11 @@ export function StartMenu({ save, onContinue, onCreate, onQuickStart }: Props) {
           </button>
         </div>
 
-        {save && <p className="start-menu-note">Сейчас можно вести только одну историю: новый герой заменит текущую игру.</p>}
+        {save && (
+          <p className="start-menu-note">
+            Одновременно можно вести одну историю: новая прервёт текущую, а её герой вернётся в «Мои герои».
+          </p>
+        )}
       </section>
     </main>
   )

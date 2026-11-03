@@ -218,5 +218,14 @@ test('своя предыстория по шаблону 2024: сборка, б
   await expect(page.locator('.summary-sheet')).toContainText('51 зм') // 5 зм волшебника + 46 зм сдачи
   await expect(page.getByTestId('summary-items')).toContainText('Верёвка (50 футов) ×2')
   await expectNoHorizontalScroll(page)
+
+  // Героя можно сохранить, не начиная истории: он появляется в «Моих героях» свободным.
+  await page.getByRole('button', { name: 'Сохранить в «Мои герои»' }).click()
+  await expect(page.getByRole('heading', { name: 'Мои герои' })).toBeVisible()
+  const card = page.locator('.hero-card')
+  await expect(card).toHaveCount(1)
+  await expect(card.locator('.hero-meta')).toHaveText('Орк · Волшебник 1 ур.')
+  await expect(card.locator('.hero-portrait')).toHaveText('📜')
+  await expect(card.getByTestId('hero-story')).toHaveText('Вне истории')
   expect(errors).toEqual([])
 })

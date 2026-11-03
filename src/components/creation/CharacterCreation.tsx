@@ -35,11 +35,17 @@ const STEP_COMPONENTS: Record<Exclude<CreationStep, 'summary'>, (props: StepProp
 }
 
 interface Props {
+  /** Сохранить героя и сразу начать историю. */
   onStart: (sheet: CharacterSheet) => void
+  /** Только сохранить героя в «Мои герои». */
+  onSave: (sheet: CharacterSheet) => void
 }
 
+/** Каждому новому герою — свой id. */
+const withNewId = (sheet: CharacterSheet): CharacterSheet => ({ ...sheet, character: { ...sheet.character, id: crypto.randomUUID() } })
+
 /** Экран создания персонажа: пошаговый мастер по правилам SRD 5.2. */
-export function CharacterCreation({ onStart }: Props) {
+export function CharacterCreation({ onStart, onSave }: Props) {
   const [draft, setDraft] = useState<CreationDraft>(emptyDraft)
   const [step, setStep] = useState<CreationStep>('class')
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -105,9 +111,14 @@ export function CharacterCreation({ onStart }: Props) {
           {problems[0] ?? ''}
         </p>
         {step === 'summary' ? (
-          <button type="button" className="primary-button" disabled={!sheet} onClick={() => sheet && onStart({ ...sheet, character: { ...sheet.character, id: crypto.randomUUID() } })}>
-            Начать приключение
-          </button>
+          <div className="creation-finish">
+            <button type="button" className="secondary-button" disabled={!sheet} onClick={() => sheet && onSave(withNewId(sheet))}>
+              Сохранить в «Мои герои»
+            </button>
+            <button type="button" className="primary-button" disabled={!sheet} onClick={() => sheet && onStart(withNewId(sheet))}>
+              Начать приключение
+            </button>
+          </div>
         ) : (
           <button type="button" className="primary-button" disabled={problems.length > 0} onClick={() => goTo(CREATION_STEPS[index + 1].id)}>
             Далее

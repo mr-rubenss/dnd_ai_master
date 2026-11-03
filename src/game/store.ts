@@ -1,13 +1,13 @@
 // Единое хранилище состояния игры с сохранением в localStorage.
 
 import type { Character, CharacterSheet } from '../types/character'
-import type { GameState } from '../types/game'
+import type { GameState, StoryProgress } from '../types/game'
 import type { ArmorType } from '../types/items'
 import type { LocationData } from '../types/location'
 import { gameReducer, initialDoorStates, type GameAction } from './state'
 
 export const SAVE_KEY = 'ai-master:save'
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -115,6 +115,15 @@ export function migrateSave(save: unknown, context: MigrationContext = {}): unkn
     state = { ...s, character: { ...s.character, proficiencies: { ...s.character?.proficiencies, armor: [...armor] } } }
     version = 7
   }
+  if (version === 7) {
+    // v8: у игры появилось прохождение истории (для «Моих героев»). Старая игра — прохождение стартовой истории.
+    const s = state as { character?: { id?: unknown } }
+    const heroId = typeof s.character?.id === 'string' ? s.character.id : ''
+    const story = context.newStory?.(heroId)
+    if (!story) return null
+    state = { ...s, story }
+    version = 8
+  }
   return version === SAVE_VERSION ? state : null
 }
 
@@ -125,6 +134,8 @@ export interface MigrationContext {
   location?: (locationId: string) => LocationData | undefined
   /** Владение доспехами класса по id — для сохранений без него. */
   armorTraining?: (classId: string) => readonly ArmorType[] | undefined
+  /** Новое прохождение стартовой истории за героя — для сохранений без истории. */
+  newStory?: (heroId: string) => StoryProgress
 }
 
 export function loadSavedGame(

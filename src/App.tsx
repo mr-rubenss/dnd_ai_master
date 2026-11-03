@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CharacterCreation } from './components/creation/CharacterCreation'
+import { HeroesScreen } from './components/HeroesScreen'
 import { StartMenu } from './components/StartMenu'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { DiceTray } from './components/DiceTray'
@@ -10,29 +11,56 @@ import { PlayerInput } from './components/PlayerInput'
 import { itemCatalog, locations, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { changeEquipment, diceRolled, messageAdded, type EquipmentChange } from './game/state'
-import { gameStore, useGameState } from './hooks/useGame'
-import type { CharacterSheet } from './types/character'
+import { deleteHero } from './game/heroes'
+import { endStory, quickStart, renameEverywhere, saveHero, startStory } from './game/session'
+import { gameStore, heroStore, useGameState, useHeroRoster } from './hooks/useGame'
 import type { GameState } from './types/game'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
 const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий пока не подключён — это заглушка.)'
 
-type Screen = 'menu' | 'creation' | 'game'
-
-const REPLACE_WARNING = 'Начать новую игру? Текущая игра будет потеряна — пока можно вести только одну историю.'
+type Screen = 'menu' | 'creation' | 'game' | 'heroes'
 
 function App() {
   const state = useGameState()
-  // При запуске всегда стартовый экран: продолжить, создать героя или быстрый старт.
+  const roster = useHeroRoster()
+  // При запуске всегда стартовый экран: продолжить, мои герои, создать героя или быстрый старт.
   const [screen, setScreen] = useState<Screen>('menu')
+  const [heroesTab, setHeroesTab] = useState<'heroes' | 'hall'>('heroes')
   const current: Screen = screen === 'game' && !state ? 'menu' : screen
+  const stores = { game: gameStore, heroes: heroStore }
 
-  /** Если есть сохранение — спросить, можно ли его заменить. */
-  const confirmReplace = () => !state || window.confirm(REPLACE_WARNING)
+  /** Если идёт история — спросить, можно ли её прервать. Её герой вернётся в «Мои герои». */
+  const confirmInterrupt = () =>
+    !state ||
+    window.confirm(
+      `Начать новую историю? Текущая история «${state.story.title}» (герой — ${state.character.name}) будет прервана, ` +
+        'а герой вернётся в «Мои герои». Одновременно можно вести только одну историю.',
+    )
 
-  const startGame = (sheet: CharacterSheet) => {
-    gameStore.startGame(sheet)
-    setScreen('game')
+  /** Выполнить действие сессии; при отказе — показать причину. */
+  const run = (action: () => string | null): boolean => {
+    const reason = action()
+    if (reason) window.alert(reason)
+    return !reason
+  }
+
+  const startHero = (heroId: string) => {
+    if (confirmInterrupt() && run(() => startStory(stores, heroId))) setScreen('game')
+  }
+
+  const openHeroes = (tab: 'heroes' | 'hall' = 'heroes') => {
+    setHeroesTab(tab)
+    setScreen('heroes')
+  }
+
+  const finishStory = () => {
+    if (!state) return
+    const ok = window.confirm(
+      `Завершить историю «${state.story.title}»? ${state.character.name} отправится в «Зал славы» с итогом пути. ` +
+        'Продолжить эту историю будет нельзя.',
+    )
+    if (ok && run(() => endStory(stores, 'completed'))) openHeroes('hall')
   }
 
   return (
@@ -40,23 +68,51 @@ function App() {
       <header className="app-header">
         <h1>ИИ-Мастер</h1>
         {current !== 'menu' && (
-          <button type="button" className="header-button" onClick={() => setScreen('menu')}>
-            В меню
-          </button>
+          <div className="header-actions">
+            {current === 'game' && (
+              <button type="button" className="header-button" onClick={finishStory} data-testid="finish-story">
+                Завершить историю
+              </button>
+            )}
+            <button type="button" className="header-button" onClick={() => setScreen('menu')}>
+              В меню
+            </button>
+          </div>
         )}
       </header>
       {current === 'menu' && (
         <StartMenu
           save={state}
+          heroCount={roster.heroes.length}
           onContinue={() => setScreen('game')}
-          onCreate={() => confirmReplace() && setScreen('creation')}
-          onQuickStart={() => confirmReplace() && startGame(startingSheet)}
+          onHeroes={() => openHeroes()}
+          onCreate={() => setScreen('creation')}
+          onQuickStart={() => confirmInterrupt() && run(() => quickStart(stores, startingSheet)) && setScreen('game')}
         />
       )}
-      {/* Подтверждение замены уже получено в меню; игра заменяется только при старте нового героя. */}
-      {current === 'creation' && <CharacterCreation onStart={startGame} />}
-      {/* key: новая игра монтирует экран заново, сбрасывая локальное состояние (ожидание ответа, анимации). */}
-      {current === 'game' && state && <GameScreen key={state.character.id} state={state} />}
+      {current === 'heroes' && (
+        <HeroesScreen
+          key={heroesTab}
+          roster={roster}
+          game={state}
+          initialTab={heroesTab}
+          onCreate={() => setScreen('creation')}
+          onStart={startHero}
+          onContinue={() => setScreen('game')}
+          onRename={(heroId, name) => renameEverywhere(stores, heroId, name)}
+          onDelete={(heroId) => heroStore.update((r) => deleteHero(r, heroId, state?.story.title))}
+        />
+      )}
+      {current === 'creation' && (
+        <CharacterCreation
+          onStart={(sheet) => {
+            if (confirmInterrupt() && run(() => saveHero(stores, sheet) ?? startStory(stores, sheet.character.id))) setScreen('game')
+          }}
+          onSave={(sheet) => run(() => saveHero(stores, sheet)) && openHeroes()}
+        />
+      )}
+      {/* key: новая история монтирует экран заново, сбрасывая локальное состояние (ожидание ответа, анимации). */}
+      {current === 'game' && state && <GameScreen key={state.story.id} state={state} />}
     </div>
   )
 }

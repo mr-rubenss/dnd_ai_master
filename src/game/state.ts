@@ -4,7 +4,7 @@
 import type { CharacterSheet } from '../types/character'
 import type { RollResult } from '../engine/dice'
 import type { Equipment } from '../types/character'
-import type { ChatMessage, GameState, MessageAuthor, RollRecord } from '../types/game'
+import type { ChatMessage, GameState, MessageAuthor, RollRecord, StoryProgress } from '../types/game'
 import type { ItemCatalog } from '../types/items'
 import { DOOR_STATES, type DoorState, type LocationData } from '../types/location'
 import { parseCharacterSheet } from './character'
@@ -18,11 +18,13 @@ export interface NewGameData {
   sheet: CharacterSheet
   location: LocationData
   intro: ChatMessage[]
+  story: StoryProgress
 }
 
 /** Новая игра из стартовых данных. Данные копируются, чтобы изменения состояния не задевали исходный JSON. */
-export function createNewGame({ sheet, location, intro }: NewGameData): GameState {
+export function createNewGame({ sheet, location, intro, story }: NewGameData): GameState {
   return structuredClone({
+    story,
     character: sheet.character,
     inventory: sheet.inventory,
     location: { id: location.id, player: location.playerStart, doors: initialDoorStates(location) },
@@ -44,6 +46,8 @@ export type GameAction =
   | { type: 'diceRolled'; roll: RollRecord }
   /** Смена экипировки: новое состояние слотов и что именно изменилось (для ведущего и журнала). */
   | { type: 'equipmentChanged'; equipped: Equipment; change: EquipmentChange }
+  /** Игрок переименовал героя (в «Моих героях»). */
+  | { type: 'characterRenamed'; name: string }
   | { type: 'gameReset'; state: GameState }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -54,6 +58,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, rolls: [...state.rolls, action.roll].slice(-MAX_ROLL_LOG) }
     case 'equipmentChanged':
       return { ...state, inventory: { ...state.inventory, equipped: action.equipped } }
+    case 'characterRenamed':
+      return { ...state, character: { ...state.character, name: action.name } }
     case 'gameReset':
       return action.state
   }
@@ -104,6 +110,20 @@ export function parseGameState(raw: unknown, { catalog, locations }: GameStateCo
   } catch (error) {
     if (error instanceof ValidationError) problems.push(...error.problems)
     else throw error
+  }
+
+  const story = raw.story
+  if (
+    !isObject(story) ||
+    !isNonEmptyString(story.id) ||
+    !isNonEmptyString(story.storyId) ||
+    !isNonEmptyString(story.title) ||
+    !isNonEmptyString(story.heroId) ||
+    typeof story.startedAt !== 'number'
+  ) {
+    problems.push('story: ожидается { id, storyId, title, heroId, startedAt }')
+  } else if (isObject(raw.character) && story.heroId !== raw.character.id) {
+    problems.push('story.heroId: должен совпадать с id персонажа')
   }
 
   const loc = raw.location

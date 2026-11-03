@@ -20,8 +20,21 @@ export interface RollRecord {
   result: RollResult
 }
 
+/** Прохождение истории: какая история, кто герой, когда начата. */
+export interface StoryProgress {
+  /** id прохождения (уникален для каждой начатой игры). */
+  id: string
+  /** id истории из данных (src/data/story.json). */
+  storyId: string
+  title: string
+  /** Герой истории — id персонажа. */
+  heroId: string
+  startedAt: number
+}
+
 /** Всё состояние игры. Меняется только через gameReducer (src/game/state.ts). */
 export interface GameState {
+  story: StoryProgress
   character: Character
   inventory: Inventory
   location: {

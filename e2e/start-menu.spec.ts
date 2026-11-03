@@ -52,25 +52,15 @@ test('с сохранением: «Продолжить» с именем гер
   await expect(page.locator('.message--player').last()).toContainText('Сажусь у камина')
 })
 
-test('«Создать нового героя» при сохранении спрашивает подтверждение; игра заменяется только при старте нового', async ({
-  page,
-}) => {
+test('«Создать нового героя» при сохранении открывает создание без вопросов — история цела', async ({ page }) => {
   await startQuickGame(page)
   await makeMove(page, 'Старая история')
   await page.getByRole('button', { name: 'В меню' }).click()
 
-  // Отказ — остаёмся в меню.
-  let message = ''
-  page.once('dialog', (dialog) => {
-    message = dialog.message()
-    void dialog.dismiss()
+  // Создать героя можно и не прерывая историю: подтверждение спросят только при старте новой.
+  page.on('dialog', () => {
+    throw new Error('Открытие создания не должно спрашивать подтверждение')
   })
-  await createButton(page).click()
-  expect(message).toContain('Текущая игра будет потеряна')
-  await expect(continueButton(page)).toBeVisible()
-
-  // Согласие — открывается создание, но сохранение живо, пока новый герой не начал игру.
-  page.once('dialog', (dialog) => void dialog.accept())
   await createButton(page).click()
   await expect(creationHeading(page)).toBeVisible()
   await page.getByRole('button', { name: 'В меню' }).click()
@@ -83,8 +73,13 @@ test('«Быстрый старт» при сохранении тоже спр�
   await makeMove(page, 'Старая история')
   await page.getByRole('button', { name: 'В меню' }).click()
 
-  page.once('dialog', (dialog) => void dialog.dismiss())
+  let message = ''
+  page.once('dialog', (dialog) => {
+    message = dialog.message()
+    void dialog.dismiss()
+  })
   await quickStart(page).click()
+  expect(message).toContain('Текущая история «Вечер в «Пьяном грифоне»» (герой — Ратибор) будет прервана')
   await expect(continueButton(page)).toBeVisible()
 
   page.once('dialog', (dialog) => void dialog.accept())

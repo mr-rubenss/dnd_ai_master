@@ -7,6 +7,8 @@ import type { ChatMessage } from '../types/game'
 import { parseCharacterSheet } from './character'
 import { parseItemCatalog } from './items'
 import { parseLocation } from './location'
+import storyJson from '../data/story.json'
+import { beginStory, parseStory } from './story'
 import { roll } from '../engine/dice'
 import { changeEquipment, createNewGame, diceRolled, gameReducer, MAX_ROLL_LOG, messageAdded, parseGameState } from './state'
 import { createGameStore, SAVE_KEY, SAVE_VERSION, type KeyValueStorage } from './store'
@@ -14,8 +16,9 @@ import { createGameStore, SAVE_KEY, SAVE_VERSION, type KeyValueStorage } from '.
 const catalog = parseItemCatalog(itemsJson)
 const location = parseLocation(drunkenGriffinJson)
 const locations = { [location.id]: location }
+const story = parseStory(storyJson, locations)
 const sheet = parseCharacterSheet(fighterJson, catalog)
-const newGame = () => createNewGame({ sheet, location, intro: introJson as ChatMessage[] })
+const newGame = () => createNewGame({ sheet, location, intro: introJson as ChatMessage[], story: beginStory(story, sheet.character.id) })
 const parseState = (raw: unknown) => parseGameState(raw, { catalog, locations })
 
 /** localStorage в памяти для тестов. */
@@ -105,7 +108,7 @@ describe('смена экипировки через хранилище', () => 
 })
 
 describe('хранилище игры', () => {
-  const createNew = (s: typeof sheet = sheet) => createNewGame({ sheet: s, location, intro: introJson as ChatMessage[] })
+  const createNew = (s: typeof sheet = sheet) => createNewGame({ sheet: s, location, intro: introJson as ChatMessage[], story: beginStory(story, s.character.id) })
   const options = (storage: ReturnType<typeof memoryStorage> | null) => ({
     storage,
     createNewGame: createNew,
@@ -114,6 +117,7 @@ describe('хранилище игры', () => {
       characterTemplate: (id: string) => (id === sheet.character.id ? sheet.character : undefined),
       location: (id: string) => locations[id],
       armorTraining: (classId: string) => (classId === 'fighter' ? (['light', 'medium', 'heavy', 'shield'] as const) : undefined),
+      newStory: (heroId: string) => beginStory(story, heroId),
     },
   })
   /** Хранилище с уже начатой игрой. */
@@ -186,6 +190,8 @@ describe('хранилище игры', () => {
     if (version < 6) state.location = { id: 'drunken-griffin', player: { x: 9, y: 12 } }
     // До v7 владения доспехами в листе не было.
     if (version < 7) delete (state.character.proficiencies as Record<string, unknown>).armor
+    // До v8 у игры не было прохождения истории.
+    if (version < 8) delete state.story
     strip(state)
     return memoryStorage({ [SAVE_KEY]: JSON.stringify({ version, state }) })
   }
@@ -252,6 +258,19 @@ describe('хранилище игры', () => {
     const state = createGameStore(options(oldSave(6, () => {}))).getState()!
     expect(state.character.proficiencies.armor).toEqual(['light', 'medium', 'heavy', 'shield'])
     expect(state.messages.at(-1)?.text).toBe('Старый ход')
+  })
+
+  it('переносит сохранение версии 7: прохождение стартовой истории за героя игры', () => {
+    const state = createGameStore(options(oldSave(7, () => {}))).getState()!
+    expect(state.story).toMatchObject({ storyId: 'griffin-evening', title: 'Вечер в «Пьяном грифоне»', heroId: sheet.character.id })
+    expect(state.messages.at(-1)?.text).toBe('Старый ход')
+  })
+
+  it('отклоняет сохранение, где герой истории — не персонаж игры', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const state = { ...createNew(), story: { ...createNew().story, heroId: 'someone' } }
+    expect(createGameStore(options(memoryStorage({ [SAVE_KEY]: JSON.stringify({ version: SAVE_VERSION, state }) }))).getState()).toBeNull()
+    warn.mockRestore()
   })
 
   it('открытая дверь сохраняется в состоянии и переживает перезагрузку', () => {

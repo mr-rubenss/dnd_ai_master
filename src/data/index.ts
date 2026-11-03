@@ -12,7 +12,13 @@ import featsJson from './rules/feats.json'
 import packsJson from './rules/packs.json'
 import speciesJson from './rules/species.json'
 
+import { parseStory } from '../game/story'
+import { locations } from './locations'
+import storyJson from './story.json'
+
 export { locations, startingLocation } from './locations'
+/** Стартовая история (пока она одна). */
+export const startingStory = parseStory(storyJson, locations)
 
 export const itemCatalog = parseItemCatalog(itemsJson)
 export const rulesData = parseRulesData(
