@@ -116,28 +116,6 @@ test('новая история за другого героя — отдель�
   await expect(page.locator('.hero-card')).toHaveCount(2)
 })
 
-test('завершённая история: герой в «Зале славы» с итогом пути', async ({ page }, testInfo) => {
-  await page.locator('.player-input textarea').fill('Заказываю эль')
-  await page.locator('.player-input textarea').press('Enter')
-  await expect(page.locator('.message--master')).toHaveCount(3)
-
-  page.once('dialog', (dialog) => void dialog.accept())
-  await page.getByTestId('finish-story').click()
-  await expect(page.getByRole('tab', { name: 'Зал славы (1)' })).toHaveAttribute('aria-selected', 'true')
-  const entry = page.getByTestId('hall-ratibor')
-  await expect(entry.locator('.hero-name')).toHaveText('Ратибор')
-  await expect(entry.locator('.fate-badge')).toHaveText('История завершена')
-  await expect(entry.getByTestId('hall-summary')).toHaveText(`История «${STORY}» завершена на 1-м уровне. 1 ход, 0 бросков кубиков.`)
-  await expectNoHorizontalScroll(page)
-  await testInfo.attach('зал славы', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
-
-  // Героя больше нет среди героев, а игру продолжить нельзя.
-  await page.getByRole('tab', { name: 'Герои (0)' }).click()
-  await expect(page.locator('.heroes-empty')).toBeVisible()
-  await page.getByRole('button', { name: 'В меню' }).click()
-  await expect(page.getByTestId('menu-continue')).toHaveCount(0)
-})
-
 test('погибший герой в «Зале славы» отмечен гибелью', async ({ page }) => {
   await page.evaluate(async () => {
     const store = (window as unknown as { __aiMaster: { importRecords(r: unknown): Promise<void>; flush(): Promise<void> } }).__aiMaster

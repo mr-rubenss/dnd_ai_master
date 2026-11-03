@@ -85,6 +85,23 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
     if (ch.speciesOption !== null && typeof ch.speciesOption !== 'string') fail('character.speciesOption: строка или null')
     if (!Array.isArray(ch.feats) || !ch.feats.every((f) => typeof f === 'string')) fail('character.feats: массив id черт')
     if (typeof ch.appearance !== 'string') fail('character.appearance: строка')
+    if (ch.chronicle !== undefined) {
+      if (!Array.isArray(ch.chronicle)) fail('character.chronicle: массив записей «Летописи»')
+      else {
+        ch.chronicle.forEach((e: unknown, i) => {
+          const ok =
+            isObject(e) &&
+            ['storyId', 'storyTitle', 'summary', 'outcome'].every((k) => isNonEmptyString(e[k])) &&
+            isNumber(e.endedAt) &&
+            isInt(e.startLevel) &&
+            isInt(e.endLevel) &&
+            Array.isArray(e.finds) &&
+            e.finds.every((f) => typeof f === 'string') &&
+            (e.fate === 'survived' || e.fate === 'fallen')
+          if (!ok) fail(`character.chronicle[${i}]: ожидается { storyId, storyTitle, endedAt, summary, outcome, startLevel, endLevel, finds, fate }`)
+        })
+      }
+    }
 
     const prof = ch.proficiencies
     if (!isObject(prof)) {

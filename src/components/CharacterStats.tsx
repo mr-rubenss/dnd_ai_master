@@ -10,7 +10,7 @@ import { CONDITION_DEFINITIONS } from '../engine/conditions'
 import { SKILL_DEFINITIONS, SKILLS, type ProficiencyLevel } from '../engine/skills'
 import { itemCatalog, rulesData } from '../data'
 import { armorTrainingText } from './itemText'
-import type { Character } from '../types/character'
+import type { Character, ChronicleEntry } from '../types/character'
 
 const PROFICIENCY_TITLES: Record<ProficiencyLevel, string> = {
   none: 'Без владения',
@@ -102,6 +102,11 @@ export function CharacterStats({ character }: { character: Character }) {
         </dl>
       </section>
 
+      <section className="inventory-section" aria-label="Летопись">
+        <h3>Летопись</h3>
+        <Chronicle entries={character.chronicle ?? []} />
+      </section>
+
       <section className="inventory-section" aria-label="Состояния">
         <h3>Состояния</h3>
         {character.conditions.length === 0 ? (
@@ -124,5 +129,31 @@ export function CharacterStats({ character }: { character: Character }) {
         )}
       </section>
     </div>
+  )
+}
+
+const chronicleDate = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+/** «Летопись» героя — итоги пройденных историй по порядку. */
+export function Chronicle({ entries }: { entries: ChronicleEntry[] }) {
+  if (entries.length === 0) return <p className="chronicle-empty">Пока пусто: сюда попадут итоги завершённых историй.</p>
+  return (
+    <ol className="chronicle" data-testid="chronicle">
+      {entries.map((entry) => (
+        <li key={entry.storyId} className="chronicle-entry">
+          <p className="chronicle-head">
+            <strong>«{entry.storyTitle}»</strong>
+            <time dateTime={new Date(entry.endedAt).toISOString()}>{chronicleDate.format(entry.endedAt)}</time>
+          </p>
+          <p className="chronicle-summary">{entry.summary}</p>
+          <p className="chronicle-outcome">{entry.outcome}</p>
+          <p className="chronicle-meta">
+            Уровень {entry.startLevel} → {entry.endLevel}
+            {entry.fate === 'fallen' && ' · гибель'}
+            {entry.finds.length > 0 && <> · находки: {entry.finds.join(', ')}</>}
+          </p>
+        </li>
+      ))}
+    </ol>
   )
 }

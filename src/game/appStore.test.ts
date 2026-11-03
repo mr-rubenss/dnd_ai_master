@@ -9,6 +9,7 @@ import type { ChatMessage } from '../types/game'
 import { parseAdventure } from './adventure'
 import { createAppStore, type AppStore } from './appStore'
 import { parseCharacterSheet } from './character'
+import { draftEpilogue } from './epilogue'
 import { createHeroRecord } from './heroes'
 import { parseItemCatalog } from './items'
 import { LEGACY_BACKUP_KEY, LEGACY_HEROES_KEY, type LegacyContext } from './legacyImport'
@@ -193,16 +194,68 @@ describe('истории не смешиваются', () => {
     expect(store.getState().roster.heroes.find((h) => h.id === 'ingrid')!.storyId).toBe(south)
   })
 
-  it('завершение истории: герои в «Зале славы», история закрыта для действий, другая не тронута', async () => {
+  it('завершение: история только для чтения, герой свободен и получает запись «Летописи», другая история не тронута', async () => {
     const { store, north, south } = await twoStories()
     store.dispatch(say('ingrid', 'Последний ход'), player('ingrid'))
-    expect(await store.completeActive()).toBeNull()
+    store.dispatch({ type: 'itemsGranted', heroId: 'ingrid', items: [{ itemId: 'dagger', quantity: 1 }] }, MASTER)
+    expect(await store.completeStory(draftEpilogue(store.getState().active!, 5000))).toBeNull()
+
     const state = store.getState()
-    expect(state.roster.hallOfFame).toMatchObject([{ name: 'Ингрид', storyTitle: 'Юг', fate: 'completed' }])
-    expect(state.roster.heroes.map((h) => h.id)).toEqual(['ratibor'])
+    expect(state.active).toMatchObject({ id: south, status: 'completed', epilogue: { endedAt: 5000 } })
     expect(state.stories.find((x) => x.id === south)?.status).toBe('completed')
     expect(state.stories.find((x) => x.id === north)?.status).toBe('active')
-    expect(await store.dispatchTo(south, say('ingrid', 'Ещё'), player('ingrid'))).toBe('История завершена — в ней больше ничего не происходит.')
+    expect(state.roster.hallOfFame).toEqual([])
+    const ingridHero = state.roster.heroes.find((h) => h.id === 'ingrid')!
+    expect(ingridHero.storyId).toBeNull()
+    expect(ingridHero.sheet.character.chronicle).toMatchObject([
+      { storyId: south, storyTitle: 'Юг', startLevel: 1, endLevel: 1, finds: ['Кинжал'], fate: 'survived', endedAt: 5000 },
+    ])
+    expect(state.roster.heroes.find((h) => h.id === 'ratibor')!.storyId).toBe(north)
+    // Только для чтения.
+    expect(store.dispatch(say('ingrid', 'Ещё'), player('ingrid'))).toBe('История завершена — в ней больше ничего не происходит.')
+  })
+
+  it('погибший герой уходит в «Зал славы», выживший — свободен с «Летописью»', async () => {
+    const store = await open()
+    await store.saveHero(ratibor)
+    await store.saveHero(ingrid)
+    await store.createStory({ title: 'Склеп', tone: 'horror', adventureId: adventure.id, heroIds: ['ratibor', 'ingrid'] })
+    expect(store.dispatch({ type: 'heroDied', heroId: 'ingrid' }, ENGINE)).toBeNull()
+    await store.completeStory(draftEpilogue(store.getState().active!, 7000))
+    const { roster } = store.getState()
+    expect(roster.hallOfFame).toMatchObject([{ heroId: 'ingrid', fate: 'fallen', storyTitle: 'Склеп' }])
+    expect(roster.heroes.map((h) => [h.id, h.storyId, h.sheet.character.chronicle?.[0]?.fate])).toEqual([['ratibor', null, 'survived']])
+  })
+
+  it('«Летопись» переходит с героем в новую историю и пополняется по порядку', async () => {
+    const store = await open()
+    await store.saveHero(ratibor)
+    await store.createStory({ title: 'Первая', tone: 'horror', adventureId: adventure.id, heroIds: ['ratibor'] })
+    await store.completeStory(draftEpilogue(store.getState().active!, 1000))
+    await store.createStory({ title: 'Вторая', tone: 'detective', adventureId: adventure.id, heroIds: ['ratibor'] })
+    // В новой истории у героя — его летопись.
+    expect(leadMember(store.getState().active!).character.chronicle?.map((e) => e.storyTitle)).toEqual(['Первая'])
+    await store.completeStory(draftEpilogue(store.getState().active!, 2000))
+    await store.flush()
+    const reloaded = await open(store.dbName)
+    const hero = reloaded.getState().roster.heroes[0]
+    expect(hero.sheet.character.chronicle?.map((e) => e.storyTitle)).toEqual(['Первая', 'Вторая'])
+  })
+
+  it('правка итога — в журнале истории и в «Летописи» героя, переживает перезагрузку', async () => {
+    const store = await open()
+    await store.saveHero(ratibor)
+    await store.createStory({ title: 'Первая', tone: 'horror', adventureId: adventure.id, heroIds: ['ratibor'] })
+    const id = store.getState().active!.id
+    await store.completeStory(draftEpilogue(store.getState().active!, 1000))
+    expect(await store.editEpilogue(id, { summary: 'Ратибор нашёл погреб и вернул кошелёк.', outcome: 'Таверна спасена.' })).toBeNull()
+    expect(await store.editEpilogue(id, { summary: ' ', outcome: 'x' })).toBe('Краткое содержание не может быть пустым.')
+    await store.flush()
+
+    const reloaded = await open(store.dbName)
+    expect((await reloaded.readStory(id))?.epilogue).toMatchObject({ summary: 'Ратибор нашёл погреб и вернул кошелёк.', outcome: 'Таверна спасена.' })
+    expect(reloaded.getState().roster.heroes[0].sheet.character.chronicle).toMatchObject([{ summary: 'Ратибор нашёл погреб и вернул кошелёк.', outcome: 'Таверна спасена.' }])
+    expect((await reloaded.repo.actionsOf(id)).map((a) => a.type)).toEqual(['storyCreated', 'storyCompleted', 'epilogueEdited'])
   })
 
   it('действие в неоткрытую историю попадает только в её журнал', async () => {

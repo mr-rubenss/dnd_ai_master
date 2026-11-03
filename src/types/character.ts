@@ -31,6 +31,31 @@ export interface Character {
   feats: string[]
   /** Внешность — свободный текст игрока. */
   appearance: string
+  /**
+   * «Летопись» — раздел предыстории героя: итоги пройденных историй по порядку.
+   * Переходит вместе с героем в новые истории. Нет поля — записей ещё нет.
+   */
+  chronicle?: ChronicleEntry[]
+}
+
+/** Чем закончился для героя путь в истории. */
+export type ChronicleFate = 'survived' | 'fallen'
+
+/** Запись «Летописи»: итог одной завершённой истории для героя. */
+export interface ChronicleEntry {
+  storyId: string
+  storyTitle: string
+  /** Когда история завершена, мс с начала эпохи. */
+  endedAt: number
+  /** Краткое содержание истории (3–6 предложений). */
+  summary: string
+  /** Чем всё кончилось. */
+  outcome: string
+  startLevel: number
+  endLevel: number
+  /** Ключевые находки героя: «Кинжал ×2». */
+  finds: string[]
+  fate: ChronicleFate
 }
 
 export interface InventoryEntry {

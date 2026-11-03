@@ -109,11 +109,9 @@ function StoryCard({ story, onContinue, onRename, onDelete }: CardProps) {
         </form>
       ) : (
         <div className="item-actions hero-actions">
-          {!completed && (
-            <button type="button" className="item-action is-primary" onClick={onContinue}>
-              Продолжить
-            </button>
-          )}
+          <button type="button" className="item-action is-primary" onClick={onContinue}>
+            {completed ? 'Открыть' : 'Продолжить'}
+          </button>
           {!completed && (
             <button
               type="button"

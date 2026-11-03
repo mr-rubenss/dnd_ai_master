@@ -15,7 +15,8 @@ interface Props {
   inventory: Inventory
   catalog: ItemCatalog
   /** Сменить экипировку; возвращает причину отказа или null. */
-  onEquipChange: (change: EquipmentChange) => string | null
+  /** Смена экипировки; нет — только чтение (завершённая история). */
+  onEquipChange?: (change: EquipmentChange) => string | null
 }
 
 type Tab = 'stats' | 'equipment'
@@ -83,7 +84,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange }:
   }
 
   const change = (place: string, request: EquipmentChange) => {
-    const reason = onEquipChange(request)
+    const reason = onEquipChange?.(request) ?? null
     setEquipError(reason ? { place, message: reason } : null)
   }
 
@@ -210,7 +211,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange }:
                         </small>
                       )}
                     </span>
-                    {item && (
+                    {item && onEquipChange && (
                       <button
                         type="button"
                         className="slot-button"
@@ -253,7 +254,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange }:
                           setExpandedId((cur) => (cur === entry.itemId ? null : entry.itemId))
                           setEquipError(null)
                         }}
-                        onChange={(request) => change(entry.itemId, request)}
+                        onChange={onEquipChange ? (request) => change(entry.itemId, request) : undefined}
                       />
                     ))}
                   </ul>
@@ -275,7 +276,8 @@ interface ItemRowProps {
   expanded: boolean
   error: string | null
   onToggle: () => void
-  onChange: (change: EquipmentChange) => void
+  /** Смена экипировки; нет — только чтение. */
+  onChange?: (change: EquipmentChange) => void
 }
 
 function ItemRow({ item, quantity, slots, expanded, error, onToggle, onChange }: ItemRowProps) {
@@ -312,7 +314,7 @@ function ItemRow({ item, quantity, slots, expanded, error, onToggle, onChange }:
               </dd>
             </div>
           </dl>
-          {actions.length > 0 && (
+          {actions.length > 0 && onChange && (
             <div className="item-actions">
               {actions.map((action) =>
                 slots.includes(action.slot) ? (

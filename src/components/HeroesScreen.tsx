@@ -5,7 +5,7 @@ import { MAX_HERO_NAME_LENGTH } from '../game/heroes'
 import type { CharacterSheet } from '../types/character'
 import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
 import type { StoryMeta, StoryState } from '../types/story'
-import { CharacterStats } from './CharacterStats'
+import { CharacterStats, Chronicle } from './CharacterStats'
 
 type Tab = 'heroes' | 'hall'
 
@@ -138,6 +138,12 @@ function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, o
         <p className={`hero-story${storyTitle ? ' is-active' : ''}`} data-testid="hero-story">
           {storyTitle ? `В истории «${storyTitle}»` : 'Вне истории'}
         </p>
+        {(sheet.character.chronicle?.length ?? 0) > 0 && (
+          <details className="hero-chronicle" data-testid="hero-chronicle">
+            <summary>Летопись: {chronicleCount(sheet.character.chronicle!.length)}</summary>
+            <Chronicle entries={sheet.character.chronicle!} />
+          </details>
+        )}
       </div>
 
       {renaming ? (
@@ -203,6 +209,14 @@ function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, o
       )}
     </li>
   )
+}
+
+/** «1 история», «2 истории», «5 историй». */
+function chronicleCount(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  const word = mod10 === 1 && mod100 !== 11 ? 'история' : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'истории' : 'историй'
+  return `${n} ${word}`
 }
 
 const FATE_LABELS = { fallen: 'Гибель', completed: 'История завершена' } as const

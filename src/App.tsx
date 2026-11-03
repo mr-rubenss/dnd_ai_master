@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CharacterCreation } from './components/creation/CharacterCreation'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { DiceTray } from './components/DiceTray'
+import { EpilogueDialog } from './components/EpilogueDialog'
 import { HeroesScreen } from './components/HeroesScreen'
 import { InventoryPanel } from './components/InventoryPanel'
 import { MapPanel } from './components/MapPanel'
@@ -12,6 +13,7 @@ import { StartMenu } from './components/StartMenu'
 import { StoriesScreen } from './components/StoriesScreen'
 import { adventures, defaultAdventure, itemCatalog, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
+import { draftEpilogue } from './game/epilogue'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryState } from './types/story'
@@ -30,7 +32,10 @@ function App() {
   const [storyHeroId, setStoryHeroId] = useState<string | null>(null)
   /** Куда вернуться после создания героя. */
   const [afterCreation, setAfterCreation] = useState<'heroes' | 'new-story'>('heroes')
+  /** Окно итога завершённой истории. */
+  const [epilogueOpen, setEpilogueOpen] = useState(false)
   const current: Screen = screen === 'game' && !app.active ? 'menu' : screen
+  const readOnly = app.active?.status === 'completed'
   const latest = app.stories.find((s) => s.status === 'active') ?? null
 
   useEffect(() => {
@@ -44,6 +49,7 @@ function App() {
   }
 
   const openStory = async (storyId: string) => {
+    setEpilogueOpen(false)
     if (ok(await appStore.openStory(storyId))) setScreen('game')
   }
 
@@ -65,11 +71,11 @@ function App() {
   const finishStory = async () => {
     const active = app.active
     if (!active) return
-    const names = active.party.map((m) => m.character.name).join(', ')
     const confirmed = window.confirm(
-      `Завершить историю «${active.title}»? Герои (${names}) отправятся в «Зал славы» с итогом пути. Продолжить эту историю будет нельзя.`,
+      `Завершить историю «${active.title}»? Дальше она будет доступна только для чтения, а герои освободятся для новых историй ` +
+        '(погибшие уйдут в «Зал славы»). Итог истории попадёт в «Летопись» героев.',
     )
-    if (confirmed && ok(await appStore.completeActive('completed'))) openHeroes('hall')
+    if (confirmed && ok(await appStore.completeStory(draftEpilogue(active, Date.now())))) setEpilogueOpen(true)
   }
 
   if (!app.ready) {
@@ -91,12 +97,19 @@ function App() {
         <h1>ИИ-Мастер</h1>
         {current !== 'menu' && (
           <div className="header-actions">
-            {current === 'game' && (
+            {current === 'game' && !readOnly && (
               <button type="button" className="header-button" onClick={finishStory} data-testid="finish-story">
                 Завершить историю
               </button>
             )}
-            <button type="button" className="header-button" onClick={() => setScreen('menu')}>
+            <button
+              type="button"
+              className="header-button"
+              onClick={() => {
+                setEpilogueOpen(false)
+                setScreen('menu')
+              }}
+            >
               В меню
             </button>
           </div>
@@ -167,13 +180,23 @@ function App() {
         />
       )}
       {/* key: другая история монтирует экран заново, сбрасывая локальное состояние (ожидание ответа, анимации). */}
-      {current === 'game' && app.active && <GameScreen key={app.active.id} story={app.active} />}
+      {current === 'game' && app.active && <GameScreen key={app.active.id} story={app.active} onShowEpilogue={() => setEpilogueOpen(true)} />}
+      {current === 'game' && app.active?.epilogue && epilogueOpen && (
+        <EpilogueDialog
+          story={app.active}
+          catalog={itemCatalog}
+          onSave={(text) => appStore.editEpilogue(app.active!.id, text)}
+          onClose={() => setEpilogueOpen(false)}
+        />
+      )}
     </div>
   )
 }
 
-function GameScreen({ story }: { story: StoryState }) {
+function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilogue: () => void }) {
   const lead = leadMember(story)
+  /** Завершённая история — только для чтения. */
+  const readOnly = story.status === 'completed'
   const location = currentLocation(story)
   const [waiting, setWaiting] = useState(false)
   const timerRef = useRef<number | undefined>(undefined)
@@ -218,10 +241,24 @@ function GameScreen({ story }: { story: StoryState }) {
           <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} />
           <section className="panel story-panel">
             <NarrationLog messages={story.messages} />
-            <PlayerInput onSend={handleSend} disabled={waiting} leading={<DiceTray rolls={story.rolls} onRoll={handleRoll} />} />
+            {readOnly ? (
+              <div className="story-ended" data-testid="story-read-only">
+                <p>История завершена — только чтение.</p>
+                <button type="button" className="item-action is-primary" onClick={onShowEpilogue}>
+                  Итог истории
+                </button>
+              </div>
+            ) : (
+              <PlayerInput onSend={handleSend} disabled={waiting} leading={<DiceTray rolls={story.rolls} onRoll={handleRoll} />} />
+            )}
           </section>
         </main>
-        <InventoryPanel character={lead.character} inventory={lead.inventory} catalog={itemCatalog} onEquipChange={handleEquipChange} />
+        <InventoryPanel
+          character={lead.character}
+          inventory={lead.inventory}
+          catalog={itemCatalog}
+          onEquipChange={readOnly ? undefined : handleEquipChange}
+        />
       </div>
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}
     </>

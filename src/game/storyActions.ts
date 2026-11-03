@@ -32,6 +32,7 @@ export const TONE_LABELS: Record<StoryTone, string> = {
 }
 
 export const MAX_STORY_TITLE_LENGTH = 60
+export const MAX_EPILOGUE_LENGTH = 1500
 /** Сколько последних бросков хранить в состоянии (журнал действий хранит все). */
 export const MAX_ROLL_LOG = 100
 
@@ -78,6 +79,7 @@ export function newStorySeed({ id, title, tone, adventure, locations, party, now
       character: sheet.character,
       inventory: sheet.inventory,
       position: start.playerStart,
+      startLevel: sheet.character.level,
     })),
     world: {
       locations: worldLocations,
@@ -128,7 +130,11 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     case 'storyRenamed':
       return { ...state, title: action.title }
     case 'storyCompleted':
-      return { ...state, status: 'completed' }
+      return { ...state, status: 'completed', ...(action.epilogue ? { epilogue: action.epilogue } : {}) }
+    case 'epilogueEdited':
+      return { ...state, epilogue: action.epilogue }
+    case 'heroDied':
+      return updateMember(state, action.heroId, (m) => ({ ...m, fallen: true, character: { ...m.character, hp: 0 } }))
     case 'playerSpoke': {
       const message: ChatMessage = { id: action.messageId, author: 'player', text: action.text, heroId: action.heroId }
       return { ...state, messages: [...state.messages, message] }
@@ -143,8 +149,9 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, name: action.name } }))
     case 'conditionsChanged':
       return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, conditions: action.conditions } }))
-    case 'itemsGranted':
-      return updateMember(state, action.heroId, (m) => {
+    case 'itemsGranted': {
+      const finds = [...(state.finds ?? []), ...action.items.map((e) => ({ heroId: action.heroId, itemId: e.itemId, quantity: e.quantity, at: action.at }))]
+      return updateMember({ ...state, finds }, action.heroId, (m) => {
         const items = [...m.inventory.items]
         for (const { itemId, quantity } of action.items) {
           const index = items.findIndex((e) => e.itemId === itemId)
@@ -153,6 +160,7 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         }
         return { ...m, inventory: { ...m.inventory, items } }
       })
+    }
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]
       const npcs = location.npcs.map((n) => (n.id === action.npcId ? { ...n, x: action.to.x, y: action.to.y } : n))
@@ -200,6 +208,10 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
   }
   if (!state) return 'История ещё не создана.'
   if (action.storyId !== state.id) return 'Действие относится к другой истории.'
+  if (action.type === 'epilogueEdited') {
+    if (state.status !== 'completed') return 'Итог есть только у завершённой истории.'
+    return epilogueProblem(action.epilogue)
+  }
   if (state.status === 'completed') return 'История завершена — в ней больше ничего не происходит.'
 
   const member = (heroId: string) => state.party.find((m) => m.heroId === heroId)
@@ -210,7 +222,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
     case 'storyRenamed':
       return storyTitleProblem(action.title)
     case 'storyCompleted':
-      return null
+      return action.epilogue ? epilogueProblem(action.epilogue) : null
+    case 'heroDied':
+      return needMember(action.heroId) ?? (action.author.kind === 'engine' ? null : 'Гибель героя определяет движок по правилам.')
     case 'playerSpoke':
       if (action.author.kind !== 'player' || action.author.heroId !== action.heroId) return 'Говорить за героя может только его игрок.'
       return isNonEmptyString(action.text) ? null : 'Пустая реплика.'
@@ -255,6 +269,15 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
     case 'journalWritten':
       return isNonEmptyString(action.entry.text) ? null : 'Пустая запись журнала.'
   }
+}
+
+/** Проверка итога истории. */
+export function epilogueProblem(epilogue: { summary: string; outcome: string }): string | null {
+  if (!isNonEmptyString(epilogue.summary)) return 'Краткое содержание не может быть пустым.'
+  if (epilogue.summary.length > MAX_EPILOGUE_LENGTH) return `Краткое содержание — не длиннее ${MAX_EPILOGUE_LENGTH} символов.`
+  if (!isNonEmptyString(epilogue.outcome)) return 'Напишите, чем всё кончилось.'
+  if (epilogue.outcome.length > MAX_EPILOGUE_LENGTH) return `«Чем всё кончилось» — не длиннее ${MAX_EPILOGUE_LENGTH} символов.`
+  return null
 }
 
 // ---------- Выборки ----------

@@ -3,11 +3,12 @@
 // к состоянию и дописывается в журнал истории в IndexedDB. Записи в базу идут строго по очереди.
 
 import type { CharacterSheet } from '../types/character'
-import type { HallOfFameEntry, HeroFate, HeroRecord, HeroRoster } from '../types/heroes'
+import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
 import type { ItemCatalog } from '../types/items'
 import type { LocationData } from '../types/location'
-import type { ActionAuthor, StoryEvent, StoryMeta, StoryState, StoryTone } from '../types/story'
+import type { ActionAuthor, StoryEpilogue, StoryEvent, StoryMeta, StoryState, StoryTone } from '../types/story'
 import type { AdventureData } from './adventure'
+import { chronicleEntry, withChronicle } from './epilogue'
 import {
   addHero,
   createHeroRecord,
@@ -236,18 +237,40 @@ export function createAppStore(options: AppStoreOptions) {
       return null
     },
 
-    /** Завершить открытую историю: все герои отряда уходят в «Зал славы». */
-    async completeActive(fate: HeroFate = 'completed'): Promise<CommandResult> {
-      const active = state.active
-      if (!active) return 'Нет открытой истории.'
-      const reason = store.dispatch({ type: 'storyCompleted' }, SYSTEM)
+    /**
+     * Завершить открытую историю с итогом. Она становится доступной только для чтения; живые герои
+     * освобождаются и получают запись в «Летопись», погибшие уходят в «Зал славы».
+     */
+    async completeStory(epilogue: StoryEpilogue): Promise<CommandResult> {
+      if (!state.active) return 'Нет открытой истории.'
+      const reason = store.dispatch({ type: 'storyCompleted', epilogue }, SYSTEM)
       if (reason) return reason
+      const done = state.active!
       let roster = state.roster
-      for (const member of active.party) {
-        const retired = retireHero(roster, active, member.heroId, fate, now())
-        if (retired.ok) roster = retired.roster
+      for (const member of done.party) {
+        const result = member.fallen
+          ? retireHero(roster, done, member.heroId, 'fallen', epilogue.endedAt)
+          : leaveStory(roster, member.heroId, withChronicle(memberSheet(member), chronicleEntry(done, member, epilogue, catalog)))
+        if (result.ok) roster = result.roster
       }
-      set({ roster, active: null })
+      set({ roster })
+      await saveRoster()
+      return null
+    },
+
+    /** Поправить итог завершённой истории — и запись «Летописи» её героев. */
+    async editEpilogue(storyId: string, text: { summary: string; outcome: string }): Promise<CommandResult> {
+      const story = await store.readStory(storyId)
+      if (!story?.epilogue) return 'У этой истории нет итога.'
+      const epilogue = { ...story.epilogue, summary: text.summary.trim(), outcome: text.outcome.trim() }
+      const reason = await store.dispatchTo(storyId, { type: 'epilogueEdited', epilogue }, SYSTEM)
+      if (reason) return reason
+      const heroes = state.roster.heroes.map((hero) => {
+        const member = story.party.find((m) => m.heroId === hero.id)
+        if (!member || !hero.sheet.character.chronicle?.some((e) => e.storyId === storyId)) return hero
+        return { ...hero, sheet: withChronicle(hero.sheet, chronicleEntry(story, member, epilogue, catalog)) }
+      })
+      set({ roster: { ...state.roster, heroes } })
       await saveRoster()
       return null
     },

@@ -175,6 +175,18 @@ describe('parseCharacterSheet', () => {
     expect(problemsOf(raw)).toEqual(['character.proficiencies.armor: виды доспехов не должны повторяться'])
   })
 
+  it('«Летопись» необязательна; записи проверяются', () => {
+    const raw = base()
+    raw.character.chronicle = [
+      { storyId: 's', storyTitle: 'Т', endedAt: 1, summary: 'Итог.', outcome: 'Конец.', startLevel: 1, endLevel: 2, finds: ['Кинжал'], fate: 'survived' },
+    ]
+    expect(problemsOf(raw)).toEqual([])
+    raw.character.chronicle = [{ storyId: 's', fate: 'lost' }]
+    expect(problemsOf(raw)).toEqual([
+      'character.chronicle[0]: ожидается { storyId, storyTitle, endedAt, summary, outcome, startLevel, endLevel, finds, fate }',
+    ])
+  })
+
   it('проверяет состояния: известные, без повторов, уровень только у Истощения (1–6)', () => {
     const raw = base()
     raw.character.conditions = [

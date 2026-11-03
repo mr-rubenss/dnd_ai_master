@@ -18,6 +18,28 @@ export interface PartyMember {
   character: Character
   inventory: Inventory
   position: CellPosition
+  /** Уровень героя в начале истории (нет — история создана до появления поля). */
+  startLevel?: number
+  /** Герой погиб в этой истории. */
+  fallen?: boolean
+}
+
+/** Находка: что и кому досталось в истории. */
+export interface StoryFind {
+  heroId: string
+  itemId: string
+  quantity: number
+  at: number
+}
+
+/** Итог завершённой истории (черновик собирает код, игрок может его поправить). */
+export interface StoryEpilogue {
+  /** Краткое содержание, 3–6 предложений. */
+  summary: string
+  /** Чем всё кончилось. */
+  outcome: string
+  /** Когда история завершена. */
+  endedAt: number
 }
 
 /** Факт о мире, который установлен в этой истории. */
@@ -73,6 +95,10 @@ export interface StoryState {
   messages: ChatMessage[]
   /** Журнал бросков, новые в конце. */
   rolls: RollRecord[]
+  /** Находки героев (предметы, полученные в истории). Нет поля — находок ещё не было. */
+  finds?: StoryFind[]
+  /** Итог — у завершённой истории. */
+  epilogue?: StoryEpilogue
 }
 
 /** Кто совершил действие. */
@@ -87,7 +113,12 @@ export type StoryEvent =
   /** История создана: начальное состояние целиком. */
   | { type: 'storyCreated'; seed: StoryState }
   | { type: 'storyRenamed'; title: string }
-  | { type: 'storyCompleted' }
+  /** История завершена с итогом; дальше она только для чтения. */
+  | { type: 'storyCompleted'; epilogue?: StoryEpilogue }
+  /** Игрок поправил итог завершённой истории (единственное, что можно сделать после завершения). */
+  | { type: 'epilogueEdited'; epilogue: StoryEpilogue }
+  /** Герой погиб. */
+  | { type: 'heroDied'; heroId: string }
   | { type: 'playerSpoke'; heroId: string; messageId: string; text: string }
   | { type: 'masterNarrated'; messageId: string; text: string }
   | { type: 'diceRolled'; roll: RollRecord }
