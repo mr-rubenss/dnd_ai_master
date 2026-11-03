@@ -1,0 +1,13 @@
+{
+  "id": "ruined-chapel",
+  "name": "Разрушенная часовня",
+  "description": "Заросшие плющом руины на краю Сумрачного леса.",
+  "player": { "x": 50, "y": 82 },
+  "points": [
+    { "id": "gate", "name": "Обвалившиеся ворота", "x": 50, "y": 92, "kind": "entrance" },
+    { "id": "altar", "name": "Расколотый алтарь", "x": 50, "y": 22, "kind": "feature" },
+    { "id": "hermit", "name": "Отшельник Борислав", "x": 24, "y": 48, "kind": "npc" },
+    { "id": "well", "name": "Старый колодец", "x": 76, "y": 58, "kind": "feature" },
+    { "id": "crypt", "name": "Спуск в склеп", "x": 82, "y": 18, "kind": "exit" }
+  ]
+}
