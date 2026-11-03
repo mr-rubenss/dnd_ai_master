@@ -38,11 +38,15 @@ export interface InventoryEntry {
   quantity: number
 }
 
-/** Надетая экипировка: id предметов из инвентаря или null, если слот пуст. */
+/**
+ * Экипировка: id предметов из инвентаря или null, если слот пуст.
+ * Основная рука — оружие; вторая рука — щит или второе лёгкое оружие (пусто при двуручном хвате).
+ * Правила смены — src/game/equipment.ts.
+ */
 export interface Equipment {
-  weapon: string | null
+  mainHand: string | null
+  offHand: string | null
   armor: string | null
-  shield: string | null
 }
 
 export interface Inventory {

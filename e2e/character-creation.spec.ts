@@ -34,6 +34,10 @@ test('шаги вперёд закрыты, пока текущий не зав�
 
   await option(page, 'Класс', 'fighter').click()
   await expect(page.locator('.creation-details')).toContainText('к10')
+  // Воину нужен боевой стиль.
+  await expect(next(page)).toBeDisabled()
+  await expect(page.locator('.creation-problems')).toHaveText('Выберите боевой стиль')
+  await option(page, 'Боевой стиль', 'defense').click()
   await expect(next(page)).toBeEnabled()
 })
 
@@ -131,8 +135,10 @@ test('полный путь: плут-эльф с предысторией пр�
 
 test('человек с чертой «Одарённый» выбирает ещё три навыка; можно вернуться назад', async ({ page }) => {
   await option(page, 'Класс', 'fighter').click()
+  await option(page, 'Боевой стиль', 'great-weapon-fighting').click()
   await next(page).click()
   await option(page, 'Предыстория', 'soldier').click()
+  await page.getByLabel('Ваш инструмент').selectOption('playing-cards')
   await page.getByRole('radio', { name: '+1 к трём' }).click()
   await next(page).click()
   await option(page, 'Вид', 'human').click()
@@ -155,4 +161,62 @@ test('человек с чертой «Одарённый» выбирает е�
   await expect(option(page, 'Класс', 'fighter')).toHaveAttribute('aria-checked', 'true')
   await page.locator('.creation-steps button', { hasText: 'Навыки' }).click()
   await expect(page.locator('[data-slot="featSkills"] .slot-count')).toHaveText('3 из 3')
+})
+
+test('своя предыстория по шаблону 2024: сборка, бюджет 50 зм и итоговый лист', async ({ page }, testInfo) => {
+  const errors = collectPageErrors(page)
+  await option(page, 'Класс', 'wizard').click()
+  await next(page).click()
+
+  await option(page, 'Предыстория', 'custom').click()
+  await expect(next(page)).toBeDisabled()
+  await expect(page.locator('.creation-problems')).toHaveText('Введите название предыстории')
+  await page.getByLabel('Название').fill('Корабельный юнга')
+  for (const a of ['str', 'dex', 'wis']) await page.locator(`[data-slot="custom-abilities"] [data-value="${a}"]`).click()
+  await expect(page.locator('[data-slot="custom-abilities"] [data-value="int"]')).toBeDisabled()
+  for (const s of ['athletics', 'perception']) await page.locator(`[data-slot="custom-skills"] [data-value="${s}"]`).click()
+  await page.getByLabel('Инструмент', { exact: true }).selectOption('navigators-tools')
+  // Черты боевого стиля в списке нет — только происхождения.
+  const feats = page.getByRole('radiogroup', { name: 'Черта своей предыстории' })
+  await expect(feats.getByRole('radio')).toHaveCount(4)
+  await feats.locator('[data-option="alert"]').click()
+
+  // Покупки: 2 верёвки (2 зм) и кинжал (2 зм) — осталось 46 зм.
+  await page.getByLabel('Поиск предмета').fill('верёвка')
+  await page.getByRole('button', { name: 'Больше: Верёвка (50 футов)' }).click()
+  await page.getByRole('button', { name: 'Больше: Верёвка (50 футов)' }).click()
+  await page.getByLabel('Поиск предмета').fill('кинжал')
+  await page.getByRole('button', { name: 'Больше: Кинжал' }).click()
+  await expect(page.getByTestId('budget-left')).toHaveText('осталось 46 зм')
+  // Кольчуга (75 зм) не по карману.
+  await page.getByLabel('Поиск предмета').fill('кольчуга')
+  await expect(page.getByRole('button', { name: 'Больше: Кольчуга', exact: true })).toBeDisabled()
+
+  await page.getByRole('radiogroup', { name: 'Прибавка +2' }).locator('[data-value="dex"]').click()
+  await page.getByRole('radiogroup', { name: 'Прибавка +1' }).locator('[data-value="wis"]').click()
+  await expectNoHorizontalScroll(page)
+  await testInfo.attach('своя предыстория', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+  await next(page).click()
+
+  await option(page, 'Вид', 'orc').click()
+  await next(page).click()
+  await page.getByRole('button', { name: /Расставить под класс/ }).click()
+  await next(page).click()
+  await expect(page.locator('.hint').first()).toContainText('Атлетика, Внимательность')
+  await chip(page, 'classSkills', 'arcana').click()
+  await chip(page, 'classSkills', 'history').click()
+  await next(page).click()
+  await option(page, 'Снаряжение класса', 'class-A').click()
+  await option(page, 'Снаряжение предыстории', 'background-A').click()
+  await next(page).click()
+  await page.getByLabel('Имя', { exact: true }).fill('Сёма')
+  await next(page).click()
+
+  await expect(page.locator('.summary-head p')).toHaveText('Орк · Волшебник 1 ур. · Корабельный юнга')
+  await expect(page.getByTestId('summary-tools')).toHaveText('Инструменты навигатора')
+  await expect(page.locator('.summary-sheet')).toContainText('Бдительный')
+  await expect(page.locator('.summary-sheet')).toContainText('51 зм') // 5 зм волшебника + 46 зм сдачи
+  await expect(page.getByTestId('summary-items')).toContainText('Верёвка (50 футов) ×2')
+  await expectNoHorizontalScroll(page)
+  expect(errors).toEqual([])
 })

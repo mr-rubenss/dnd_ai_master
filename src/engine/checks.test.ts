@@ -33,6 +33,7 @@ function ratibor(conditions: ActiveCondition[] = []): CheckSubject {
     proficiencies: {
       savingThrows: ['str', 'con'],
       skills: { athletics: 'proficient', intimidation: 'proficient', perception: 'proficient', survival: 'proficient' },
+      tools: [],
     },
     conditions,
   }
@@ -45,6 +46,7 @@ const rogue: CheckSubject = {
   proficiencies: {
     savingThrows: ['dex', 'int'],
     skills: { stealth: 'expertise', 'sleight-of-hand': 'expertise', perception: 'proficient' },
+    tools: ['thieves-tools'],
   },
   conditions: [],
 }

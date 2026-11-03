@@ -12,7 +12,7 @@ export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
   const cls = rulesData.classes[character.classId]
   const species = rulesData.species[character.speciesId]
   const option = species.choice?.options.find((o) => o.id === character.speciesOption)
-  const ac = armorClass(character.abilities, inventory, itemCatalog, character.classId)
+  const ac = armorClass(character, inventory, itemCatalog)
   const proficientSkills = Object.entries(character.proficiencies.skills)
   const equipped = new Set(Object.values(inventory.equipped).filter(Boolean))
 
@@ -79,6 +79,10 @@ export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
                 return `${SKILL_DEFINITIONS[id].name}${level === 'expertise' ? ' (компетентность)' : ''} ${formatModifier(skillModifier(character, id))}`
               })
               .join(', ')}
+          </p>
+          <h4>Инструменты</h4>
+          <p data-testid="summary-tools">
+            {character.proficiencies.tools.length === 0 ? 'нет' : character.proficiencies.tools.map((id) => itemCatalog[id].name).join(', ')}
           </p>
           <h4>Черты</h4>
           <ul className="feature-list">

@@ -59,7 +59,8 @@
         "items": [],
         "gold": 75
       }
-    ]
+    ],
+    "martialWeapons": "all"
   },
   {
     "id": "bard",
@@ -100,7 +101,7 @@
             "quantity": 2
           },
           {
-            "itemId": "lute"
+            "chosenTool": "class"
           },
           {
             "packId": "entertainers-pack"
@@ -113,7 +114,16 @@
         "items": [],
         "gold": 90
       }
-    ]
+    ],
+    "martialWeapons": "none",
+    "tools": {
+      "choose": {
+        "count": 3,
+        "kinds": [
+          "musical"
+        ]
+      }
+    }
   },
   {
     "id": "cleric",
@@ -175,7 +185,8 @@
         "items": [],
         "gold": 110
       }
-    ]
+    ],
+    "martialWeapons": "none"
   },
   {
     "id": "druid",
@@ -247,7 +258,13 @@
         "items": [],
         "gold": 50
       }
-    ]
+    ],
+    "martialWeapons": "none",
+    "tools": {
+      "fixed": [
+        "herbalism-kit"
+      ]
+    }
   },
   {
     "id": "fighter",
@@ -347,7 +364,9 @@
         "items": [],
         "gold": 155
       }
-    ]
+    ],
+    "martialWeapons": "all",
+    "fightingStyle": true
   },
   {
     "id": "monk",
@@ -396,7 +415,7 @@
             "quantity": 5
           },
           {
-            "itemId": "woodcarvers-tools"
+            "chosenTool": "class"
           },
           {
             "packId": "explorers-pack"
@@ -409,7 +428,17 @@
         "items": [],
         "gold": 50
       }
-    ]
+    ],
+    "martialWeapons": "light",
+    "tools": {
+      "choose": {
+        "count": 1,
+        "kinds": [
+          "artisan",
+          "musical"
+        ]
+      }
+    }
   },
   {
     "id": "paladin",
@@ -481,7 +510,8 @@
         "items": [],
         "gold": 150
       }
-    ]
+    ],
+    "martialWeapons": "all"
   },
   {
     "id": "ranger",
@@ -561,7 +591,8 @@
         "items": [],
         "gold": 150
       }
-    ]
+    ],
+    "martialWeapons": "all"
   },
   {
     "id": "rogue",
@@ -648,7 +679,13 @@
         "items": [],
         "gold": 100
       }
-    ]
+    ],
+    "martialWeapons": "finesse-or-light",
+    "tools": {
+      "fixed": [
+        "thieves-tools"
+      ]
+    }
   },
   {
     "id": "sorcerer",
@@ -709,7 +746,8 @@
         "items": [],
         "gold": 50
       }
-    ]
+    ],
+    "martialWeapons": "none"
   },
   {
     "id": "warlock",
@@ -777,7 +815,8 @@
         "items": [],
         "gold": 100
       }
-    ]
+    ],
+    "martialWeapons": "none"
   },
   {
     "id": "wizard",
@@ -846,6 +885,7 @@
         "items": [],
         "gold": 55
       }
-    ]
+    ],
+    "martialWeapons": "none"
   }
 ]

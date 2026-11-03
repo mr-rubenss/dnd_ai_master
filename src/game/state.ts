@@ -3,10 +3,12 @@
 
 import type { CharacterSheet } from '../types/character'
 import type { RollResult } from '../engine/dice'
+import type { Equipment } from '../types/character'
 import type { ChatMessage, GameState, MessageAuthor, RollRecord } from '../types/game'
 import type { ItemCatalog } from '../types/items'
 import type { LocationData } from '../types/location'
 import { parseCharacterSheet } from './character'
+import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { tileAt } from './location'
 import { isNonEmptyString, isObject, isOneOf, ValidationError } from './validation'
 
@@ -35,6 +37,8 @@ export const MAX_ROLL_LOG = 100
 export type GameAction =
   | { type: 'messageAdded'; message: ChatMessage }
   | { type: 'diceRolled'; roll: RollRecord }
+  /** Смена экипировки: новое состояние слотов и что именно изменилось (для ведущего и журнала). */
+  | { type: 'equipmentChanged'; equipped: Equipment; change: EquipmentChange }
   | { type: 'gameReset'; state: GameState }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -43,6 +47,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, messages: [...state.messages, action.message] }
     case 'diceRolled':
       return { ...state, rolls: [...state.rolls, action.roll].slice(-MAX_ROLL_LOG) }
+    case 'equipmentChanged':
+      return { ...state, inventory: { ...state.inventory, equipped: action.equipped } }
     case 'gameReset':
       return action.state
   }
@@ -56,6 +62,25 @@ export function messageAdded(author: MessageAuthor, text: string): GameAction {
 /** Создаёт действие «записать бросок в журнал». Сам бросок делает движок (src/engine/dice.ts). */
 export function diceRolled(result: RollResult, label?: string): Extract<GameAction, { type: 'diceRolled' }> {
   return { type: 'diceRolled', roll: { id: crypto.randomUUID(), label, timestamp: Date.now(), result } }
+}
+
+export type EquipmentChange = { kind: 'equip'; itemId: string; slot: EquipmentSlot } | { kind: 'unequip'; slot: EquipmentSlot }
+
+/**
+ * Проверяет смену экипировки по правилам и возвращает действие для хранилища
+ * или причину, по которой сменить нельзя. Состояние меняет только редьюсер.
+ */
+export function changeEquipment(
+  state: GameState,
+  catalog: ItemCatalog,
+  change: EquipmentChange,
+): { ok: true; action: GameAction } | { ok: false; reason: string } {
+  if (change.kind === 'unequip') {
+    return { ok: true, action: { type: 'equipmentChanged', equipped: unequipSlot(state.inventory.equipped, change.slot), change } }
+  }
+  const result = equipItem(state.inventory, catalog, change.itemId, change.slot)
+  if (!result.ok) return result
+  return { ok: true, action: { type: 'equipmentChanged', equipped: result.equipped, change } }
 }
 
 export interface GameStateContext {

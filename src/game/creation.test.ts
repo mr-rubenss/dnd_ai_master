@@ -24,10 +24,13 @@ import {
   skillSlots,
   startingInventory,
   stepProblems,
+  toolProficiencies,
+  updateCustomBackground,
   type CreationDraft,
 } from './creation'
 import { parseItemCatalog } from './items'
 import { parseRulesData } from './rulesData'
+import { CUSTOM_BACKGROUND_ID } from './backgroundTemplate'
 
 const catalog = parseItemCatalog(itemsJson)
 const data = parseRulesData(
@@ -45,9 +48,9 @@ function assignInOrder(draft: CreationDraft): CreationDraft {
 
 /** Воин-человек-солдат, как Ратибор. */
 function fighterDraft(): CreationDraft {
-  let d = chooseClass(emptyDraft(), 'fighter')
+  let d: CreationDraft = { ...chooseClass(emptyDraft(), 'fighter'), fightingStyle: 'great-weapon-fighting' }
   d = chooseBackground(d, 'soldier', data)
-  d = { ...d, bonusPlus2: 'str', bonusPlus1: 'con' }
+  d = { ...d, bonusPlus2: 'str', bonusPlus1: 'con', backgroundTool: 'dice-set' }
   d = chooseSpecies(d, 'human')
   d = { ...d, originFeat: 'alert' }
   d = assignInOrder(d)
@@ -57,11 +60,13 @@ function fighterDraft(): CreationDraft {
 }
 
 describe('данные правил SRD 5.2', () => {
-  it('12 классов, 4 предыстории, 9 видов, 4 черты происхождения', () => {
+  it('12 классов, 4 предыстории, 9 видов, 4 черты происхождения и 4 боевых стиля', () => {
     expect(Object.keys(data.classes)).toHaveLength(12)
     expect(Object.keys(data.backgrounds).sort()).toEqual(['acolyte', 'criminal', 'sage', 'soldier'])
     expect(Object.keys(data.species)).toHaveLength(9)
-    expect(Object.keys(data.feats).sort()).toEqual(['alert', 'magic-initiate', 'savage-attacker', 'skilled'])
+    const ids = (category: string) => Object.values(data.feats).filter((f) => f.category === category).map((f) => f.id).sort()
+    expect(ids('origin')).toEqual(['alert', 'magic-initiate', 'savage-attacker', 'skilled'])
+    expect(ids('fighting-style')).toEqual(['archery', 'defense', 'great-weapon-fighting', 'two-weapon-fighting'])
   })
 
   it('кость хитов и спасброски классов', () => {
@@ -90,7 +95,7 @@ describe('шаги создания', () => {
   })
 
   it('прибавки предыстории: +2/+1 к разным характеристикам из её списка', () => {
-    const d = chooseBackground(emptyDraft(), 'soldier', data)
+    const d = { ...chooseBackground(emptyDraft(), 'soldier', data), backgroundTool: 'dice-set' }
     expect(stepProblems('background', d, data)).toEqual(['Распределите прибавки +2 и +1'])
     expect(stepProblems('background', { ...d, bonusPlus2: 'str', bonusPlus1: 'str' }, data)).toEqual([
       'Прибавки +2 и +1 должны быть к разным характеристикам',
@@ -207,21 +212,21 @@ describe('снаряжение', () => {
     expect(inventory.gold).toBe(18)
     const qty = Object.fromEntries(inventory.items.map((i) => [i.itemId, i.quantity]))
     expect(qty).toMatchObject({ 'chain-mail': 1, greatsword: 1, javelin: 8, rations: 10, torch: 10, arrow: 20, 'travelers-clothes': 1 })
-    expect(inventory.equipped).toEqual({ weapon: 'greatsword', armor: 'chain-mail', shield: null })
+    expect(inventory.equipped).toEqual({ mainHand: 'greatsword', offHand: null, armor: 'chain-mail' })
   })
 
   it('только золото: варианты B', () => {
     const inventory = startingInventory({ ...fighterDraft(), classEquipment: 'C', backgroundEquipment: 'B' }, data, catalog)
-    expect(inventory).toEqual({ gold: 205, items: [], equipped: { weapon: null, armor: null, shield: null } })
+    expect(inventory).toEqual({ gold: 205, items: [], equipped: { mainHand: null, offHand: null, armor: null } })
   })
 
   it('со щитом надевается одноручное оружие', () => {
     expect(autoEquip([{ itemId: 'shield', quantity: 1 }, { itemId: 'greatsword', quantity: 1 }, { itemId: 'mace', quantity: 1 }], catalog)).toEqual({
-      weapon: 'mace',
+      mainHand: 'mace',
+      offHand: 'shield',
       armor: null,
-      shield: 'shield',
     })
-    expect(autoEquip([{ itemId: 'shield', quantity: 1 }, { itemId: 'greatsword', quantity: 1 }], catalog).shield).toBeNull()
+    expect(autoEquip([{ itemId: 'shield', quantity: 1 }, { itemId: 'greatsword', quantity: 1 }], catalog).offHand).toBeNull()
   })
 
   it('у каждого класса и предыстории все варианты снаряжения собираются', () => {
@@ -248,15 +253,16 @@ describe('готовый лист персонажа', () => {
       level: 1,
       maxHp: 12,
       hp: 12,
-      feats: ['savage-attacker', 'alert'],
+      feats: ['savage-attacker', 'alert', 'great-weapon-fighting'],
       appearance: 'Ветеран',
       conditions: [],
     })
     expect(character.proficiencies).toEqual({
       savingThrows: ['str', 'con'],
       skills: { athletics: 'proficient', intimidation: 'proficient', perception: 'proficient', survival: 'proficient', insight: 'proficient' },
+      tools: ['dice-set'],
     })
-    expect(armorClass(character.abilities, inventory, catalog, character.classId)).toBe(16)
+    expect(armorClass(character, inventory, catalog)).toBe(16)
     expect(inventoryWeight(inventory, catalog)).toBe(148)
     // Лист проходит ту же проверку, что и загружаемые персонажи.
     expect(parseCharacterSheet(sheet, catalog)).toEqual(sheet)
@@ -279,18 +285,19 @@ describe('готовый лист персонажа', () => {
     expect(character.proficiencies.skills).toMatchObject({ stealth: 'expertise', perception: 'expertise', acrobatics: 'proficient' })
     expect(character.speciesOption).toBe('wood-elf')
     expect(character.feats).toEqual(['alert'])
-    expect(inventory.equipped).toEqual({ weapon: 'dagger', armor: 'leather-armor', shield: null })
+    expect(inventory.equipped).toEqual({ mainHand: 'dagger', offHand: null, armor: 'leather-armor' })
+    expect(character.proficiencies.tools).toEqual(['thieves-tools'])
     // Кожаный доспех 11 + ЛОВ (14+2=16 → +3).
-    expect(armorClass(character.abilities, inventory, catalog, character.classId)).toBe(14)
+    expect(armorClass(character, inventory, catalog)).toBe(14)
   })
 
   it('Варвар без доспеха: Защита без доспехов 10 + ЛОВ + ТЕЛ', () => {
     let d = chooseBackground(chooseClass(emptyDraft(), 'barbarian'), 'soldier', data)
-    d = { ...chooseSpecies(d, 'orc'), bonusPlus2: 'str', bonusPlus1: 'con' }
+    d = { ...chooseSpecies(d, 'orc'), bonusPlus2: 'str', bonusPlus1: 'con', backgroundTool: 'playing-cards' }
     d = assignInOrder({ ...d, classSkills: ['survival', 'perception'], classEquipment: 'A', backgroundEquipment: 'B', name: 'Грок' })
     const { character, inventory } = buildCharacterSheet(d, data, catalog, 'b')
     expect(inventory.equipped.armor).toBeNull()
-    expect(armorClass(character.abilities, inventory, catalog, character.classId)).toBe(10 + 2 + 2)
+    expect(armorClass(character, inventory, catalog)).toBe(10 + 2 + 2)
   })
 
   it('незаконченный персонаж — ошибка со списком того, что не выбрано', () => {
@@ -300,5 +307,119 @@ describe('готовый лист персонажа', () => {
     } catch (error) {
       expect((error as CreationError).problems).toEqual(['Введите имя персонажа'])
     }
+  })
+})
+
+describe('боевой стиль и инструменты', () => {
+  it('воину нужен боевой стиль; черта происхождения не подходит', () => {
+    const d = chooseClass(emptyDraft(), 'fighter')
+    expect(stepProblems('class', d, data)).toEqual(['Выберите боевой стиль'])
+    expect(stepProblems('class', { ...d, fightingStyle: 'alert' }, data)).toEqual(['Выберите боевой стиль'])
+    expect(stepProblems('class', { ...d, fightingStyle: 'defense' }, data)).toEqual([])
+  })
+
+  it('Оборона в итоговом листе: +1 к КД в кольчуге', () => {
+    const { character, inventory } = buildCharacterSheet({ ...fighterDraft(), fightingStyle: 'defense' }, data, catalog, 'x')
+    expect(character.feats).toContain('defense')
+    expect(armorClass(character, inventory, catalog)).toBe(17)
+  })
+
+  it('смена класса сбрасывает боевой стиль и инструменты', () => {
+    expect(chooseClass({ ...fighterDraft(), classTools: ['lute'] }, 'bard')).toMatchObject({ fightingStyle: null, classTools: [] })
+  })
+
+  it('Солдат выбирает игровой набор: он во владении и в снаряжении', () => {
+    const d = { ...fighterDraft(), backgroundTool: 'playing-cards' }
+    expect(stepProblems('background', { ...d, backgroundTool: 'lute' }, data)).toEqual(['Выберите инструмент предыстории'])
+    const { character, inventory } = buildCharacterSheet(d, data, catalog, 'x')
+    expect(character.proficiencies.tools).toEqual(['playing-cards'])
+    expect(inventory.items.map((i) => i.itemId)).toContain('playing-cards')
+    expect(inventory.items.map((i) => i.itemId)).not.toContain('dice-set')
+  })
+
+  it('Бард выбирает 3 музыкальных инструмента, первый — в снаряжении', () => {
+    let d = chooseClass(emptyDraft(), 'bard')
+    expect(stepProblems('class', d, data)).toEqual(['Выберите инструменты: 3 (выбрано 0)'])
+    expect(stepProblems('class', { ...d, classTools: ['lyre', 'flute', 'smiths-tools'] }, data)).toEqual(['Этот инструмент нельзя выбрать для класса'])
+    d = { ...d, classTools: ['lyre', 'flute', 'drum'], classEquipment: 'A' }
+    expect(stepProblems('class', d, data)).toEqual([])
+    expect(startingInventory(d, data, catalog).items.map((i) => i.itemId)).toContain('lyre')
+    expect(toolProficiencies(d, data)).toEqual(['lyre', 'flute', 'drum'])
+  })
+
+  it('Монах выбирает 1 инструмент ремесленника или музыкальный', () => {
+    const d = { ...chooseClass(emptyDraft(), 'monk'), classTools: ['smiths-tools'], classEquipment: 'A' }
+    expect(stepProblems('class', d, data)).toEqual([])
+    expect(startingInventory(d, data, catalog).items.map((i) => i.itemId)).toContain('smiths-tools')
+  })
+
+  it('Плут и преступник: воровские инструменты один раз', () => {
+    const d = { ...chooseBackground(chooseClass(emptyDraft(), 'rogue'), 'criminal', data) }
+    expect(toolProficiencies(d, data)).toEqual(['thieves-tools'])
+  })
+})
+
+describe('своя предыстория', () => {
+  function customDraft(): CreationDraft {
+    let d: CreationDraft = { ...chooseClass(emptyDraft(), 'fighter'), fightingStyle: 'archery' }
+    d = chooseBackground(d, CUSTOM_BACKGROUND_ID, data)
+    d = updateCustomBackground(
+      d,
+      {
+        name: 'Корабельный юнга',
+        abilities: ['str', 'dex', 'wis'],
+        skills: ['athletics', 'perception'],
+        tool: 'navigators-tools',
+        feat: 'skilled',
+        items: [
+          { itemId: 'rope', quantity: 2 },
+          { itemId: 'dagger', quantity: 1 },
+        ],
+      },
+      data,
+    )
+    return { ...d, bonusPlus2: 'dex', bonusPlus1: 'str' }
+  }
+
+  it('шаг предыстории проверяет шаблон и прибавки', () => {
+    const d = chooseBackground(emptyDraft(), CUSTOM_BACKGROUND_ID, data)
+    expect(stepProblems('background', d, data)).toEqual([
+      'Введите название предыстории',
+      'Выберите 3 разные характеристики для прибавок (выбрано 0)',
+      'Выберите 2 разных навыка (выбрано 0)',
+      'Выберите один инструмент',
+      'Выберите черту происхождения',
+    ])
+    expect(stepProblems('background', customDraft(), data)).toEqual([])
+  })
+
+  it('убранная характеристика снимает прибавку, навыки предыстории убираются из выбора класса', () => {
+    let d: CreationDraft = { ...customDraft(), classSkills: ['athletics'] }
+    d = updateCustomBackground(d, { abilities: ['str', 'con', 'wis'], skills: ['athletics', 'survival'] }, data)
+    expect(d.bonusPlus2).toBeNull()
+    expect(d.bonusPlus1).toBe('str')
+    expect(d.classSkills).toEqual([])
+  })
+
+  it('собирает персонажа: навыки, инструмент, черта «Одарённый» с тремя навыками, сдача золотом', () => {
+    let d = customDraft()
+    d = chooseSpecies(d, 'orc')
+    d = assignInOrder({ ...d, classSkills: ['history', 'insight'], featSkills: ['arcana', 'medicine', 'nature'] })
+    d = { ...d, classEquipment: 'C', backgroundEquipment: 'A', name: 'Сёма' }
+    expect(stepProblems('summary', d, data)).toEqual([])
+    const { character, inventory } = buildCharacterSheet(d, data, catalog, 'x')
+    expect(character).toMatchObject({ background: 'Корабельный юнга', backgroundId: 'custom', feats: ['skilled', 'archery'] })
+    expect(character.proficiencies.tools).toEqual(['navigators-tools'])
+    expect(Object.keys(character.proficiencies.skills).sort()).toEqual(
+      ['arcana', 'athletics', 'history', 'insight', 'medicine', 'nature', 'perception'].sort(),
+    )
+    expect(finalScores(d, data)).toMatchObject({ str: 16, dex: 16 })
+    expect(inventory.gold).toBe(155 + 46)
+    expect(inventory.equipped.mainHand).toBe('dagger')
+  })
+
+  it('дорогое снаряжение не пропускает шаг', () => {
+    const d = updateCustomBackground(customDraft(), { items: [{ itemId: 'spellbook', quantity: 2 }] }, data)
+    expect(stepProblems('background', d, data)).toEqual(['Снаряжение стоит 100 зм — больше 50 зм'])
   })
 })

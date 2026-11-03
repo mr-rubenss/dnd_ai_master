@@ -40,6 +40,7 @@ test('подсказка на карте по наведению или нажа
 
 test('описание предмета раскрывается по нажатию', async ({ page, isMobile }) => {
   if (isMobile) await page.locator('.inventory-toggle').tap()
+  await page.getByRole('tab', { name: 'Снаряжение' }).click()
   const item = page.locator('.item-button', { hasText: 'Двуручный меч' })
   await item.click()
   await expect(item).toHaveAttribute('aria-expanded', 'true')

@@ -7,6 +7,7 @@
     "weight": 6,
     "description": "Воинское рукопашное оружие. Длинный клинок, которым рубят обеими руками.",
     "weapon": {
+      "kind": "martial",
       "damage": "2d6",
       "damageType": "slashing",
       "properties": [
@@ -14,7 +15,8 @@
         "two-handed"
       ],
       "mastery": "graze"
-    }
+    },
+    "cost": 50
   },
   {
     "id": "flail",
@@ -24,11 +26,13 @@
     "weight": 2,
     "description": "Воинское рукопашное оружие. Шипастый шар на цепи, закреплённой на рукояти.",
     "weapon": {
+      "kind": "martial",
       "damage": "1d8",
       "damageType": "bludgeoning",
       "properties": [],
       "mastery": "sap"
-    }
+    },
+    "cost": 10
   },
   {
     "id": "javelin",
@@ -38,6 +42,7 @@
     "weight": 2,
     "description": "Простое рукопашное оружие. Лёгкое копьё, которое удобно метать.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d6",
       "damageType": "piercing",
       "properties": [
@@ -48,7 +53,8 @@
         "normal": 30,
         "long": 120
       }
-    }
+    },
+    "cost": 0.5
   },
   {
     "id": "spear",
@@ -58,6 +64,7 @@
     "weight": 3,
     "description": "Простое рукопашное оружие. Можно метать или держать двумя руками.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d6",
       "damageType": "piercing",
       "properties": [
@@ -70,7 +77,8 @@
         "normal": 20,
         "long": 60
       }
-    }
+    },
+    "cost": 1
   },
   {
     "id": "shortbow",
@@ -80,6 +88,7 @@
     "weight": 2,
     "description": "Простое дальнобойное оружие. Нужны стрелы.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d6",
       "damageType": "piercing",
       "properties": [
@@ -91,7 +100,8 @@
         "normal": 80,
         "long": 320
       }
-    }
+    },
+    "cost": 25
   },
   {
     "id": "arrow",
@@ -99,7 +109,8 @@
     "category": "ammunition",
     "icon": "🪶",
     "weight": 0.05,
-    "description": "Боеприпас для лука. После боя половину выпущенных стрел можно найти."
+    "description": "Боеприпас для лука. После боя половину выпущенных стрел можно найти.",
+    "cost": 0.05
   },
   {
     "id": "quiver",
@@ -107,7 +118,8 @@
     "category": "gear",
     "icon": "🧺",
     "weight": 1,
-    "description": "Вмещает до 20 стрел."
+    "description": "Вмещает до 20 стрел.",
+    "cost": 1
   },
   {
     "id": "chain-mail",
@@ -121,7 +133,8 @@
       "baseAC": 16,
       "strength": 13,
       "stealthDisadvantage": true
-    }
+    },
+    "cost": 75
   },
   {
     "id": "shield",
@@ -133,7 +146,8 @@
     "armor": {
       "type": "shield",
       "baseAC": 2
-    }
+    },
+    "cost": 10
   },
   {
     "id": "backpack",
@@ -141,7 +155,8 @@
     "category": "gear",
     "icon": "🎒",
     "weight": 5,
-    "description": "Вмещает до 30 фунтов снаряжения."
+    "description": "Вмещает до 30 фунтов снаряжения.",
+    "cost": 2
   },
   {
     "id": "caltrops",
@@ -149,7 +164,8 @@
     "category": "gear",
     "icon": "📌",
     "weight": 2,
-    "description": "Рассыпанные по полу шипы. Вошедший на них проходит спасбросок Ловкости Сл 15 или получает 1 колющий урон и теряет скорость до конца хода."
+    "description": "Рассыпанные по полу шипы. Вошедший на них проходит спасбросок Ловкости Сл 15 или получает 1 колющий урон и теряет скорость до конца хода.",
+    "cost": 1
   },
   {
     "id": "crowbar",
@@ -157,7 +173,8 @@
     "category": "gear",
     "icon": "🔧",
     "weight": 5,
-    "description": "Даёт преимущество на проверки Силы там, где поможет рычаг."
+    "description": "Даёт преимущество на проверки Силы там, где поможет рычаг.",
+    "cost": 2
   },
   {
     "id": "oil",
@@ -165,7 +182,8 @@
     "category": "consumable",
     "icon": "🛢️",
     "weight": 1,
-    "description": "Горючее масло. Флягу можно метнуть или разлить и поджечь."
+    "description": "Горючее масло. Флягу можно метнуть или разлить и поджечь.",
+    "cost": 0.1
   },
   {
     "id": "rations",
@@ -173,7 +191,8 @@
     "category": "consumable",
     "icon": "🍖",
     "weight": 2,
-    "description": "Сухари, вяленое мясо, сушёные фрукты и орехи на один день."
+    "description": "Сухари, вяленое мясо, сушёные фрукты и орехи на один день.",
+    "cost": 0.5
   },
   {
     "id": "rope",
@@ -181,7 +200,8 @@
     "category": "gear",
     "icon": "🪢",
     "weight": 5,
-    "description": "Пеньковая верёвка. Ею можно связать существо или подняться по ней."
+    "description": "Пеньковая верёвка. Ею можно связать существо или подняться по ней.",
+    "cost": 1
   },
   {
     "id": "tinderbox",
@@ -189,7 +209,8 @@
     "category": "gear",
     "icon": "🔥",
     "weight": 1,
-    "description": "Кремень, огниво и трут. Позволяет разжечь огонь."
+    "description": "Кремень, огниво и трут. Позволяет разжечь огонь.",
+    "cost": 0.5
   },
   {
     "id": "torch",
@@ -197,7 +218,8 @@
     "category": "consumable",
     "icon": "🔦",
     "weight": 1,
-    "description": "Горит 1 час, давая яркий свет в радиусе 20 футов и тусклый ещё на 20 футов."
+    "description": "Горит 1 час, давая яркий свет в радиусе 20 футов и тусклый ещё на 20 футов.",
+    "cost": 0.01
   },
   {
     "id": "healers-kit",
@@ -205,15 +227,18 @@
     "category": "tool",
     "icon": "🩹",
     "weight": 3,
-    "description": "Бинты, мази и шины на 10 применений. Позволяет стабилизировать существо с 0 хитов без проверки."
+    "description": "Бинты, мази и шины на 10 применений. Позволяет стабилизировать существо с 0 хитов без проверки.",
+    "cost": 5
   },
   {
     "id": "dice-set",
-    "name": "Игральные кости",
+    "name": "Игровой набор (кости)",
     "category": "tool",
     "icon": "🎲",
     "weight": 0,
-    "description": "Набор костей для азартных игр. Солдатская привычка."
+    "description": "Набор костей для азартных игр.",
+    "cost": 0.1,
+    "toolKind": "gaming"
   },
   {
     "id": "travelers-clothes",
@@ -221,7 +246,8 @@
     "category": "gear",
     "icon": "👕",
     "weight": 4,
-    "description": "Прочная одежда для долгих странствий."
+    "description": "Прочная одежда для долгих странствий.",
+    "cost": 2
   },
   {
     "id": "silver-amulet",
@@ -239,6 +265,7 @@
     "weight": 7,
     "description": "Воинское рукопашное оружие. Тяжёлый двуручный топор.",
     "weapon": {
+      "kind": "martial",
       "damage": "1d12",
       "damageType": "slashing",
       "properties": [
@@ -246,7 +273,8 @@
         "two-handed"
       ],
       "mastery": "cleave"
-    }
+    },
+    "cost": 30
   },
   {
     "id": "handaxe",
@@ -256,6 +284,7 @@
     "weight": 2,
     "description": "Простое рукопашное оружие. Лёгкий топорик, который можно метнуть.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d6",
       "damageType": "slashing",
       "properties": [
@@ -267,7 +296,8 @@
         "normal": 20,
         "long": 60
       }
-    }
+    },
+    "cost": 5
   },
   {
     "id": "dagger",
@@ -277,6 +307,7 @@
     "weight": 1,
     "description": "Простое рукопашное оружие. Удобно прятать и метать.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d4",
       "damageType": "piercing",
       "properties": [
@@ -289,7 +320,8 @@
         "normal": 20,
         "long": 60
       }
-    }
+    },
+    "cost": 2
   },
   {
     "id": "mace",
@@ -299,11 +331,13 @@
     "weight": 4,
     "description": "Простое рукопашное оружие. Окованная металлом дубина.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d6",
       "damageType": "bludgeoning",
       "properties": [],
       "mastery": "sap"
-    }
+    },
+    "cost": 5
   },
   {
     "id": "sickle",
@@ -313,13 +347,15 @@
     "weight": 2,
     "description": "Простое рукопашное оружие. Изогнутый клинок на короткой рукояти.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d4",
       "damageType": "slashing",
       "properties": [
         "light"
       ],
       "mastery": "nick"
-    }
+    },
+    "cost": 1
   },
   {
     "id": "quarterstaff",
@@ -329,6 +365,7 @@
     "weight": 4,
     "description": "Простое рукопашное оружие. Может служить фокусировкой для заклинаний.",
     "weapon": {
+      "kind": "simple",
       "damage": "1d6",
       "damageType": "bludgeoning",
       "properties": [
@@ -336,7 +373,8 @@
       ],
       "mastery": "topple",
       "versatileDamage": "1d8"
-    }
+    },
+    "cost": 0.2
   },
   {
     "id": "scimitar",
@@ -346,6 +384,7 @@
     "weight": 3,
     "description": "Воинское рукопашное оружие. Лёгкий изогнутый клинок.",
     "weapon": {
+      "kind": "martial",
       "damage": "1d6",
       "damageType": "slashing",
       "properties": [
@@ -353,7 +392,8 @@
         "light"
       ],
       "mastery": "nick"
-    }
+    },
+    "cost": 25
   },
   {
     "id": "shortsword",
@@ -363,6 +403,7 @@
     "weight": 2,
     "description": "Воинское рукопашное оружие. Короткий клинок для ловкого бойца.",
     "weapon": {
+      "kind": "martial",
       "damage": "1d6",
       "damageType": "piercing",
       "properties": [
@@ -370,7 +411,8 @@
         "light"
       ],
       "mastery": "vex"
-    }
+    },
+    "cost": 10
   },
   {
     "id": "longsword",
@@ -380,6 +422,7 @@
     "weight": 3,
     "description": "Воинское рукопашное оружие. Можно держать одной или двумя руками.",
     "weapon": {
+      "kind": "martial",
       "damage": "1d8",
       "damageType": "slashing",
       "properties": [
@@ -387,7 +430,8 @@
       ],
       "mastery": "sap",
       "versatileDamage": "1d10"
-    }
+    },
+    "cost": 15
   },
   {
     "id": "longbow",
@@ -397,6 +441,7 @@
     "weight": 2,
     "description": "Воинское дальнобойное оружие. Нужны стрелы.",
     "weapon": {
+      "kind": "martial",
       "damage": "1d8",
       "damageType": "piercing",
       "properties": [
@@ -409,7 +454,8 @@
         "normal": 150,
         "long": 600
       }
-    }
+    },
+    "cost": 50
   },
   {
     "id": "leather-armor",
@@ -421,7 +467,8 @@
     "armor": {
       "type": "light",
       "baseAC": 11
-    }
+    },
+    "cost": 10
   },
   {
     "id": "studded-leather",
@@ -433,7 +480,8 @@
     "armor": {
       "type": "light",
       "baseAC": 12
-    }
+    },
+    "cost": 45
   },
   {
     "id": "chain-shirt",
@@ -445,7 +493,8 @@
     "armor": {
       "type": "medium",
       "baseAC": 13
-    }
+    },
+    "cost": 50
   },
   {
     "id": "holy-symbol",
@@ -453,7 +502,8 @@
     "category": "gear",
     "icon": "✝️",
     "weight": 1,
-    "description": "Амулет с символом божества. Служит фокусировкой для жреческих заклинаний."
+    "description": "Амулет с символом божества. Служит фокусировкой для жреческих заклинаний.",
+    "cost": 5
   },
   {
     "id": "druidic-focus",
@@ -461,7 +511,8 @@
     "category": "gear",
     "icon": "🌿",
     "weight": 0,
-    "description": "Веточка омелы — фокусировка для друидических заклинаний."
+    "description": "Веточка омелы — фокусировка для друидических заклинаний.",
+    "cost": 1
   },
   {
     "id": "arcane-focus-crystal",
@@ -469,7 +520,8 @@
     "category": "gear",
     "icon": "🔮",
     "weight": 1,
-    "description": "Кристалл, через который направляют магию."
+    "description": "Кристалл, через который направляют магию.",
+    "cost": 10
   },
   {
     "id": "arcane-focus-orb",
@@ -477,7 +529,8 @@
     "category": "gear",
     "icon": "🔮",
     "weight": 3,
-    "description": "Хрустальная сфера, через которую направляют магию."
+    "description": "Хрустальная сфера, через которую направляют магию.",
+    "cost": 20
   },
   {
     "id": "book",
@@ -485,7 +538,8 @@
     "category": "gear",
     "icon": "📕",
     "weight": 5,
-    "description": "Книга молитв, истории или тайного знания."
+    "description": "Книга молитв, истории или тайного знания.",
+    "cost": 25
   },
   {
     "id": "spellbook",
@@ -493,7 +547,8 @@
     "category": "gear",
     "icon": "📖",
     "weight": 3,
-    "description": "Книга волшебника с записанными заклинаниями."
+    "description": "Книга волшебника с записанными заклинаниями.",
+    "cost": 50
   },
   {
     "id": "robe",
@@ -501,7 +556,8 @@
     "category": "gear",
     "icon": "🥻",
     "weight": 4,
-    "description": "Длинное одеяние жреца или учёного."
+    "description": "Длинное одеяние жреца или учёного.",
+    "cost": 1
   },
   {
     "id": "parchment",
@@ -509,7 +565,8 @@
     "category": "consumable",
     "icon": "📜",
     "weight": 0,
-    "description": "Лист пергамента для письма."
+    "description": "Лист пергамента для письма.",
+    "cost": 0.1
   },
   {
     "id": "pouch",
@@ -517,7 +574,8 @@
     "category": "gear",
     "icon": "👝",
     "weight": 1,
-    "description": "Небольшой кожаный мешочек."
+    "description": "Небольшой кожаный мешочек.",
+    "cost": 0.5
   },
   {
     "id": "bedroll",
@@ -525,7 +583,8 @@
     "category": "gear",
     "icon": "🛏️",
     "weight": 7,
-    "description": "Скатка для ночлега под открытым небом."
+    "description": "Скатка для ночлега под открытым небом.",
+    "cost": 1
   },
   {
     "id": "waterskin",
@@ -533,7 +592,8 @@
     "category": "gear",
     "icon": "💧",
     "weight": 5,
-    "description": "Вмещает 4 пинты воды (вес указан полного)."
+    "description": "Вмещает 4 пинты воды (вес указан полного).",
+    "cost": 0.2
   },
   {
     "id": "ball-bearings",
@@ -541,7 +601,8 @@
     "category": "gear",
     "icon": "⚪",
     "weight": 2,
-    "description": "Тысяча металлических шариков. Рассыпанные по полу, заставляют проходить спасбросок Ловкости Сл 10 или упасть."
+    "description": "Тысяча металлических шариков. Рассыпанные по полу, заставляют проходить спасбросок Ловкости Сл 10 или упасть.",
+    "cost": 1
   },
   {
     "id": "bell",
@@ -549,7 +610,8 @@
     "category": "gear",
     "icon": "🔔",
     "weight": 0,
-    "description": "Маленький медный колокольчик."
+    "description": "Маленький медный колокольчик.",
+    "cost": 1
   },
   {
     "id": "candle",
@@ -557,7 +619,8 @@
     "category": "consumable",
     "icon": "🕯️",
     "weight": 0,
-    "description": "Горит 1 час, давая тусклый свет в радиусе 5 футов."
+    "description": "Горит 1 час, давая тусклый свет в радиусе 5 футов.",
+    "cost": 0.01
   },
   {
     "id": "hooded-lantern",
@@ -565,7 +628,8 @@
     "category": "gear",
     "icon": "🏮",
     "weight": 2,
-    "description": "Горит на масле 6 часов: яркий свет на 30 футов. Заслонку можно опустить."
+    "description": "Горит на масле 6 часов: яркий свет на 30 футов. Заслонку можно опустить.",
+    "cost": 5
   },
   {
     "id": "bullseye-lantern",
@@ -573,7 +637,8 @@
     "category": "gear",
     "icon": "🔦",
     "weight": 2,
-    "description": "Горит на масле 6 часов: яркий свет конусом на 60 футов."
+    "description": "Горит на масле 6 часов: яркий свет конусом на 60 футов.",
+    "cost": 10
   },
   {
     "id": "costume",
@@ -581,7 +646,8 @@
     "category": "gear",
     "icon": "🎭",
     "weight": 4,
-    "description": "Сценический наряд."
+    "description": "Сценический наряд.",
+    "cost": 5
   },
   {
     "id": "mirror",
@@ -589,7 +655,8 @@
     "category": "gear",
     "icon": "🪞",
     "weight": 0.5,
-    "description": "Небольшое стальное зеркало."
+    "description": "Небольшое стальное зеркало.",
+    "cost": 5
   },
   {
     "id": "blanket",
@@ -597,7 +664,8 @@
     "category": "gear",
     "icon": "🧣",
     "weight": 3,
-    "description": "Тёплое шерстяное одеяло."
+    "description": "Тёплое шерстяное одеяло.",
+    "cost": 0.5
   },
   {
     "id": "holy-water",
@@ -605,7 +673,8 @@
     "category": "consumable",
     "icon": "💧",
     "weight": 1,
-    "description": "Брошенная в нежить или исчадие, наносит 2к8 урона излучением."
+    "description": "Брошенная в нежить или исчадие, наносит 2к8 урона излучением.",
+    "cost": 25
   },
   {
     "id": "lamp",
@@ -613,7 +682,8 @@
     "category": "gear",
     "icon": "🪔",
     "weight": 1,
-    "description": "Горит на масле 6 часов: яркий свет на 15 футов."
+    "description": "Горит на масле 6 часов: яркий свет на 15 футов.",
+    "cost": 0.5
   },
   {
     "id": "ink",
@@ -621,7 +691,8 @@
     "category": "consumable",
     "icon": "🖋️",
     "weight": 0,
-    "description": "Унция чернил."
+    "description": "Унция чернил.",
+    "cost": 10
   },
   {
     "id": "ink-pen",
@@ -629,7 +700,8 @@
     "category": "gear",
     "icon": "🪶",
     "weight": 0,
-    "description": "Перо для письма."
+    "description": "Перо для письма.",
+    "cost": 0.02
   },
   {
     "id": "calligraphers-supplies",
@@ -637,7 +709,9 @@
     "category": "tool",
     "icon": "✒️",
     "weight": 5,
-    "description": "Инструменты каллиграфа."
+    "description": "Инструменты каллиграфа.",
+    "cost": 10,
+    "toolKind": "artisan"
   },
   {
     "id": "thieves-tools",
@@ -645,7 +719,9 @@
     "category": "tool",
     "icon": "🗝️",
     "weight": 1,
-    "description": "Отмычки, щупы и напильник для вскрытия замков и обезвреживания ловушек."
+    "description": "Отмычки, щупы и напильник для вскрытия замков и обезвреживания ловушек.",
+    "cost": 25,
+    "toolKind": "kit"
   },
   {
     "id": "herbalism-kit",
@@ -653,7 +729,9 @@
     "category": "tool",
     "icon": "🌱",
     "weight": 3,
-    "description": "Ножницы, ступка и мешочки для трав. Нужен для изготовления зелий лечения."
+    "description": "Ножницы, ступка и мешочки для трав. Нужен для изготовления зелий лечения.",
+    "cost": 5,
+    "toolKind": "kit"
   },
   {
     "id": "woodcarvers-tools",
@@ -661,7 +739,9 @@
     "category": "tool",
     "icon": "🪵",
     "weight": 5,
-    "description": "Ножи и стамески для работы по дереву."
+    "description": "Ножи и стамески для работы по дереву.",
+    "cost": 1,
+    "toolKind": "artisan"
   },
   {
     "id": "lute",
@@ -669,6 +749,318 @@
     "category": "tool",
     "icon": "🪕",
     "weight": 2,
+    "description": "Музыкальный инструмент.",
+    "cost": 35,
+    "toolKind": "musical"
+  },
+  {
+    "id": "alchemists-supplies",
+    "name": "Инструменты алхимика",
+    "category": "tool",
+    "icon": "⚗️",
+    "weight": 8,
+    "cost": 50,
+    "toolKind": "artisan",
+    "description": "Колбы, реторты и реактивы для алхимических опытов."
+  },
+  {
+    "id": "brewers-supplies",
+    "name": "Инструменты пивовара",
+    "category": "tool",
+    "icon": "🍺",
+    "weight": 9,
+    "cost": 20,
+    "toolKind": "artisan",
+    "description": "Всё, чтобы варить пиво и очищать воду."
+  },
+  {
+    "id": "carpenters-tools",
+    "name": "Инструменты плотника",
+    "category": "tool",
+    "icon": "🪚",
+    "weight": 6,
+    "cost": 8,
+    "toolKind": "artisan",
+    "description": "Пила, молоток, гвозди и рубанок."
+  },
+  {
+    "id": "cartographers-tools",
+    "name": "Инструменты картографа",
+    "category": "tool",
+    "icon": "🗺️",
+    "weight": 6,
+    "cost": 15,
+    "toolKind": "artisan",
+    "description": "Перья, линейки и циркули для составления карт."
+  },
+  {
+    "id": "cobblers-tools",
+    "name": "Инструменты сапожника",
+    "category": "tool",
+    "icon": "👢",
+    "weight": 5,
+    "cost": 5,
+    "toolKind": "artisan",
+    "description": "Шило, дратва и колодки для починки обуви."
+  },
+  {
+    "id": "cooks-utensils",
+    "name": "Инструменты повара",
+    "category": "tool",
+    "icon": "🍳",
+    "weight": 8,
+    "cost": 1,
+    "toolKind": "artisan",
+    "description": "Котелок, ножи и половник."
+  },
+  {
+    "id": "glassblowers-tools",
+    "name": "Инструменты стеклодува",
+    "category": "tool",
+    "icon": "🫙",
+    "weight": 5,
+    "cost": 30,
+    "toolKind": "artisan",
+    "description": "Трубка и щипцы для работы со стеклом."
+  },
+  {
+    "id": "jewelers-tools",
+    "name": "Инструменты ювелира",
+    "category": "tool",
+    "icon": "💍",
+    "weight": 2,
+    "cost": 25,
+    "toolKind": "artisan",
+    "description": "Лупа, крошечные пилки и щипчики."
+  },
+  {
+    "id": "leatherworkers-tools",
+    "name": "Инструменты кожевника",
+    "category": "tool",
+    "icon": "🧵",
+    "weight": 5,
+    "cost": 5,
+    "toolKind": "artisan",
+    "description": "Ножи, иглы и шило для работы с кожей."
+  },
+  {
+    "id": "masons-tools",
+    "name": "Инструменты каменщика",
+    "category": "tool",
+    "icon": "🧱",
+    "weight": 8,
+    "cost": 10,
+    "toolKind": "artisan",
+    "description": "Мастерок, молоток и зубило."
+  },
+  {
+    "id": "painters-supplies",
+    "name": "Инструменты художника",
+    "category": "tool",
+    "icon": "🎨",
+    "weight": 5,
+    "cost": 10,
+    "toolKind": "artisan",
+    "description": "Кисти, краски и холсты."
+  },
+  {
+    "id": "potters-tools",
+    "name": "Инструменты гончара",
+    "category": "tool",
+    "icon": "🏺",
+    "weight": 3,
+    "cost": 10,
+    "toolKind": "artisan",
+    "description": "Стеки и резцы для глины."
+  },
+  {
+    "id": "smiths-tools",
+    "name": "Инструменты кузнеца",
+    "category": "tool",
+    "icon": "⚒️",
+    "weight": 8,
+    "cost": 20,
+    "toolKind": "artisan",
+    "description": "Молоты, клещи и пробойники."
+  },
+  {
+    "id": "tinkers-tools",
+    "name": "Инструменты ремонтника",
+    "category": "tool",
+    "icon": "🔩",
+    "weight": 10,
+    "cost": 50,
+    "toolKind": "artisan",
+    "description": "Мелкие инструменты для починки механизмов."
+  },
+  {
+    "id": "weavers-tools",
+    "name": "Инструменты ткача",
+    "category": "tool",
+    "icon": "🧶",
+    "weight": 5,
+    "cost": 1,
+    "toolKind": "artisan",
+    "description": "Нитки, иглы и ткацкая рамка."
+  },
+  {
+    "id": "dragonchess-set",
+    "name": "Игровой набор (драконьи шахматы)",
+    "category": "tool",
+    "icon": "♟️",
+    "weight": 0.5,
+    "cost": 1,
+    "toolKind": "gaming",
+    "description": "Доска и фигурки для драконьих шахмат."
+  },
+  {
+    "id": "playing-cards",
+    "name": "Игровой набор (карты)",
+    "category": "tool",
+    "icon": "🃏",
+    "weight": 0,
+    "cost": 0.5,
+    "toolKind": "gaming",
+    "description": "Колода игральных карт."
+  },
+  {
+    "id": "three-dragon-ante",
+    "name": "Игровой набор («Ставка трёх драконов»)",
+    "category": "tool",
+    "icon": "🐉",
+    "weight": 0,
+    "cost": 1,
+    "toolKind": "gaming",
+    "description": "Карточная игра на ставки."
+  },
+  {
+    "id": "bagpipes",
+    "name": "Волынка",
+    "category": "tool",
+    "icon": "🎶",
+    "weight": 6,
+    "cost": 30,
+    "toolKind": "musical",
     "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "drum",
+    "name": "Барабан",
+    "category": "tool",
+    "icon": "🥁",
+    "weight": 3,
+    "cost": 6,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "dulcimer",
+    "name": "Цимбалы",
+    "category": "tool",
+    "icon": "🎶",
+    "weight": 10,
+    "cost": 25,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "flute",
+    "name": "Флейта",
+    "category": "tool",
+    "icon": "🎶",
+    "weight": 1,
+    "cost": 2,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "horn",
+    "name": "Рожок",
+    "category": "tool",
+    "icon": "📯",
+    "weight": 2,
+    "cost": 3,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "lyre",
+    "name": "Лира",
+    "category": "tool",
+    "icon": "🎶",
+    "weight": 2,
+    "cost": 30,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "pan-flute",
+    "name": "Свирель",
+    "category": "tool",
+    "icon": "🎶",
+    "weight": 2,
+    "cost": 12,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "shawm",
+    "name": "Шалмей",
+    "category": "tool",
+    "icon": "🎶",
+    "weight": 1,
+    "cost": 2,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "viol",
+    "name": "Виола",
+    "category": "tool",
+    "icon": "🎻",
+    "weight": 1,
+    "cost": 30,
+    "toolKind": "musical",
+    "description": "Музыкальный инструмент."
+  },
+  {
+    "id": "disguise-kit",
+    "name": "Набор для грима",
+    "category": "tool",
+    "icon": "🎭",
+    "weight": 3,
+    "cost": 25,
+    "toolKind": "kit",
+    "description": "Косметика, краска для волос и мелкие реквизиты для маскировки."
+  },
+  {
+    "id": "forgery-kit",
+    "name": "Набор для фальсификации",
+    "category": "tool",
+    "icon": "📝",
+    "weight": 5,
+    "cost": 15,
+    "toolKind": "kit",
+    "description": "Чернила, бумага и печати для подделки документов."
+  },
+  {
+    "id": "navigators-tools",
+    "name": "Инструменты навигатора",
+    "category": "tool",
+    "icon": "🧭",
+    "weight": 2,
+    "cost": 25,
+    "toolKind": "kit",
+    "description": "Секстант, компас и карты для навигации."
+  },
+  {
+    "id": "poisoners-kit",
+    "name": "Набор отравителя",
+    "category": "tool",
+    "icon": "☠️",
+    "weight": 2,
+    "cost": 50,
+    "toolKind": "kit",
+    "description": "Склянки и реактивы для изготовления ядов."
   }
 ]

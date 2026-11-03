@@ -3,7 +3,7 @@
 // (в том числе сгенерированном ИИ) не дошла до игры.
 import { ABILITIES } from '../engine/abilities'
 import { SKILLS } from '../engine/skills'
-import type { ItemCatalog } from '../types/items'
+import { TOOL_KINDS, type ItemCatalog } from '../types/items'
 import type {
   BackgroundDefinition,
   ClassDefinition,
@@ -14,6 +14,7 @@ import type {
   SkillChoice,
   SpeciesDefinition,
 } from '../types/rules'
+import { validateBackgroundTemplate } from './backgroundTemplate'
 import { isInt, isNonEmptyString, isObject, ValidationError } from './validation'
 
 export interface RawRulesData {
@@ -58,7 +59,11 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
 
   const feats = byId<FeatDefinition>(raw.feats, 'feats', (feat, where) => {
     if (!isNonEmptyString(feat.description)) fail(`${where}: нет описания`)
+    if (feat.category !== 'origin' && feat.category !== 'fighting-style') fail(`${where}: "category" — origin или fighting-style`)
   })
+
+  const isToolItem = (id: unknown) => typeof id === 'string' && catalog[id]?.toolKind !== undefined
+  const isToolKind = (kind: unknown) => (TOOL_KINDS as readonly unknown[]).includes(kind)
 
   const checkEquipment = (options: unknown, where: string) => {
     if (!Array.isArray(options) || options.length === 0) return fail(`${where}: "equipment" — непустой массив вариантов`)
@@ -70,7 +75,9 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
         continue
       }
       for (const line of option.items) {
-        if (line.packId !== undefined) {
+        if (line.chosenTool !== undefined) {
+          if (line.chosenTool !== 'class' && line.chosenTool !== 'background') fail(`${where}: вариант ${option.id}: "chosenTool" — class или background`)
+        } else if (line.packId !== undefined) {
           if (!packs[line.packId]) fail(`${where}: вариант ${option.id}: неизвестный набор "${line.packId}"`)
         } else if (!catalog[line.itemId]) {
           fail(`${where}: вариант ${option.id}: неизвестный предмет "${String(line.itemId)}"`)
@@ -97,6 +104,18 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
     }
     checkSkillChoice(cls.skillChoices, where)
     if (cls.expertise !== undefined && (!isInt(cls.expertise) || cls.expertise < 1)) fail(`${where}: "expertise" — положительное целое`)
+    if (!['all', 'none', 'light', 'finesse-or-light'].includes(cls.martialWeapons as string)) {
+      fail(`${where}: "martialWeapons" — all, none, light или finesse-or-light`)
+    }
+    const tools = cls.tools as ClassDefinition['tools']
+    if (tools !== undefined) {
+      for (const id of tools.fixed ?? []) if (!isToolItem(id)) fail(`${where}: "${id}" — не инструмент`)
+      if (tools.choose && (!isInt(tools.choose.count) || tools.choose.count < 1 || !tools.choose.kinds.every(isToolKind))) {
+        fail(`${where}: "tools.choose" — { count, kinds }`)
+      }
+    }
+    const usesChosenTool = (cls.equipment as EquipmentOption[] | undefined)?.some((o) => o.items?.some((l) => l.chosenTool === 'class'))
+    if (usesChosenTool && !tools?.choose) fail(`${where}: снаряжение ссылается на выбранный инструмент, но выбора инструмента нет`)
     checkEquipment(cls.equipment, where)
   })
 
@@ -105,6 +124,11 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
       fail(`${where}: "abilities" — три разные характеристики`)
     }
     if (typeof bg.feat !== 'string' || !feats[bg.feat]) fail(`${where}: неизвестная черта "${String(bg.feat)}"`)
+    else if (feats[bg.feat].category !== 'origin') fail(`${where}: черта "${bg.feat}" — не черта происхождения`)
+    const tool = bg.tool as { itemId?: unknown; choose?: unknown } | undefined
+    if (!isObject(tool) || (tool.itemId !== undefined ? !isToolItem(tool.itemId) : !isToolKind(tool.choose))) {
+      fail(`${where}: "tool" — { "itemId": инструмент } или { "choose": вид инструмента }`)
+    }
     if (!Array.isArray(bg.skills) || bg.skills.length !== 2 || !bg.skills.every(isSkill)) fail(`${where}: "skills" — два навыка`)
     checkEquipment(bg.equipment, where)
   })
@@ -119,6 +143,11 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
     }
   })
 
+  // Официальные предыстории обязаны укладываться в тот же шаблон 2024, что и свои.
+  for (const bg of Object.values(backgrounds)) {
+    for (const problem of validateBackgroundTemplate(bg, { feats, catalog })) fail(`backgrounds "${bg.id}": ${problem}`)
+  }
+
   if (problems.length > 0) throw new ValidationError('Некорректные данные правил', problems)
-  return { classes, backgrounds, species, feats, packs }
+  return { classes, backgrounds, species, feats, packs, catalog }
 }

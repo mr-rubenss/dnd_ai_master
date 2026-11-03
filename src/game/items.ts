@@ -4,6 +4,8 @@ import {
   ARMOR_TYPES,
   DAMAGE_TYPES,
   ITEM_CATEGORIES,
+  TOOL_KINDS,
+  WEAPON_KINDS,
   WEAPON_MASTERIES,
   WEAPON_PROPERTIES,
   type ItemCatalog,
@@ -31,12 +33,17 @@ export function parseItemCatalog(raw: unknown): ItemCatalog {
     }
     if (!isOneOf(ITEM_CATEGORIES, item.category)) fail(`${where}: "category" должно быть одним из: ${ITEM_CATEGORIES.join(', ')}`)
     if (!isNumber(item.weight) || item.weight < 0) fail(`${where}: "weight" должно быть неотрицательным числом`)
+    if (item.cost !== undefined && (!isNumber(item.cost) || item.cost <= 0)) fail(`${where}: "cost" — положительное число (в зм)`)
+    if (item.toolKind !== undefined && !isOneOf(TOOL_KINDS, item.toolKind)) {
+      fail(`${where}: "toolKind" должно быть одним из: ${TOOL_KINDS.join(', ')}`)
+    }
 
     if (item.weapon !== undefined) {
       const w = item.weapon
       if (!isObject(w)) {
         fail(`${where}: "weapon" должно быть объектом`)
       } else {
+        if (!isOneOf(WEAPON_KINDS, w.kind)) fail(`${where}: "weapon.kind" — simple или martial`)
         if (typeof w.damage !== 'string' || !DICE_RE.test(w.damage)) fail(`${where}: "weapon.damage" должно быть в нотации "2d6"`)
         if (!isOneOf(DAMAGE_TYPES, w.damageType)) fail(`${where}: "weapon.damageType" должно быть одним из: ${DAMAGE_TYPES.join(', ')}`)
         if (!Array.isArray(w.properties) || !w.properties.every((p) => isOneOf(WEAPON_PROPERTIES, p))) {

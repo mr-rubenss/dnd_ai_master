@@ -1,58 +1,199 @@
 [
   {
-    "id": "acolyte", "name": "Прислужник",
+    "id": "acolyte",
+    "name": "Прислужник",
     "description": "Вы служили в храме, помогая жрецам в обрядах и изучая священные тексты.",
-    "abilities": ["int", "wis", "cha"],
-    "feat": "magic-initiate", "featNote": "список жреца",
-    "skills": ["insight", "religion"],
-    "tool": "Каллиграфические принадлежности",
+    "abilities": [
+      "int",
+      "wis",
+      "cha"
+    ],
+    "feat": "magic-initiate",
+    "featNote": "список жреца",
+    "skills": [
+      "insight",
+      "religion"
+    ],
+    "tool": {
+      "itemId": "calligraphers-supplies"
+    },
     "equipment": [
-      { "id": "A", "items": [
-        { "itemId": "calligraphers-supplies" }, { "itemId": "book" }, { "itemId": "holy-symbol" },
-        { "itemId": "parchment", "quantity": 10 }, { "itemId": "robe" } ], "gold": 8 },
-      { "id": "B", "items": [], "gold": 50 }
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "calligraphers-supplies"
+          },
+          {
+            "itemId": "book"
+          },
+          {
+            "itemId": "holy-symbol"
+          },
+          {
+            "itemId": "parchment",
+            "quantity": 10
+          },
+          {
+            "itemId": "robe"
+          }
+        ],
+        "gold": 8
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
     ]
   },
   {
-    "id": "criminal", "name": "Преступник",
+    "id": "criminal",
+    "name": "Преступник",
     "description": "Вы зарабатывали на жизнь в тёмных переулках: обчищали карманы, вскрывали замки и знали нужных людей.",
-    "abilities": ["dex", "con", "int"],
+    "abilities": [
+      "dex",
+      "con",
+      "int"
+    ],
     "feat": "alert",
-    "skills": ["sleight-of-hand", "stealth"],
-    "tool": "Воровские инструменты",
+    "skills": [
+      "sleight-of-hand",
+      "stealth"
+    ],
+    "tool": {
+      "itemId": "thieves-tools"
+    },
     "equipment": [
-      { "id": "A", "items": [
-        { "itemId": "dagger", "quantity": 2 }, { "itemId": "thieves-tools" }, { "itemId": "crowbar" },
-        { "itemId": "pouch", "quantity": 2 }, { "itemId": "travelers-clothes" } ], "gold": 16 },
-      { "id": "B", "items": [], "gold": 50 }
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "dagger",
+            "quantity": 2
+          },
+          {
+            "itemId": "thieves-tools"
+          },
+          {
+            "itemId": "crowbar"
+          },
+          {
+            "itemId": "pouch",
+            "quantity": 2
+          },
+          {
+            "itemId": "travelers-clothes"
+          }
+        ],
+        "gold": 16
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
     ]
   },
   {
-    "id": "sage", "name": "Мудрец",
+    "id": "sage",
+    "name": "Мудрец",
     "description": "Годы среди книг и свитков в библиотеках и университетах научили вас многому о мире и магии.",
-    "abilities": ["con", "int", "wis"],
-    "feat": "magic-initiate", "featNote": "список волшебника",
-    "skills": ["arcana", "history"],
-    "tool": "Каллиграфические принадлежности",
+    "abilities": [
+      "con",
+      "int",
+      "wis"
+    ],
+    "feat": "magic-initiate",
+    "featNote": "список волшебника",
+    "skills": [
+      "arcana",
+      "history"
+    ],
+    "tool": {
+      "itemId": "calligraphers-supplies"
+    },
     "equipment": [
-      { "id": "A", "items": [
-        { "itemId": "quarterstaff" }, { "itemId": "calligraphers-supplies" }, { "itemId": "book" },
-        { "itemId": "parchment", "quantity": 8 }, { "itemId": "robe" } ], "gold": 8 },
-      { "id": "B", "items": [], "gold": 50 }
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "quarterstaff"
+          },
+          {
+            "itemId": "calligraphers-supplies"
+          },
+          {
+            "itemId": "book"
+          },
+          {
+            "itemId": "parchment",
+            "quantity": 8
+          },
+          {
+            "itemId": "robe"
+          }
+        ],
+        "gold": 8
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
     ]
   },
   {
-    "id": "soldier", "name": "Солдат",
+    "id": "soldier",
+    "name": "Солдат",
     "description": "Вы начали военную службу, едва повзрослев, и знаете цену дисциплине и боевому братству.",
-    "abilities": ["str", "dex", "con"],
+    "abilities": [
+      "str",
+      "dex",
+      "con"
+    ],
     "feat": "savage-attacker",
-    "skills": ["athletics", "intimidation"],
-    "tool": "Игровой набор (кости)",
+    "skills": [
+      "athletics",
+      "intimidation"
+    ],
+    "tool": {
+      "choose": "gaming"
+    },
     "equipment": [
-      { "id": "A", "items": [
-        { "itemId": "spear" }, { "itemId": "shortbow" }, { "itemId": "arrow", "quantity": 20 }, { "itemId": "dice-set" },
-        { "itemId": "healers-kit" }, { "itemId": "quiver" }, { "itemId": "travelers-clothes" } ], "gold": 14 },
-      { "id": "B", "items": [], "gold": 50 }
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "spear"
+          },
+          {
+            "itemId": "shortbow"
+          },
+          {
+            "itemId": "arrow",
+            "quantity": 20
+          },
+          {
+            "chosenTool": "background"
+          },
+          {
+            "itemId": "healers-kit"
+          },
+          {
+            "itemId": "quiver"
+          },
+          {
+            "itemId": "travelers-clothes"
+          }
+        ],
+        "gold": 14
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
     ]
   }
 ]

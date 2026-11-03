@@ -2,14 +2,21 @@
 // Файлы — src/data/rules/*.json, валидация — src/game/rulesData.ts.
 import type { Ability } from '../engine/abilities'
 import type { SkillId } from '../engine/skills'
+import type { ItemCatalog, ToolKind } from './items'
 
 export interface NamedText {
   name: string
   description: string
 }
 
-/** Строка снаряжения: предмет из справочника или набор (pack), который раскрывается в предметы. */
-export type EquipmentLine = { itemId: string; quantity?: number; packId?: undefined } | { packId: string; itemId?: undefined }
+/**
+ * Строка снаряжения: предмет из справочника, набор (pack), который раскрывается в предметы,
+ * или инструмент, выбранный игроком для класса или предыстории.
+ */
+export type EquipmentLine =
+  | { itemId: string; quantity?: number; packId?: undefined; chosenTool?: undefined }
+  | { packId: string; itemId?: undefined; chosenTool?: undefined }
+  | { chosenTool: 'class' | 'background'; itemId?: undefined; packId?: undefined }
 
 export interface EquipmentOption {
   /** «A», «B», «C» — как в книге. */
@@ -38,9 +45,21 @@ export interface ClassDefinition {
   /** Сколько навыков получают компетентность на 1-м уровне (Плут — 2). */
   expertise?: number
   armorTraining: string
+  /** Владение воинским оружием (простым владеют все классы SRD 5.2). */
+  martialWeapons: MartialWeaponTraining
+  /** Инструменты: заданные и на выбор. */
+  tools?: { fixed?: string[]; choose?: { count: number; kinds: ToolKind[] } }
+  /** Выбирает черту боевого стиля на 1-м уровне (Воин). */
+  fightingStyle?: boolean
   features: NamedText[]
   equipment: EquipmentOption[]
 }
+
+/** Воинское оружие: всё, никакое, только лёгкое (Монах), фехтовальное или лёгкое (Плут). */
+export type MartialWeaponTraining = 'all' | 'none' | 'light' | 'finesse-or-light'
+
+/** Инструмент предыстории: конкретный или на выбор указанного вида. */
+export type ToolGrant = { itemId: string; choose?: undefined } | { choose: ToolKind; itemId?: undefined }
 
 export interface BackgroundDefinition {
   id: string
@@ -52,7 +71,7 @@ export interface BackgroundDefinition {
   /** Уточнение к черте, например «список жреца». */
   featNote?: string
   skills: SkillId[]
-  tool: string
+  tool: ToolGrant
   equipment: EquipmentOption[]
 }
 
@@ -81,9 +100,14 @@ export interface SpeciesDefinition {
   originFeat?: boolean
 }
 
+export const FEAT_CATEGORIES = ['origin', 'fighting-style'] as const
+export type FeatCategory = (typeof FEAT_CATEGORIES)[number]
+
 export interface FeatDefinition {
   id: string
   name: string
+  /** Черта происхождения или черта боевого стиля. */
+  category: FeatCategory
   description: string
   /** Сколько навыков даёт черта на выбор (Одарённый — 3). */
   skillChoices?: number
@@ -101,4 +125,6 @@ export interface RulesData {
   species: Record<string, SpeciesDefinition>
   feats: Record<string, FeatDefinition>
   packs: Record<string, PackDefinition>
+  /** Справочник предметов, на который ссылаются данные. */
+  catalog: ItemCatalog
 }

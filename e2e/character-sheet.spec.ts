@@ -4,8 +4,8 @@ import { collectPageErrors, continueGame, expectNoHorizontalScroll, startQuickGa
 
 async function openStatsTab(page: Page, isMobile: boolean) {
   if (isMobile) await page.locator('.inventory-toggle').tap()
-  await expect(page.getByRole('tab', { name: 'Снаряжение' })).toHaveAttribute('aria-selected', 'true')
-  await page.getByRole('tab', { name: 'Характеристики' }).click()
+  // При первом запуске открыта вкладка «Характеристики».
+  await expect(page.getByRole('tab', { name: 'Характеристики' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.locator('#sheet-panel-stats')).toBeVisible()
 }
 
@@ -50,13 +50,14 @@ test('вкладка «Характеристики»: характеристи�
 
 test('вкладки переключаются стрелками с клавиатуры', async ({ page, isMobile }) => {
   test.skip(isMobile, 'клавиатура — на десктопе')
-  await page.getByRole('tab', { name: 'Снаряжение' }).focus()
+  await page.getByRole('tab', { name: 'Характеристики' }).focus()
   await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('tab', { name: 'Снаряжение' })).toBeFocused()
+  await expect(page.getByRole('tab', { name: 'Снаряжение' })).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('ArrowLeft')
   await expect(page.getByRole('tab', { name: 'Характеристики' })).toBeFocused()
   await expect(page.getByRole('tab', { name: 'Характеристики' })).toHaveAttribute('aria-selected', 'true')
-  await page.keyboard.press('ArrowLeft')
-  await expect(page.getByRole('tab', { name: 'Снаряжение' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.locator('.item-button').first()).toBeVisible()
+  await expect(page.locator('#sheet-panel-stats')).toBeVisible()
 })
 
 test('состояния из сохранения: Отравлен снижает пассивное Восприятие, Истощение показывает уровень', async ({ page, isMobile }) => {

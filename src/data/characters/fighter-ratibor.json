@@ -31,12 +31,16 @@
         "perception": "proficient",
         "survival": "proficient",
         "insight": "proficient"
-      }
+      },
+      "tools": [
+        "dice-set"
+      ]
     },
     "conditions": [],
     "feats": [
       "savage-attacker",
-      "alert"
+      "alert",
+      "great-weapon-fighting"
     ],
     "appearance": "Широкоплечий ветеран с коротко стриженной бородой и шрамом через бровь. Носит потёртую кольчугу со знаком своего бывшего отряда."
   },
@@ -125,9 +129,9 @@
       }
     ],
     "equipped": {
-      "weapon": "greatsword",
-      "armor": "chain-mail",
-      "shield": null
+      "mainHand": "greatsword",
+      "offHand": null,
+      "armor": "chain-mail"
     }
   }
 }

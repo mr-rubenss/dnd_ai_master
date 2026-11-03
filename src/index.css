@@ -626,18 +626,90 @@ textarea {
 
 .equipment-list li {
   display: grid;
-  grid-template-columns: 26px 56px 1fr;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon slot button'
+    'icon item button';
   align-items: center;
-  gap: 6px;
-  padding: 5px 0;
+  column-gap: 8px;
+  padding: 6px 0;
   font-size: 0.92rem;
 }
 
+.equipment-list li + li {
+  border-top: 1px solid rgba(58, 45, 32, 0.6);
+}
+
+.equipment-list .item-icon {
+  grid-area: icon;
+}
+
 .equipment-slot {
-  font-size: 0.72rem;
+  grid-area: slot;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.equipment-item {
+  grid-area: item;
+  min-width: 0;
+}
+
+.attack-notes {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.slot-button,
+.item-action {
+  grid-area: button;
+  padding: 3px 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--bg);
+  font-size: 0.78rem;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.slot-button:hover,
+.item-action:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.item-action.is-primary {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.equip-error {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--blood-bright);
+  border-radius: 0 4px 4px 0;
+  background: rgba(142, 42, 34, 0.15);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #f0b8ae;
+}
+
+.fact-list--compact {
+  grid-template-columns: minmax(0, 1fr);
+  font-size: 0.85rem;
+}
+
+.fact-list--compact dd {
+  margin-bottom: 6px;
 }
 
 .equipment-item small {
@@ -1709,6 +1781,106 @@ textarea {
   .fact-list dd {
     margin-bottom: 4px;
   }
+}
+
+/* ---------- Своя предыстория ---------- */
+
+.tool-select {
+  max-width: 420px;
+  margin-top: 12px;
+}
+
+.tool-select select {
+  padding: 7px 8px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.shop-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shop-filter {
+  width: 100%;
+  max-width: 420px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+}
+
+.shop-list {
+  max-height: 320px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overscroll-behavior: contain;
+}
+
+.shop-list li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.86rem;
+}
+
+.shop-list li + li {
+  border-top: 1px solid rgba(58, 45, 32, 0.6);
+}
+
+.shop-list li.is-chosen {
+  background: rgba(201, 164, 92, 0.1);
+}
+
+.shop-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shop-cost {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.shop-qty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shop-qty span {
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-qty button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.shop-qty button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* ---------- Игровой стол (броски) ---------- */

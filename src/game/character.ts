@@ -3,29 +3,41 @@
 import { ABILITIES, abilityModifier, type AbilityScores } from '../engine/abilities'
 import { CONDITIONS, MAX_EXHAUSTION } from '../engine/conditions'
 import { SKILLS } from '../engine/skills'
-import type { Character, CharacterSheet, Inventory } from '../types/character'
+import type { Character, CharacterSheet, Equipment, Inventory } from '../types/character'
 import type { ItemCatalog } from '../types/items'
+import { EQUIPMENT_SLOTS, equipmentProblems } from './equipment'
 import { isInt, isNonEmptyString, isNumber, isObject, ValidationError } from './validation'
+
+/** Что нужно для расчёта КД. */
+export interface ArmorClassSubject {
+  abilities: AbilityScores
+  classId?: string
+  /** id черт: Оборона даёт +1 в доспехе. */
+  feats?: string[]
+}
 
 /**
  * Класс доспеха от надетой экипировки.
- * Без доспеха: 10 + Лов (или Защита без доспехов Варвара и Монаха). Лёгкий: база + Лов. Средний: база + Лов (макс. +2). Тяжёлый: база. Щит: +бонус.
+ * Без доспеха: 10 + Лов (Защита без доспехов: Варвар +Тел, Монах без щита +Мдр).
+ * Лёгкий: база + Лов. Средний: база + Лов (макс. +2). Тяжёлый: база. Щит во второй руке: +2.
+ * Оборона (боевой стиль): +1, если надет доспех.
  */
-export function armorClass(abilities: AbilityScores, inventory: Inventory, catalog: ItemCatalog, classId?: string): number {
+export function armorClass(subject: ArmorClassSubject, inventory: Inventory, catalog: ItemCatalog): number {
+  const { abilities, classId } = subject
   const dex = abilityModifier(abilities.dex)
   const armor = inventory.equipped.armor ? catalog[inventory.equipped.armor]?.armor : undefined
-  const hasShield = Boolean(inventory.equipped.shield)
+  const offHand = inventory.equipped.offHand ? catalog[inventory.equipped.offHand]?.armor : undefined
+  const shield = offHand?.type === 'shield' ? offHand : undefined
   let ac: number
-  // Защита без доспехов: Варвар — 10 + ЛОВ + ТЕЛ (щит можно), Монах — 10 + ЛОВ + МДР (без щита).
   if (!armor && classId === 'barbarian') ac = 10 + dex + abilityModifier(abilities.con)
-  else if (!armor && classId === 'monk' && !hasShield) ac = 10 + dex + abilityModifier(abilities.wis)
+  else if (!armor && classId === 'monk' && !shield) ac = 10 + dex + abilityModifier(abilities.wis)
   else if (!armor) ac = 10 + dex
   else if (armor.type === 'light') ac = armor.baseAC + dex
   else if (armor.type === 'medium') ac = armor.baseAC + Math.min(dex, 2)
   else ac = armor.baseAC
 
-  const shield = inventory.equipped.shield ? catalog[inventory.equipped.shield]?.armor : undefined
-  if (shield?.type === 'shield') ac += shield.baseAC
+  if (shield) ac += shield.baseAC
+  if (armor && subject.feats?.includes('defense')) ac += 1
   return ac
 }
 
@@ -78,6 +90,9 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
         fail(`character.proficiencies.savingThrows: массив из ${ABILITIES.join(', ')}`)
       } else if (new Set(prof.savingThrows).size !== prof.savingThrows.length) {
         fail('character.proficiencies.savingThrows: характеристики не должны повторяться')
+      }
+      if (!Array.isArray(prof.tools) || !prof.tools.every((t) => typeof t === 'string' && catalog[t]?.toolKind !== undefined)) {
+        fail('character.proficiencies.tools: массив id инструментов из справочника')
       }
       if (!isObject(prof.skills)) {
         fail('character.proficiencies.skills: должно быть объектом { навык: "proficient" | "expertise" }')
@@ -132,27 +147,11 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
     }
 
     const eq = inv.equipped
-    if (!isObject(eq)) {
-      fail('inventory.equipped: должно быть объектом { weapon, armor, shield }')
-    } else {
-      const slot = (name: 'weapon' | 'armor' | 'shield', check: (id: string) => string | null) => {
-        const id = eq[name]
-        if (id === null) return
-        if (typeof id !== 'string') return fail(`inventory.equipped.${name}: id предмета или null`)
-        if (!owned.has(id)) return fail(`inventory.equipped.${name}: предмета "${id}" нет в инвентаре`)
-        const error = check(id)
-        if (error) fail(`inventory.equipped.${name}: ${error}`)
-      }
-      slot('weapon', (id) => (catalog[id].weapon ? null : `"${id}" — не оружие`))
-      slot('armor', (id) => {
-        const armor = catalog[id].armor
-        return armor && armor.type !== 'shield' ? null : `"${id}" — не доспех`
-      })
-      slot('shield', (id) => (catalog[id].armor?.type === 'shield' ? null : `"${id}" — не щит`))
-
-      const weaponId = typeof eq.weapon === 'string' ? eq.weapon : null
-      if (weaponId && eq.shield && catalog[weaponId]?.weapon?.properties.includes('two-handed')) {
-        fail('inventory.equipped: двуручное оружие нельзя использовать вместе со щитом')
+    if (!isObject(eq) || !EQUIPMENT_SLOTS.every((slot) => eq[slot] === null || typeof eq[slot] === 'string')) {
+      fail('inventory.equipped: должно быть объектом { mainHand, offHand, armor } с id предметов или null')
+    } else if (Array.isArray(inv.items) && inv.items.every((e) => isObject(e) && typeof e.itemId === 'string' && catalog[e.itemId])) {
+      for (const problem of equipmentProblems(eq as unknown as Equipment, inv as unknown as Inventory, catalog)) {
+        fail(`inventory.equipped: ${problem}`)
       }
     }
   }

@@ -6,7 +6,15 @@ import { roll, type Rng, type RollResult } from '../engine/dice'
 import { SKILLS, type SkillId } from '../engine/skills'
 import type { CharacterSheet, Equipment, InventoryEntry } from '../types/character'
 import type { ItemCatalog } from '../types/items'
-import type { ClassDefinition, EquipmentOption, RulesData, SkillChoice } from '../types/rules'
+import type { ToolKind } from '../types/items'
+import type { BackgroundDefinition, ClassDefinition, EquipmentOption, RulesData, SkillChoice } from '../types/rules'
+import {
+  buildCustomBackground,
+  CUSTOM_BACKGROUND_ID,
+  emptyCustomBackground,
+  validateBackgroundTemplate,
+  type CustomBackgroundInput,
+} from './backgroundTemplate'
 
 export const CREATION_STEPS = [
   { id: 'class', title: 'Класс' },
@@ -30,6 +38,14 @@ export type BonusMode = 'two-one' | 'one-one-one'
 
 export interface CreationDraft {
   classId: string | null
+  /** Черта боевого стиля (Воин). */
+  fightingStyle: string | null
+  /** Инструменты, выбранные для класса (Бард — 3 музыкальных, Монах — 1). */
+  classTools: string[]
+  /** Инструмент предыстории, если он на выбор (Солдат — игровой набор). */
+  backgroundTool: string | null
+  /** Своя предыстория (используется, когда backgroundId === 'custom'). */
+  customBackground: CustomBackgroundInput
   backgroundId: string | null
   /** Прибавки предыстории: +2 и +1 к двум характеристикам или +1 ко всем трём. */
   bonusMode: BonusMode
@@ -58,6 +74,10 @@ export interface CreationDraft {
 export function emptyDraft(): CreationDraft {
   return {
     classId: null,
+    fightingStyle: null,
+    classTools: [],
+    backgroundTool: null,
+    customBackground: emptyCustomBackground(),
     backgroundId: null,
     bonusMode: 'two-one',
     bonusPlus2: null,
@@ -83,25 +103,56 @@ export function emptyDraft(): CreationDraft {
 
 export function chooseClass(draft: CreationDraft, classId: string): CreationDraft {
   if (draft.classId === classId) return draft
-  return { ...draft, classId, classSkills: [], expertise: [], classEquipment: null }
+  return { ...draft, classId, fightingStyle: null, classTools: [], classSkills: [], expertise: [], classEquipment: null }
+}
+
+/** Навыки предыстории даются автоматически — убираем их из выбранных в других местах. */
+function withoutGranted(draft: CreationDraft, data: RulesData): CreationDraft {
+  const granted = new Set(backgroundOf(draft, data)?.skills ?? [])
+  const keep = (skills: SkillId[]) => skills.filter((s) => !granted.has(s))
+  return {
+    ...draft,
+    classSkills: keep(draft.classSkills),
+    speciesSkills: keep(draft.speciesSkills),
+    featSkills: keep(draft.featSkills),
+  }
 }
 
 export function chooseBackground(draft: CreationDraft, backgroundId: string, data: RulesData): CreationDraft {
   if (draft.backgroundId === backgroundId) return draft
-  // Навыки предыстории даются автоматически — убираем их из выбранных в других местах.
-  const granted = new Set(data.backgrounds[backgroundId]?.skills ?? [])
-  const keep = (skills: SkillId[]) => skills.filter((s) => !granted.has(s))
-  return {
-    ...draft,
-    backgroundId,
-    bonusPlus2: null,
-    bonusPlus1: null,
-    backgroundEquipment: null,
-    classSkills: keep(draft.classSkills),
-    speciesSkills: keep(draft.speciesSkills),
-    featSkills: keep(draft.featSkills),
-    expertise: [],
-  }
+  return withoutGranted(
+    { ...draft, backgroundId, bonusPlus2: null, bonusPlus1: null, backgroundTool: null, backgroundEquipment: null, expertise: [] },
+    data,
+  )
+}
+
+/** Изменяет свою предысторию; прибавки к убранным характеристикам и конфликтующие навыки сбрасываются. */
+export function updateCustomBackground(draft: CreationDraft, patch: Partial<CustomBackgroundInput>, data: RulesData): CreationDraft {
+  const customBackground = { ...draft.customBackground, ...patch }
+  const keepBonus = (a: Ability | null) => (a && customBackground.abilities.includes(a) ? a : null)
+  const next = { ...draft, customBackground, bonusPlus2: keepBonus(draft.bonusPlus2), bonusPlus1: keepBonus(draft.bonusPlus1) }
+  return patch.skills ? withoutGranted(next, data) : next
+}
+
+/** Предыстория черновика: готовая из данных или своя, собранная по шаблону. */
+export function backgroundOf(draft: CreationDraft, data: RulesData): BackgroundDefinition | undefined {
+  if (draft.backgroundId === CUSTOM_BACKGROUND_ID) return buildCustomBackground(draft.customBackground, data.catalog)
+  return draft.backgroundId ? data.backgrounds[draft.backgroundId] : undefined
+}
+
+/** Инструменты, которыми будет владеть персонаж: от класса и предыстории. */
+export function toolProficiencies(draft: CreationDraft, data: RulesData): string[] {
+  const cls = draft.classId ? data.classes[draft.classId] : undefined
+  const background = backgroundOf(draft, data)
+  const backgroundTool = background?.tool.itemId || (background?.tool.choose ? draft.backgroundTool : null)
+  return [...new Set([...(cls?.tools?.fixed ?? []), ...draft.classTools, ...(backgroundTool ? [backgroundTool] : [])])]
+}
+
+/** Инструменты вида (или видов) из справочника. */
+export function toolsOfKinds(kinds: ToolKind[], data: RulesData): string[] {
+  return Object.values(data.catalog)
+    .filter((item) => item.toolKind && kinds.includes(item.toolKind))
+    .map((item) => item.id)
 }
 
 export function chooseSpecies(draft: CreationDraft, speciesId: string): CreationDraft {
@@ -145,9 +196,9 @@ export function abilityPool(draft: CreationDraft): number[] {
 
 /** Прибавки от предыстории. */
 export function backgroundBonuses(draft: CreationDraft, data: RulesData): Partial<Record<Ability, number>> {
-  const background = draft.backgroundId ? data.backgrounds[draft.backgroundId] : undefined
+  const background = backgroundOf(draft, data)
   if (!background) return {}
-  if (draft.bonusMode === 'one-one-one') return Object.fromEntries(background.abilities.map((a) => [a, 1]))
+  if (draft.bonusMode === 'one-one-one') return Object.fromEntries((background.abilities ?? []).map((a) => [a, 1]))
   const bonuses: Partial<Record<Ability, number>> = {}
   if (draft.bonusPlus2) bonuses[draft.bonusPlus2] = 2
   if (draft.bonusPlus1) bonuses[draft.bonusPlus1] = 1
@@ -190,16 +241,23 @@ const resolveChoice = (choice: SkillChoice): SkillId[] => (choice.from === 'any'
 
 /** Навыки, которые даются без выбора (предыстория). */
 export function grantedSkills(draft: CreationDraft, data: RulesData): SkillId[] {
-  return draft.backgroundId ? [...(data.backgrounds[draft.backgroundId]?.skills ?? [])] : []
+  return [...(backgroundOf(draft, data)?.skills ?? [])]
 }
 
-/** Черты персонажа: от предыстории и (у Человека) на выбор. */
+/** Черты персонажа: от предыстории, (у Человека) черта происхождения на выбор и боевой стиль (Воин). */
 export function chosenFeats(draft: CreationDraft, data: RulesData): string[] {
   const feats: string[] = []
-  const background = draft.backgroundId ? data.backgrounds[draft.backgroundId] : undefined
-  if (background) feats.push(background.feat)
+  const background = backgroundOf(draft, data)
+  if (background?.feat) feats.push(background.feat)
   if (draft.originFeat) feats.push(draft.originFeat)
-  return feats
+  const cls = draft.classId ? data.classes[draft.classId] : undefined
+  if (cls?.fightingStyle && draft.fightingStyle) feats.push(draft.fightingStyle)
+  return [...new Set(feats)]
+}
+
+/** Черты нужной категории (происхождения или боевого стиля). */
+export function featsOfCategory(category: 'origin' | 'fighting-style', data: RulesData) {
+  return Object.values(data.feats).filter((f) => f.category === category)
 }
 
 /** Все выборы навыков: класс, вид (Эльф, Человек), черта «Одарённый». */
@@ -236,12 +294,24 @@ function findOption(options: EquipmentOption[] | undefined, id: string | null) {
   return id ? options?.find((o) => o.id === id) : undefined
 }
 
-/** Раскрывает вариант снаряжения в предметы (наборы — в их содержимое). */
-export function expandEquipment(option: EquipmentOption, data: RulesData): InventoryEntry[] {
+/** Инструменты, выбранные игроком, на которые ссылается снаряжение ({ "chosenTool": "class" }). */
+export interface ChosenTools {
+  class?: string | null
+  background?: string | null
+}
+
+/** Раскрывает вариант снаряжения в предметы (наборы — в их содержимое, выбранный инструмент — в предмет). */
+export function expandEquipment(option: EquipmentOption, data: RulesData, chosen: ChosenTools = {}): InventoryEntry[] {
   const lines: InventoryEntry[] = []
   for (const line of option.items) {
-    if (line.packId !== undefined) lines.push(...data.packs[line.packId].contents.map((c) => ({ ...c })))
-    else lines.push({ itemId: line.itemId, quantity: line.quantity ?? 1 })
+    if (line.chosenTool !== undefined) {
+      const itemId = chosen[line.chosenTool]
+      if (itemId) lines.push({ itemId, quantity: 1 })
+    } else if (line.packId !== undefined) {
+      lines.push(...data.packs[line.packId].contents.map((c) => ({ ...c })))
+    } else {
+      lines.push({ itemId: line.itemId, quantity: line.quantity ?? 1 })
+    }
   }
   return lines
 }
@@ -254,39 +324,39 @@ export function mergeItems(lines: InventoryEntry[]): InventoryEntry[] {
 }
 
 /**
- * Что надеть: лучший доспех, щит и первое оружие из списка. Если оружие двуручное, а есть щит —
- * берётся первое одноручное оружие; если такого нет — щит не надевается.
+ * Что надеть: лучший доспех, в основную руку — первое оружие ближнего боя (или дальнобойное),
+ * во вторую — щит. Если оружие двуручное, а есть щит, — берётся первое одноручное оружие;
+ * если такого нет — щит остаётся в рюкзаке.
  */
 export function autoEquip(items: InventoryEntry[], catalog: ItemCatalog): Equipment {
   const defs = items.map((i) => catalog[i.itemId]).filter(Boolean)
-  const armor = defs
-    .filter((d) => d.armor && d.armor.type !== 'shield')
-    .sort((a, b) => b.armor!.baseAC - a.armor!.baseAC)[0]
+  const armor = defs.filter((d) => d.armor && d.armor.type !== 'shield').sort((a, b) => b.armor!.baseAC - a.armor!.baseAC)[0]
   const shield = defs.find((d) => d.armor?.type === 'shield')
-  const weapons = defs.filter((d) => d.weapon && !d.weapon.properties.includes('ammunition'))
+  const melee = defs.filter((d) => d.weapon && !d.weapon.properties.includes('ammunition'))
   const ranged = defs.filter((d) => d.weapon?.properties.includes('ammunition'))
-  const oneHanded = weapons.find((d) => !d.weapon!.properties.includes('two-handed'))
-  let weapon = weapons[0] ?? ranged[0]
+  const oneHanded = melee.find((d) => !d.weapon!.properties.includes('two-handed'))
+  let weapon = melee[0] ?? ranged[0]
   let useShield = Boolean(shield)
   if (shield && weapon?.weapon?.properties.includes('two-handed')) {
     if (oneHanded) weapon = oneHanded
     else useShield = false
   }
-  return { weapon: weapon?.id ?? null, armor: armor?.id ?? null, shield: useShield && shield ? shield.id : null }
+  return { mainHand: weapon?.id ?? null, offHand: useShield && shield ? shield.id : null, armor: armor?.id ?? null }
 }
 
 export function startingInventory(draft: CreationDraft, data: RulesData, catalog: ItemCatalog) {
   const cls = draft.classId ? data.classes[draft.classId] : undefined
-  const background = draft.backgroundId ? data.backgrounds[draft.backgroundId] : undefined
+  const background = backgroundOf(draft, data)
   const classOption = findOption(cls?.equipment, draft.classEquipment)
   const backgroundOption = findOption(background?.equipment, draft.backgroundEquipment)
+  const chosen: ChosenTools = { class: draft.classTools[0] ?? null, background: draft.backgroundTool }
   const lines = [
-    ...(classOption ? expandEquipment(classOption, data) : []),
-    ...(backgroundOption ? expandEquipment(backgroundOption, data) : []),
+    ...(classOption ? expandEquipment(classOption, data, chosen) : []),
+    ...(backgroundOption ? expandEquipment(backgroundOption, data, chosen) : []),
   ]
   const items = mergeItems(lines)
   return {
-    gold: (classOption?.gold ?? 0) + (backgroundOption?.gold ?? 0),
+    gold: Math.round(((classOption?.gold ?? 0) + (backgroundOption?.gold ?? 0)) * 100) / 100,
     items,
     equipped: autoEquip(items, catalog),
   }
@@ -308,17 +378,40 @@ export function startingHitPoints(draft: CreationDraft, data: RulesData, con: nu
 export function stepProblems(step: CreationStep, draft: CreationDraft, data: RulesData): string[] {
   const problems: string[] = []
   const cls = draft.classId ? data.classes[draft.classId] : undefined
-  const background = draft.backgroundId ? data.backgrounds[draft.backgroundId] : undefined
+  const background = backgroundOf(draft, data)
   const species = draft.speciesId ? data.species[draft.speciesId] : undefined
 
   switch (step) {
     case 'class':
-      if (!cls) problems.push('Выберите класс')
+      if (!cls) {
+        problems.push('Выберите класс')
+        break
+      }
+      if (cls.fightingStyle && (!draft.fightingStyle || data.feats[draft.fightingStyle]?.category !== 'fighting-style')) {
+        problems.push('Выберите боевой стиль')
+      }
+      if (cls.tools?.choose) {
+        const { count, kinds } = cls.tools.choose
+        const allowed = new Set(toolsOfKinds(kinds, data))
+        if (draft.classTools.length !== count) problems.push(`Выберите инструменты: ${count} (выбрано ${draft.classTools.length})`)
+        else if (!draft.classTools.every((t) => allowed.has(t)) || new Set(draft.classTools).size !== count) {
+          problems.push('Этот инструмент нельзя выбрать для класса')
+        }
+      }
       break
     case 'background':
       if (!background) {
         problems.push('Выберите предысторию')
-      } else if (draft.bonusMode === 'two-one') {
+        break
+      }
+      if (background.id === CUSTOM_BACKGROUND_ID) {
+        problems.push(...validateBackgroundTemplate(background, { feats: data.feats, catalog: data.catalog }))
+        if (problems.length > 0) break
+      }
+      if (background.tool.choose && (!draft.backgroundTool || data.catalog[draft.backgroundTool]?.toolKind !== background.tool.choose)) {
+        problems.push('Выберите инструмент предыстории')
+      }
+      if (draft.bonusMode === 'two-one') {
         if (!draft.bonusPlus2 || !draft.bonusPlus1) problems.push('Распределите прибавки +2 и +1')
         else if (draft.bonusPlus2 === draft.bonusPlus1) problems.push('Прибавки +2 и +1 должны быть к разным характеристикам')
         else if (![draft.bonusPlus2, draft.bonusPlus1].every((a) => background.abilities.includes(a))) {
@@ -333,7 +426,7 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
         if (species.choice && !species.choice.options.some((o) => o.id === draft.speciesOption)) {
           problems.push(`Выберите: ${species.choice.label.toLowerCase()}`)
         }
-        if (species.originFeat && (!draft.originFeat || !data.feats[draft.originFeat])) problems.push('Выберите черту происхождения')
+        if (species.originFeat && data.feats[draft.originFeat ?? '']?.category !== 'origin') problems.push('Выберите черту происхождения')
       }
       break
     case 'abilities': {
@@ -399,7 +492,7 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
   if (problems.length > 0) throw new CreationError(problems)
 
   const cls = data.classes[draft.classId!]
-  const background = data.backgrounds[draft.backgroundId!]
+  const background = backgroundOf(draft, data)!
   const species = data.species[draft.speciesId!]
   const abilities = finalScores(draft, data)!
   const hp = startingHitPoints(draft, data, abilities.con)
@@ -423,7 +516,7 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
       abilities,
       maxHp: hp,
       hp,
-      proficiencies: { savingThrows: [...cls.savingThrows], skills },
+      proficiencies: { savingThrows: [...cls.savingThrows], skills, tools: toolProficiencies(draft, data) },
       conditions: [],
       feats: chosenFeats(draft, data),
       appearance: draft.appearance.trim(),

@@ -8,7 +8,7 @@ import { parseCharacterSheet } from './character'
 import { parseItemCatalog } from './items'
 import { parseLocation } from './location'
 import { roll } from '../engine/dice'
-import { createNewGame, diceRolled, gameReducer, MAX_ROLL_LOG, messageAdded, parseGameState } from './state'
+import { changeEquipment, createNewGame, diceRolled, gameReducer, MAX_ROLL_LOG, messageAdded, parseGameState } from './state'
 import { createGameStore, SAVE_KEY, SAVE_VERSION, type KeyValueStorage } from './store'
 
 const catalog = parseItemCatalog(itemsJson)
@@ -67,6 +67,36 @@ describe('журнал бросков', () => {
     expect(state.rolls).toHaveLength(MAX_ROLL_LOG)
     expect(state.rolls[0].label).toBe('#5')
     expect(state.rolls.at(-1)?.label).toBe(`#${MAX_ROLL_LOG + 4}`)
+  })
+})
+
+describe('смена экипировки через хранилище', () => {
+  it('правила проверяются до действия; редьюсер применяет новую экипировку', () => {
+    const state = newGame()
+    const take = changeEquipment(state, catalog, { kind: 'equip', itemId: 'flail', slot: 'mainHand' })
+    expect(take.ok).toBe(true)
+    if (!take.ok) return
+    expect(take.action).toEqual({
+      type: 'equipmentChanged',
+      equipped: { mainHand: 'flail', offHand: null, armor: 'chain-mail' },
+      change: { kind: 'equip', itemId: 'flail', slot: 'mainHand' },
+    })
+    const next = gameReducer(state, take.action)
+    expect(next.inventory.equipped.mainHand).toBe('flail')
+    expect(state.inventory.equipped.mainHand).toBe('greatsword')
+    expect(parseState(next)).toBe(next)
+  })
+
+  it('нарушение правил — причина вместо действия', () => {
+    expect(changeEquipment(newGame(), catalog, { kind: 'equip', itemId: 'javelin', slot: 'offHand' })).toEqual({
+      ok: false,
+      reason: '«Метательное копьё» не лёгкое — во вторую руку можно взять только лёгкое оружие',
+    })
+  })
+
+  it('«Убрать» освобождает слот', () => {
+    const result = changeEquipment(newGame(), catalog, { kind: 'unequip', slot: 'armor' })
+    expect(result.ok && gameReducer(newGame(), result.action).inventory.equipped.armor).toBeNull()
   })
 })
 
@@ -169,8 +199,27 @@ describe('хранилище игры', () => {
 
   it('переносит сохранение версии 3: вид, предыстория и черты из шаблона', () => {
     const store = createGameStore(options(oldSave(3, stripV4)))
-    expect(store.getState()!.character).toMatchObject({ speciesId: 'human', backgroundId: 'soldier', feats: ['savage-attacker', 'alert'] })
+    expect(store.getState()!.character).toMatchObject({
+      speciesId: 'human',
+      backgroundId: 'soldier',
+      feats: ['savage-attacker', 'alert', 'great-weapon-fighting'],
+    })
     expect(store.getState()!.messages.at(-1)?.text).toBe('Старый ход')
+  })
+
+  it('переносит сохранение версии 4: руки вместо слотов «оружие/щит», инструменты и боевой стиль из шаблона', () => {
+    const storage = oldSave(4, (s) => {
+      const inventory = s.inventory as { equipped: Record<string, unknown> }
+      inventory.equipped = { weapon: 'greatsword', armor: 'chain-mail', shield: null }
+      const proficiencies = s.character.proficiencies as Record<string, unknown>
+      delete proficiencies.tools
+      s.character.feats = ['savage-attacker', 'alert']
+    })
+    const state = createGameStore(options(storage)).getState()!
+    expect(state.inventory.equipped).toEqual({ mainHand: 'greatsword', offHand: null, armor: 'chain-mail' })
+    expect(state.character.proficiencies.tools).toEqual(['dice-set'])
+    expect(state.character.feats).toEqual(['savage-attacker', 'alert', 'great-weapon-fighting'])
+    expect(state.messages.at(-1)?.text).toBe('Старый ход')
   })
 
   it('сохранение версии 3 неизвестного персонажа тоже загружается', () => {

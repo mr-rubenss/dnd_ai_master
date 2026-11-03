@@ -19,6 +19,8 @@ export interface Proficiencies {
   savingThrows: Ability[]
   /** Навыки с владением или компетентностью; отсутствующие — без владения. */
   skills: Partial<Record<SkillId, Exclude<ProficiencyLevel, 'none'>>>
+  /** Инструменты, которыми владеет персонаж (id предметов справочника). */
+  tools: string[]
 }
 
 /** Всё, что нужно правилам проверок от персонажа (или НПС). */

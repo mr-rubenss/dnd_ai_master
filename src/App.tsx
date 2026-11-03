@@ -9,7 +9,7 @@ import { NarrationLog } from './components/NarrationLog'
 import { PlayerInput } from './components/PlayerInput'
 import { itemCatalog, locations, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
-import { diceRolled, messageAdded } from './game/state'
+import { changeEquipment, diceRolled, messageAdded, type EquipmentChange } from './game/state'
 import { gameStore, useGameState } from './hooks/useGame'
 import type { CharacterSheet } from './types/character'
 import type { GameState } from './types/game'
@@ -92,6 +92,13 @@ function GameScreen({ state }: { state: GameState }) {
     }
   }
 
+  const handleEquipChange = (change: EquipmentChange): string | null => {
+    const result = changeEquipment(state, itemCatalog, change)
+    if (!result.ok) return result.reason
+    gameStore.dispatch(result.action)
+    return null
+  }
+
   return (
     <>
       <div className="layout">
@@ -102,7 +109,7 @@ function GameScreen({ state }: { state: GameState }) {
             <PlayerInput onSend={handleSend} disabled={waiting} leading={<DiceTray rolls={state.rolls} onRoll={handleRoll} />} />
           </section>
         </main>
-        <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
+        <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} onEquipChange={handleEquipChange} />
       </div>
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}
     </>

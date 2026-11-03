@@ -5,7 +5,7 @@ import type { GameState } from '../types/game'
 import { gameReducer, type GameAction } from './state'
 
 export const SAVE_KEY = 'ai-master:save'
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -67,6 +67,25 @@ export function migrateSave(save: unknown, context: MigrationContext = {}): unkn
       },
     }
     version = 4
+  }
+  if (version === 4) {
+    // v5: руки вместо слотов «оружие/щит», владение инструментами. Ратибор (по шаблону) получает
+    // новые черты шаблона (боевой стиль); остальные персонажи — только переименование слотов.
+    const s = state as { character?: { id?: unknown; proficiencies?: object; feats?: unknown }; inventory?: { equipped?: Record<string, unknown> } }
+    const id = typeof s.character?.id === 'string' ? s.character.id : ''
+    const template = context.characterTemplate?.(id)
+    const old = s.inventory?.equipped ?? {}
+    const feats = Array.isArray(s.character?.feats) ? (s.character.feats as string[]) : []
+    state = {
+      ...s,
+      character: {
+        ...s.character,
+        proficiencies: { ...s.character?.proficiencies, tools: structuredClone(template?.proficiencies.tools ?? []) },
+        feats: [...new Set([...feats, ...(template?.feats ?? [])])],
+      },
+      inventory: { ...s.inventory, equipped: { mainHand: old.weapon ?? null, offHand: old.shield ?? null, armor: old.armor ?? null } },
+    }
+    version = 5
   }
   return version === SAVE_VERSION ? state : null
 }
