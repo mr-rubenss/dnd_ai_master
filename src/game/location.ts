@@ -97,33 +97,57 @@ export function parseLocation(raw: unknown): LocationData {
   // Объекты
   if (!Array.isArray(raw.objects)) fail('"objects" должно быть массивом')
   const objects = (Array.isArray(raw.objects) ? raw.objects : []) as unknown[]
+  /** Какой объект занимает клетку: "x,y" → описание объекта для сообщения об ошибке. */
+  const occupied = new Map<string, string>()
   objects.forEach((obj, i) => {
-    const where = `objects[${i}]`
+    let where = `objects[${i}]`
     if (!isObject(obj)) return fail(`${where}: должен быть объектом`)
+    if (isNonEmptyString(obj.id)) where += ` "${obj.id}"`
     checkId(obj.id, where)
     if (!isOneOf(OBJECT_TYPES, obj.type)) fail(`${where}: "type" должно быть одним из: ${OBJECT_TYPES.join(', ')}`)
     if (!isNonEmptyString(obj.name)) fail(`${where}: "name" должно быть непустой строкой`)
     if (obj.description !== undefined && typeof obj.description !== 'string') fail(`${where}: "description" должно быть строкой`)
+    let sizeOk = true
     for (const key of ['w', 'h'] as const) {
       if (obj[key] !== undefined && (!isInt(obj[key]) || (obj[key] as number) < 1)) {
         fail(`${where}: "${key}" должно быть положительным целым числом`)
+        sizeOk = false
       }
     }
-    if (!checkCell(obj, where)) return
+    if (!checkCell(obj, where) || !sizeOk) return
     const w = (obj.w as number | undefined) ?? 1
     const h = (obj.h as number | undefined) ?? 1
-    if (obj.x + w > width || obj.y + h > height) fail(`${where}: объект выходит за пределы карты`)
-    if (obj.type === 'door') {
-      if (tile(obj.x, obj.y) !== TILE_WALL) fail(`${where}: дверь должна стоять на клетке стены "#"`)
-    } else {
-      for (let dy = 0; dy < h; dy++) {
-        for (let dx = 0; dx < w; dx++) {
-          if (tile(obj.x + dx, obj.y + dy) !== TILE_FLOOR) {
-            fail(`${where}: объект должен стоять на полу "." (клетка ${obj.x + dx}, ${obj.y + dy})`)
-            return
-          }
+    if (obj.x + w > width || obj.y + h > height) {
+      return fail(
+        `${where}: объект размером ${w}×${h} в клетке (${obj.x}, ${obj.y}) выходит за пределы карты ${width}×${height}`,
+      )
+    }
+
+    const isDoor = obj.type === 'door'
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        const cx = obj.x + dx
+        const cy = obj.y + dy
+        if (isDoor && tile(cx, cy) !== TILE_WALL) {
+          return fail(`${where}: дверь должна стоять на клетке стены "#", а клетка (${cx}, ${cy}) — не стена`)
+        }
+        if (!isDoor && tile(cx, cy) !== TILE_FLOOR) {
+          return fail(`${where}: объект должен стоять на полу ".", а клетка (${cx}, ${cy}) — не пол`)
         }
       }
+    }
+
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        const key = `${obj.x + dx},${obj.y + dy}`
+        const other = occupied.get(key)
+        if (other) {
+          return fail(`${where}: клетка (${obj.x + dx}, ${obj.y + dy}) уже занята объектом ${other}`)
+        }
+      }
+    }
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) occupied.set(`${obj.x + dx},${obj.y + dy}`, where)
     }
   })
 
@@ -131,15 +155,18 @@ export function parseLocation(raw: unknown): LocationData {
   if (!Array.isArray(raw.npcs)) fail('"npcs" должно быть массивом')
   const npcs = (Array.isArray(raw.npcs) ? raw.npcs : []) as unknown[]
   npcs.forEach((npc, i) => {
-    const where = `npcs[${i}]`
+    let where = `npcs[${i}]`
     if (!isObject(npc)) return fail(`${where}: должен быть объектом`)
+    if (isNonEmptyString(npc.id)) where += ` "${npc.id}"`
     checkId(npc.id, where)
     if (!isNonEmptyString(npc.name)) fail(`${where}: "name" должно быть непустой строкой`)
     if (npc.description !== undefined && typeof npc.description !== 'string') fail(`${where}: "description" должно быть строкой`)
     if (npc.attitude !== undefined && !isOneOf(NPC_ATTITUDES, npc.attitude)) {
       fail(`${where}: "attitude" должно быть одним из: ${NPC_ATTITUDES.join(', ')}`)
     }
-    if (checkCell(npc, where) && tile(npc.x, npc.y) !== TILE_FLOOR) fail(`${where}: НПС должен стоять на полу "."`)
+    if (checkCell(npc, where) && tile(npc.x, npc.y) !== TILE_FLOOR) {
+      fail(`${where}: НПС должен стоять на полу ".", а клетка (${npc.x}, ${npc.y}) — ${tile(npc.x, npc.y) === TILE_WALL ? 'стена' : 'пустота'}`)
+    }
   })
 
   // Стартовая позиция игрока

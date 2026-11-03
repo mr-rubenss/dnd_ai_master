@@ -55,12 +55,14 @@
 - `npm run dev` — локальная разработка.
 - `npm run build` — проверка типов и сборка в `dist/`.
 - `npm run lint` — линтер (oxlint).
+- `npm test` — тесты (Vitest), `npm run test:watch` — в режиме наблюдения. Тесты лежат рядом с кодом: `*.test.ts`.
+  Логику правил и валидаторы данных покрывать тестами.
 - `base` в `vite.config.ts` при сборке равен `/dnd_ai_master/` (имя репозитория) — нужно для GitHub Pages.
   При переименовании репозитория обновить `REPO_NAME`.
-- `.github/workflows/deploy.yml` собирает и публикует сайт на GitHub Pages при каждом пуше в `main`.
+- `.github/workflows/deploy.yml` прогоняет тесты, собирает и публикует сайт на GitHub Pages при каждом пуше в `main`.
   В настройках репозитория: Settings → Pages → Source = **GitHub Actions**.
 
 ## Рабочий процесс
 
 - **После каждой завершённой задачи делать коммит и пуш.**
-- Перед коммитом убедиться, что `npm run build` проходит без ошибок.
+- Перед коммитом убедиться, что `npm test` и `npm run build` проходят без ошибок.
