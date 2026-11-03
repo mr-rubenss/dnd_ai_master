@@ -12,6 +12,7 @@ import {
 } from './abilities'
 import { conditionEffects, CONDITION_DEFINITIONS, resolveRollMode, type ActiveCondition } from './conditions'
 import { cryptoRng, formatNotation, roll, type RollMode, type RollResult, type Rng } from './dice'
+import type { ArmorType } from '../types/items'
 import { PROFICIENCY_MULTIPLIER, SKILL_DEFINITIONS, type ProficiencyLevel, type SkillId } from './skills'
 
 export interface Proficiencies {
@@ -19,6 +20,8 @@ export interface Proficiencies {
   savingThrows: Ability[]
   /** Навыки с владением или компетентностью; отсутствующие — без владения. */
   skills: Partial<Record<SkillId, Exclude<ProficiencyLevel, 'none'>>>
+  /** Владение доспехами: лёгкие, средние, тяжёлые, щиты (Armor Training из SRD 5.2). */
+  armor: ArmorType[]
   /** Инструменты, которыми владеет персонаж (id предметов справочника). */
   tools: string[]
 }

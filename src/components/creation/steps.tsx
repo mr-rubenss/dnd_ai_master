@@ -32,6 +32,7 @@ import {
   type CreationDraft,
 } from '../../game/creation'
 import type { ToolKind } from '../../types/items'
+import { armorTrainingText } from '../itemText'
 import type { EquipmentOption } from '../../types/rules'
 import { ChoiceChip, OptionCard } from './OptionCard'
 
@@ -99,7 +100,7 @@ export function ClassStep({ draft, update }: StepProps) {
               {selected.skillChoices.from === 'any' ? ' из любых' : `: ${skillList(selected.skillChoices.from)}`}
             </dd>
             <dt>Доспехи</dt>
-            <dd>{selected.armorTraining}</dd>
+            <dd>{armorTrainingText(selected.armorTraining)}</dd>
           </dl>
           <ul className="feature-list">
             {selected.features.map((f) => (

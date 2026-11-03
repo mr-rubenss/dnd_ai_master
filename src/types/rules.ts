@@ -2,7 +2,7 @@
 // Файлы — src/data/rules/*.json, валидация — src/game/rulesData.ts.
 import type { Ability } from '../engine/abilities'
 import type { SkillId } from '../engine/skills'
-import type { ItemCatalog, ToolKind } from './items'
+import type { ArmorType, ItemCatalog, ToolKind } from './items'
 
 export interface NamedText {
   name: string
@@ -44,7 +44,8 @@ export interface ClassDefinition {
   skillChoices: SkillChoice
   /** Сколько навыков получают компетентность на 1-м уровне (Плут — 2). */
   expertise?: number
-  armorTraining: string
+  /** Владение доспехами (Armor Training). */
+  armorTraining: ArmorType[]
   /** Владение воинским оружием (простым владеют все классы SRD 5.2). */
   martialWeapons: MartialWeaponTraining
   /** Инструменты: заданные и на выбор. */

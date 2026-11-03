@@ -60,6 +60,8 @@
   Инвентарь хранит только `itemId` и количество, свойства предмета берутся из справочника.
   У предметов есть цена `cost` в зм (без цены — не купить), у оружия `weapon.kind` (simple/martial),
   у инструментов `toolKind` (artisan/gaming/musical/kit); владение инструментами — `proficiencies.tools`.
+  Владение доспехами — `proficiencies.armor` (light/medium/heavy/shield, из `armorTraining` класса). КД — `armorClass`
+  в `src/game/character.ts`: щит без владения щитами не даёт КД (SRD 5.2); в справочнике все 12 доспехов SRD и щит.
 - Экипировка — руки: `{ mainHand, offHand, armor }`. Правила (двуручное, щит, два лёгких оружия, объяснение
   отказа) — `src/game/equipment.ts`, атаки оружием (бонус, урон, боевые стили) — `src/game/attacks.ts`.
   Смена экипировки — только через `changeEquipment` → действие `equipmentChanged` в хранилище.

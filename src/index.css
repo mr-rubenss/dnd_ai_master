@@ -2623,3 +2623,8 @@ textarea {
     display: block;
   }
 }
+
+.equip-warning {
+  display: block;
+  color: #d98a5c;
+}

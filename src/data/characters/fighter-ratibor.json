@@ -32,6 +32,7 @@
         "survival": "proficient",
         "insight": "proficient"
       },
+      "armor": ["light", "medium", "heavy", "shield"],
       "tools": [
         "dice-set"
       ]

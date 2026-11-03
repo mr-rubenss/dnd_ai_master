@@ -1,5 +1,5 @@
 // Единственный экземпляр хранилища игры, связанный с реальными данными и localStorage браузера.
-import { introMessages, itemCatalog, locations, startingLocation, startingSheet } from '../data'
+import { introMessages, itemCatalog, locations, rulesData, startingLocation, startingSheet } from '../data'
 import { createNewGame, parseGameState } from './state'
 import { createGameStore, type KeyValueStorage } from './store'
 
@@ -18,5 +18,6 @@ export const gameStore = createGameStore({
   migration: {
     characterTemplate: (id) => (id === startingSheet.character.id ? startingSheet.character : undefined),
     location: (id) => locations[id],
+    armorTraining: (classId) => rulesData.classes[classId]?.armorTraining,
   },
 })

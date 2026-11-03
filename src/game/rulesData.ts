@@ -3,7 +3,7 @@
 // (в том числе сгенерированном ИИ) не дошла до игры.
 import { ABILITIES } from '../engine/abilities'
 import { SKILLS } from '../engine/skills'
-import { TOOL_KINDS, type ItemCatalog } from '../types/items'
+import { ARMOR_TYPES, TOOL_KINDS, type ItemCatalog } from '../types/items'
 import type {
   BackgroundDefinition,
   ClassDefinition,
@@ -104,6 +104,9 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
     }
     checkSkillChoice(cls.skillChoices, where)
     if (cls.expertise !== undefined && (!isInt(cls.expertise) || cls.expertise < 1)) fail(`${where}: "expertise" — положительное целое`)
+    if (!Array.isArray(cls.armorTraining) || !cls.armorTraining.every((t) => (ARMOR_TYPES as readonly unknown[]).includes(t))) {
+      fail(`${where}: "armorTraining" — массив из ${ARMOR_TYPES.join(', ')}`)
+    }
     if (!['all', 'none', 'light', 'finesse-or-light'].includes(cls.martialWeapons as string)) {
       fail(`${where}: "martialWeapons" — all, none, light или finesse-or-light`)
     }

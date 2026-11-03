@@ -9,6 +9,7 @@ import {
 import { CONDITION_DEFINITIONS } from '../engine/conditions'
 import { SKILL_DEFINITIONS, SKILLS, type ProficiencyLevel } from '../engine/skills'
 import { itemCatalog, rulesData } from '../data'
+import { armorTrainingText } from './itemText'
 import type { Character } from '../types/character'
 
 const PROFICIENCY_TITLES: Record<ProficiencyLevel, string> = {
@@ -90,6 +91,8 @@ export function CharacterStats({ character }: { character: Character }) {
       <section className="inventory-section" aria-label="Владения и черты">
         <h3>Владения и черты</h3>
         <dl className="fact-list fact-list--compact">
+          <dt>Доспехи</dt>
+          <dd data-testid="armor-training">{armorTrainingText(character.proficiencies.armor)}</dd>
           <dt>Инструменты</dt>
           <dd data-testid="tool-proficiencies">
             {character.proficiencies.tools.length === 0 ? 'нет' : character.proficiencies.tools.map((id) => itemCatalog[id]?.name ?? id).join(', ')}

@@ -204,6 +204,11 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange }:
                       ) : (
                         item && itemSummary(item) && <small>{itemSummary(item)}</small>
                       )}
+                      {item?.armor?.type === 'shield' && !character.proficiencies.armor.includes('shield') && (
+                        <small className="equip-warning" data-testid="shield-untrained">
+                          Нет владения щитами — щит не прибавляет КД
+                        </small>
+                      )}
                     </span>
                     {item && (
                       <button

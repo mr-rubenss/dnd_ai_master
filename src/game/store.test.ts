@@ -113,6 +113,7 @@ describe('хранилище игры', () => {
     migration: {
       characterTemplate: (id: string) => (id === sheet.character.id ? sheet.character : undefined),
       location: (id: string) => locations[id],
+      armorTraining: (classId: string) => (classId === 'fighter' ? (['light', 'medium', 'heavy', 'shield'] as const) : undefined),
     },
   })
   /** Хранилище с уже начатой игрой. */
@@ -183,6 +184,8 @@ describe('хранилище игры', () => {
     }
     // До v6 стены занимали клетки, дверей в состоянии не было; (9, 12) — старая стартовая клетка таверны.
     if (version < 6) state.location = { id: 'drunken-griffin', player: { x: 9, y: 12 } }
+    // До v7 владения доспехами в листе не было.
+    if (version < 7) delete (state.character.proficiencies as Record<string, unknown>).armor
     strip(state)
     return memoryStorage({ [SAVE_KEY]: JSON.stringify({ version, state }) })
   }
@@ -243,6 +246,12 @@ describe('хранилище игры', () => {
     })
     expect(state.messages.at(-1)?.text).toBe('Старый ход')
     expect(state.character).toEqual(sheet.character)
+  })
+
+  it('переносит сохранение версии 6: владение доспехами из данных класса', () => {
+    const state = createGameStore(options(oldSave(6, () => {}))).getState()!
+    expect(state.character.proficiencies.armor).toEqual(['light', 'medium', 'heavy', 'shield'])
+    expect(state.messages.at(-1)?.text).toBe('Старый ход')
   })
 
   it('открытая дверь сохраняется в состоянии и переживает перезагрузку', () => {

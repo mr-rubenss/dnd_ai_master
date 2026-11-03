@@ -121,3 +121,25 @@ test('руки: щит, двуручное и парное оружие — с �
   await expect(armorClass(page)).toHaveText('16')
   await expectNoHorizontalScroll(page)
 })
+
+test('щит без владения щитами не прибавляет КД — и лист объясняет почему', async ({ page, isMobile }) => {
+  // Ратибор владеет всеми доспехами и щитами; уберём владение щитами и дадим ему щит и короткий меч.
+  await page.evaluate((key) => {
+    const save = JSON.parse(localStorage.getItem(key)!)
+    save.state.character.proficiencies.armor = ['light', 'medium', 'heavy']
+    save.state.inventory.items.push({ itemId: 'shield', quantity: 1 }, { itemId: 'shortsword', quantity: 1 })
+    localStorage.setItem(key, JSON.stringify(save))
+  }, SAVE_KEY)
+  await page.reload()
+  await continueGame(page)
+  if (isMobile) await page.locator('.inventory-toggle').click()
+  await expect(page.getByTestId('armor-training')).toHaveText('Все доспехи')
+
+  await openEquipment(page, isMobile)
+  await itemAction(page, 'shortsword', 'Взять в руки')
+  await itemAction(page, 'shield', 'Надеть')
+  await expect(slot(page, 'offHand')).toContainText('Щит')
+  await expect(page.getByTestId('shield-untrained')).toHaveText('Нет владения щитами — щит не прибавляет КД')
+  await expect(armorClass(page)).toHaveText('16')
+  await expectNoHorizontalScroll(page)
+})

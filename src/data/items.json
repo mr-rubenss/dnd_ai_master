@@ -497,6 +497,118 @@
     "cost": 50
   },
   {
+    "id": "padded-armor",
+    "name": "Стёганый доспех",
+    "category": "armor",
+    "icon": "🦺",
+    "weight": 8,
+    "description": "Лёгкий доспех: слои стёганой ткани и ваты. Шуршит при движении.",
+    "armor": {
+      "type": "light",
+      "baseAC": 11,
+      "stealthDisadvantage": true
+    },
+    "cost": 5
+  },
+  {
+    "id": "hide-armor",
+    "name": "Шкурный доспех",
+    "category": "armor",
+    "icon": "⛓️",
+    "weight": 12,
+    "description": "Средний доспех из толстых шкур и меха.",
+    "armor": {
+      "type": "medium",
+      "baseAC": 12
+    },
+    "cost": 10
+  },
+  {
+    "id": "scale-mail",
+    "name": "Чешуйчатый доспех",
+    "category": "armor",
+    "icon": "⛓️",
+    "weight": 45,
+    "description": "Средний доспех: кожаная куртка с нашитыми металлическими пластинками, как рыбья чешуя.",
+    "armor": {
+      "type": "medium",
+      "baseAC": 14,
+      "stealthDisadvantage": true
+    },
+    "cost": 50
+  },
+  {
+    "id": "breastplate",
+    "name": "Кираса",
+    "category": "armor",
+    "icon": "⛓️",
+    "weight": 20,
+    "description": "Средний доспех: подогнанный металлический нагрудник с кожаной поддёвкой.",
+    "armor": {
+      "type": "medium",
+      "baseAC": 14
+    },
+    "cost": 400
+  },
+  {
+    "id": "half-plate",
+    "name": "Полулаты",
+    "category": "armor",
+    "icon": "⛓️",
+    "weight": 40,
+    "description": "Средний доспех: металлические пластины, закрывающие большую часть тела.",
+    "armor": {
+      "type": "medium",
+      "baseAC": 15,
+      "stealthDisadvantage": true
+    },
+    "cost": 750
+  },
+  {
+    "id": "ring-mail",
+    "name": "Колечный доспех",
+    "category": "armor",
+    "icon": "🪖",
+    "weight": 40,
+    "description": "Тяжёлый доспех: кожаный доспех с нашитыми металлическими кольцами.",
+    "armor": {
+      "type": "heavy",
+      "baseAC": 14,
+      "stealthDisadvantage": true
+    },
+    "cost": 30
+  },
+  {
+    "id": "splint-armor",
+    "name": "Наборный доспех",
+    "category": "armor",
+    "icon": "🪖",
+    "weight": 60,
+    "description": "Тяжёлый доспех из узких вертикальных металлических полос на кожаной основе.",
+    "armor": {
+      "type": "heavy",
+      "baseAC": 17,
+      "strength": 15,
+      "stealthDisadvantage": true
+    },
+    "cost": 200
+  },
+  {
+    "id": "plate-armor",
+    "name": "Латы",
+    "category": "armor",
+    "icon": "🪖",
+    "weight": 65,
+    "description": "Тяжёлый доспех: сочленённые стальные пластины, закрывающие всё тело.",
+    "armor": {
+      "type": "heavy",
+      "baseAC": 18,
+      "strength": 15,
+      "stealthDisadvantage": true
+    },
+    "cost": 1500
+  },
+  {
     "id": "holy-symbol",
     "name": "Священный символ",
     "category": "gear",

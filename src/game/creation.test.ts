@@ -27,6 +27,7 @@ import {
   toolProficiencies,
   updateCustomBackground,
   type CreationDraft,
+  startingHitPoints,
 } from './creation'
 import { parseItemCatalog } from './items'
 import { parseRulesData } from './rulesData'
@@ -67,6 +68,42 @@ describe('данные правил SRD 5.2', () => {
     const ids = (category: string) => Object.values(data.feats).filter((f) => f.category === category).map((f) => f.id).sort()
     expect(ids('origin')).toEqual(['alert', 'magic-initiate', 'savage-attacker', 'skilled'])
     expect(ids('fighting-style')).toEqual(['archery', 'defense', 'great-weapon-fighting', 'two-weapon-fighting'])
+  })
+
+  it('кость хитов всех классов (SRD 5.2)', () => {
+    const hitDice = Object.fromEntries(Object.values(data.classes).map((c) => [c.id, c.hitDie]))
+    expect(hitDice).toEqual({
+      barbarian: 12,
+      bard: 8,
+      cleric: 8,
+      druid: 8,
+      fighter: 10,
+      monk: 8,
+      paladin: 10,
+      ranger: 10,
+      rogue: 8,
+      sorcerer: 6,
+      warlock: 8,
+      wizard: 6,
+    })
+  })
+
+  it('владение доспехами всех классов (SRD 5.2)', () => {
+    const training = Object.fromEntries(Object.values(data.classes).map((c) => [c.id, c.armorTraining]))
+    expect(training).toEqual({
+      barbarian: ['light', 'medium', 'shield'],
+      bard: ['light'],
+      cleric: ['light', 'medium', 'shield'],
+      druid: ['light', 'shield'],
+      fighter: ['light', 'medium', 'heavy', 'shield'],
+      monk: [],
+      paladin: ['light', 'medium', 'heavy', 'shield'],
+      ranger: ['light', 'medium', 'shield'],
+      rogue: ['light'],
+      sorcerer: [],
+      warlock: ['light'],
+      wizard: [],
+    })
   })
 
   it('кость хитов и спасброски классов', () => {
@@ -260,12 +297,29 @@ describe('готовый лист персонажа', () => {
     expect(character.proficiencies).toEqual({
       savingThrows: ['str', 'con'],
       skills: { athletics: 'proficient', intimidation: 'proficient', perception: 'proficient', survival: 'proficient', insight: 'proficient' },
+      armor: ['light', 'medium', 'heavy', 'shield'],
       tools: ['dice-set'],
     })
     expect(armorClass(character, inventory, catalog)).toBe(16)
     expect(inventoryWeight(inventory, catalog)).toBe(148)
     // Лист проходит ту же проверку, что и загружаемые персонажи.
     expect(parseCharacterSheet(sheet, catalog)).toEqual(sheet)
+  })
+
+  it.each([
+    ['barbarian', 10, 12],
+    ['fighter', 14, 12],
+    ['cleric', 15, 10],
+    ['rogue', 8, 7],
+    ['wizard', 12, 7],
+    ['sorcerer', 3, 2],
+  ])('хиты 1-го уровня: %s с ТЕЛ %i — %i (максимум кости хитов + мод. ТЕЛ)', (classId, con, hp) => {
+    const draft = { ...emptyDraft(), classId, speciesId: 'human' }
+    expect(startingHitPoints(draft, data, con)).toBe(hp)
+  })
+
+  it('хиты 1-го уровня у Дварфа: +1 (Дварфийская выносливость)', () => {
+    expect(startingHitPoints({ ...emptyDraft(), classId: 'wizard', speciesId: 'dwarf' }, data, 10)).toBe(7)
   })
 
   it('хиты: кость хитов + ТЕЛ, у Дварфа +1', () => {

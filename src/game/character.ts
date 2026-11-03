@@ -4,7 +4,7 @@ import { ABILITIES, abilityModifier, type AbilityScores } from '../engine/abilit
 import { CONDITIONS, MAX_EXHAUSTION } from '../engine/conditions'
 import { SKILLS } from '../engine/skills'
 import type { Character, CharacterSheet, Equipment, Inventory } from '../types/character'
-import type { ItemCatalog } from '../types/items'
+import { ARMOR_TYPES, type ArmorType, type ItemCatalog } from '../types/items'
 import { EQUIPMENT_SLOTS, equipmentProblems } from './equipment'
 import { isInt, isNonEmptyString, isNumber, isObject, ValidationError } from './validation'
 
@@ -14,12 +14,16 @@ export interface ArmorClassSubject {
   classId?: string
   /** id черт: Оборона даёт +1 в доспехе. */
   feats?: string[]
+  /** Владение доспехами: без владения щитами щит не даёт КД. */
+  proficiencies: { armor: readonly ArmorType[] }
 }
 
 /**
  * Класс доспеха от надетой экипировки.
  * Без доспеха: 10 + Лов (Защита без доспехов: Варвар +Тел, Монах без щита +Мдр).
- * Лёгкий: база + Лов. Средний: база + Лов (макс. +2). Тяжёлый: база. Щит во второй руке: +2.
+ * Лёгкий: база + Лов. Средний: база + Лов (макс. +2). Тяжёлый: база. Щит во второй руке: +2,
+ * но только при владении щитами (SRD 5.2, Armor Training: без него щит не даёт КД).
+ * Доспех без владения КД даёт как обычно (штрафы — помеха к броскам Сил/Лов и запрет колдовства).
  * Оборона (боевой стиль): +1, если надет доспех.
  */
 export function armorClass(subject: ArmorClassSubject, inventory: Inventory, catalog: ItemCatalog): number {
@@ -36,7 +40,7 @@ export function armorClass(subject: ArmorClassSubject, inventory: Inventory, cat
   else if (armor.type === 'medium') ac = armor.baseAC + Math.min(dex, 2)
   else ac = armor.baseAC
 
-  if (shield) ac += shield.baseAC
+  if (shield && subject.proficiencies.armor.includes('shield')) ac += shield.baseAC
   if (armor && subject.feats?.includes('defense')) ac += 1
   return ac
 }
@@ -90,6 +94,11 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
         fail(`character.proficiencies.savingThrows: массив из ${ABILITIES.join(', ')}`)
       } else if (new Set(prof.savingThrows).size !== prof.savingThrows.length) {
         fail('character.proficiencies.savingThrows: характеристики не должны повторяться')
+      }
+      if (!Array.isArray(prof.armor) || !prof.armor.every((t) => (ARMOR_TYPES as readonly unknown[]).includes(t))) {
+        fail(`character.proficiencies.armor: массив из ${ARMOR_TYPES.join(', ')}`)
+      } else if (new Set(prof.armor).size !== prof.armor.length) {
+        fail('character.proficiencies.armor: виды доспехов не должны повторяться')
       }
       if (!Array.isArray(prof.tools) || !prof.tools.every((t) => typeof t === 'string' && catalog[t]?.toolKind !== undefined)) {
         fail('character.proficiencies.tools: массив id инструментов из справочника')

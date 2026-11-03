@@ -1,5 +1,21 @@
 // Тексты для отображения предметов игроку.
-import type { DamageType, ItemCategory, ItemDefinition, WeaponMastery, WeaponProperty } from '../types/items'
+import type { ArmorType, DamageType, ItemCategory, ItemDefinition, WeaponMastery, WeaponProperty } from '../types/items'
+
+/** Владение доспехами текстом: «Лёгкие и средние доспехи, щиты», «Все доспехи, щиты», «нет». */
+export function armorTrainingText(training: readonly ArmorType[]): string {
+  const body = training.filter((t) => t !== 'shield')
+  const names = { light: 'лёгкие', medium: 'средние', heavy: 'тяжёлые' } as const
+  const parts: string[] = []
+  if (body.length === 3) parts.push('все доспехи')
+  else if (body.length > 0) {
+    const list = body.map((t) => names[t as keyof typeof names])
+    parts.push(`${list.length > 1 ? `${list.slice(0, -1).join(', ')} и ${list.at(-1)}` : list[0]} доспехи`)
+  }
+  if (training.includes('shield')) parts.push('щиты')
+  if (parts.length === 0) return 'нет'
+  const text = parts.join(', ')
+  return text[0].toUpperCase() + text.slice(1)
+}
 
 export const CATEGORY_LABELS: Record<ItemCategory, string> = {
   weapon: 'Оружие',

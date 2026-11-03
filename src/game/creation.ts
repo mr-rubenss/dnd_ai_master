@@ -516,7 +516,7 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
       abilities,
       maxHp: hp,
       hp,
-      proficiencies: { savingThrows: [...cls.savingThrows], skills, tools: toolProficiencies(draft, data) },
+      proficiencies: { savingThrows: [...cls.savingThrows], skills, armor: [...cls.armorTraining], tools: toolProficiencies(draft, data) },
       conditions: [],
       feats: chosenFeats(draft, data),
       appearance: draft.appearance.trim(),

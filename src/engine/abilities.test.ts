@@ -17,6 +17,11 @@ describe('характеристики', () => {
     expect(abilityModifier(score)).toBe(mod)
   })
 
+  it('модификатор для всех значений 1–30 — (значение − 10) / 2 с округлением вниз', () => {
+    const mods = Array.from({ length: 30 }, (_, i) => abilityModifier(i + 1))
+    expect(mods).toEqual([-5, -4, -4, -3, -3, -2, -2, -1, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10])
+  })
+
   it('бонус мастерства по уровням 1–20', () => {
     const byLevel = Array.from({ length: 20 }, (_, i) => proficiencyBonus(i + 1))
     expect(byLevel).toEqual([2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6])

@@ -22,7 +22,7 @@
         "survival"
       ]
     },
-    "armorTraining": "Лёгкие и средние доспехи, щиты",
+    "armorTraining": ["light", "medium", "shield"],
     "features": [
       {
         "name": "Ярость",
@@ -78,7 +78,7 @@
       "count": 3,
       "from": "any"
     },
-    "armorTraining": "Лёгкие доспехи",
+    "armorTraining": ["light"],
     "features": [
       {
         "name": "Бардовское вдохновение",
@@ -147,7 +147,7 @@
         "religion"
       ]
     },
-    "armorTraining": "Лёгкие и средние доспехи, щиты",
+    "armorTraining": ["light", "medium", "shield"],
     "features": [
       {
         "name": "Использование заклинаний",
@@ -213,7 +213,7 @@
         "survival"
       ]
     },
-    "armorTraining": "Лёгкие доспехи, щиты",
+    "armorTraining": ["light", "shield"],
     "features": [
       {
         "name": "Использование заклинаний",
@@ -293,7 +293,7 @@
         "survival"
       ]
     },
-    "armorTraining": "Все доспехи, щиты",
+    "armorTraining": ["light", "medium", "heavy", "shield"],
     "features": [
       {
         "name": "Боевой стиль",
@@ -392,7 +392,7 @@
         "stealth"
       ]
     },
-    "armorTraining": "Нет",
+    "armorTraining": [],
     "features": [
       {
         "name": "Боевые искусства",
@@ -464,7 +464,7 @@
         "religion"
       ]
     },
-    "armorTraining": "Все доспехи, щиты",
+    "armorTraining": ["light", "medium", "heavy", "shield"],
     "features": [
       {
         "name": "Наложение рук",
@@ -539,7 +539,7 @@
         "survival"
       ]
     },
-    "armorTraining": "Лёгкие и средние доспехи, щиты",
+    "armorTraining": ["light", "medium", "shield"],
     "features": [
       {
         "name": "Использование заклинаний",
@@ -622,7 +622,7 @@
       ]
     },
     "expertise": 2,
-    "armorTraining": "Лёгкие доспехи",
+    "armorTraining": ["light"],
     "features": [
       {
         "name": "Компетентность",
@@ -710,7 +710,7 @@
         "religion"
       ]
     },
-    "armorTraining": "Нет",
+    "armorTraining": [],
     "features": [
       {
         "name": "Использование заклинаний",
@@ -773,7 +773,7 @@
         "religion"
       ]
     },
-    "armorTraining": "Лёгкие доспехи",
+    "armorTraining": ["light"],
     "features": [
       {
         "name": "Таинственные воззвания",
@@ -842,7 +842,7 @@
         "religion"
       ]
     },
-    "armorTraining": "Нет",
+    "armorTraining": [],
     "features": [
       {
         "name": "Использование заклинаний",

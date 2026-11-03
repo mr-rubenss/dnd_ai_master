@@ -2,11 +2,12 @@
 
 import type { Character, CharacterSheet } from '../types/character'
 import type { GameState } from '../types/game'
+import type { ArmorType } from '../types/items'
 import type { LocationData } from '../types/location'
 import { gameReducer, initialDoorStates, type GameAction } from './state'
 
 export const SAVE_KEY = 'ai-master:save'
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -105,6 +106,15 @@ export function migrateSave(save: unknown, context: MigrationContext = {}): unkn
     }
     version = 6
   }
+  if (version === 6) {
+    // v7: владение доспехами в листе персонажа (без владения щитами щит не даёт КД). Берём из данных класса.
+    const s = state as { character?: { classId?: unknown; proficiencies?: object } }
+    const classId = typeof s.character?.classId === 'string' ? s.character.classId : ''
+    const armor = context.armorTraining?.(classId)
+    if (!armor) return null
+    state = { ...s, character: { ...s.character, proficiencies: { ...s.character?.proficiencies, armor: [...armor] } } }
+    version = 7
+  }
   return version === SAVE_VERSION ? state : null
 }
 
@@ -113,6 +123,8 @@ export interface MigrationContext {
   characterTemplate?: (characterId: string) => Character | undefined
   /** Локация по id — для переноса позиции и дверей на новый формат карт. */
   location?: (locationId: string) => LocationData | undefined
+  /** Владение доспехами класса по id — для сохранений без него. */
+  armorTraining?: (classId: string) => readonly ArmorType[] | undefined
 }
 
 export function loadSavedGame(
