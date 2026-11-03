@@ -3,7 +3,8 @@ import { InventoryPanel } from './components/InventoryPanel'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { PlayerInput } from './components/PlayerInput'
-import { mockInventory, mockLocation, mockMessages } from './data/mock'
+import { drunkenGriffin } from './data/locations'
+import { mockInventory, mockMessages } from './data/mock'
 import type { ChatMessage } from './types/game'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
@@ -32,7 +33,7 @@ function App() {
       </header>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={mockLocation} />
+          <MapPanel location={drunkenGriffin} player={drunkenGriffin.playerStart} />
           <section className="panel story-panel">
             <NarrationLog messages={messages} />
             <PlayerInput onSend={handleSend} disabled={waiting} />

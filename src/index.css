@@ -20,13 +20,6 @@
   --player-fg: #cfe0e6;
   --system-fg: #b8a77f;
 
-  --map-bg: #1a1510;
-  --map-grid: #2c2318;
-  --map-wall: #7a6142;
-  --map-entrance: #8fb07a;
-  --map-npc: #d4a94f;
-  --map-feature: #7aa3b8;
-  --map-exit: #b8463a;
 
   --font-display: 'Cormorant Garamond', Georgia, serif;
   --font-serif: 'Literata', Georgia, 'Times New Roman', serif;
@@ -149,72 +142,194 @@ textarea {
 }
 
 .map-canvas {
-  position: relative;
   flex: 1;
   min-height: 0;
   margin: 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background:
-    radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.55) 100%),
-    var(--map-bg);
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Карта вписывается в контейнер по ширине и высоте с сохранением пропорций. */
+  container-type: size;
 }
 
-.map-grid {
-  position: absolute;
-  inset: 0;
+.map-board {
+  position: relative;
+  aspect-ratio: var(--map-w) / var(--map-h);
+  width: min(100cqw, 100cqh * var(--map-w) / var(--map-h));
+}
+
+.map-svg {
+  display: block;
   width: 100%;
   height: 100%;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border), 0 6px 18px rgba(0, 0, 0, 0.6);
+  background: #0b0907;
 }
 
-.map-point {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+.floor--wood { fill: #4a3523; }
+.floor--wood.floor--alt { fill: #45311f; }
+.floor--stone { fill: #3d3a36; }
+.floor--stone.floor--alt { fill: #393632; }
+.floor--dirt { fill: #3f3424; }
+.floor--dirt.floor--alt { fill: #3b3021; }
+.floor--grass { fill: #2e3a22; }
+.floor--grass.floor--alt { fill: #2b361f; }
+
+.wall {
+  stroke: #0d0b09;
+  stroke-width: 0.04;
+}
+.wall--stone { fill: #5b544c; }
+.wall--wood { fill: #2f2014; }
+
+.grid-line {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 0.03;
+}
+
+.hit-area { fill: transparent; }
+
+.map-entity {
+  cursor: pointer;
+  outline: none;
+}
+
+.map-entity:hover > :not(.hit-area),
+.map-entity:focus-visible > :not(.hit-area),
+.map-entity.is-active > :not(.hit-area) {
+  filter: brightness(1.35) drop-shadow(0 0 0.12px #e3c27f);
+}
+
+.map-entity:focus-visible .hit-area,
+.map-entity.is-active .hit-area {
+  stroke: var(--gold-bright);
+  stroke-width: 0.05;
+  stroke-dasharray: 0.15 0.1;
+}
+
+/* Объекты */
+.obj-table { fill: #6b4628; stroke: #2a1a0d; stroke-width: 0.05; }
+.obj-table-top { fill: #7d5532; }
+.obj-mug { fill: #c9b48a; stroke: #3a2716; stroke-width: 0.03; }
+.obj-chair { fill: #5e3f22; stroke: #24170b; stroke-width: 0.04; }
+.obj-chair-back { fill: #3f2914; }
+.obj-bar { fill: #5a3519; stroke: #1f1209; stroke-width: 0.05; }
+.obj-bar-edge { fill: #8a5a30; }
+.obj-fire-glow { fill: url(#fire-glow); pointer-events: none; }
+.obj-fireplace { fill: #6a625a; stroke: #1c1916; stroke-width: 0.05; }
+.obj-fireplace-mouth { fill: #1a110b; }
+.obj-flame { fill: #f07b24; }
+.obj-flame-core { fill: #ffd36b; }
+.obj-barrel { fill: #7a5230; stroke: #2a1a0d; stroke-width: 0.05; }
+.obj-barrel-ring { fill: none; stroke: #3b3a37; stroke-width: 0.05; }
+.obj-barrel-tap { fill: #2a1a0d; }
+.obj-door { fill: #8a5a2b; stroke: #2a1a0d; stroke-width: 0.05; }
+.obj-door-plank { stroke: #5e3c1b; stroke-width: 0.03; }
+.obj-door-handle { fill: #d4b26a; }
+
+/* НПС */
+.npc-token {
+  stroke: #0b0907;
+  stroke-width: 0.07;
+}
+.npc-token--friendly { fill: #4f7a3f; }
+.npc-token--neutral { fill: #8a6d2f; }
+.npc-token--hostile { fill: #8e2a22; }
+
+.npc-initial {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.5px;
+  fill: #f6e9d6;
+  text-anchor: middle;
+  dominant-baseline: middle;
   pointer-events: none;
 }
 
-.map-point-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--point-color);
-  box-shadow: 0 0 10px var(--point-color);
-  border: 2px solid rgba(0, 0, 0, 0.6);
-}
-
-.map-point-label {
+.npc-label,
+.player-label {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  color: var(--fg);
-  text-shadow: 0 1px 3px #000, 0 0 6px #000;
+  font-weight: 700;
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke-linejoin: round;
 }
 
-.map-player {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  transform: translate(-50%, -50%) rotate(45deg);
-  background: var(--gold-bright);
-  border: 2px solid #000;
-  box-shadow: 0 0 14px var(--gold);
+.npc-label {
+  font-size: 0.5px;
+  fill: #f1e4c8;
+  stroke: #0b0907;
+  stroke-width: 0.14px;
 }
 
-.map-stub-note {
+/* Игрок */
+.player-ring {
+  fill: none;
+  stroke: var(--gold-bright);
+  stroke-width: 0.06;
+  filter: drop-shadow(0 0 0.15px #e3c27f);
+}
+.player-core { stroke: #0b0907; stroke-width: 0.05; }
+.player-label {
+  font-size: 0.32px;
+  fill: #2a1a0d;
+  dominant-baseline: middle;
+}
+
+/* Подсказка */
+.map-tooltip {
   position: absolute;
-  left: 8px;
-  top: 6px;
-  font-size: 0.7rem;
+  z-index: 2;
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 8px 10px;
+  background: rgba(20, 15, 11, 0.96);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.map-tooltip--center { transform: translateX(-50%); }
+.map-tooltip--right { transform: translateX(-100%); }
+.map-tooltip--above { translate: 0 calc(-100% - 6px); }
+.map-tooltip--below { translate: 0 6px; }
+
+.map-tooltip-kind {
+  display: block;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--muted);
-  opacity: 0.6;
+}
+
+.map-tooltip-name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold-bright);
+}
+
+.map-tooltip-text {
+  margin: 2px 0 0;
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.map-scale {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  background: rgba(11, 9, 7, 0.75);
+  border-radius: 3px;
+  pointer-events: none;
 }
 
 /* ---------- Повествование ---------- */
@@ -470,8 +585,16 @@ textarea {
   }
 
   .map-panel {
-    height: 45dvh;
-    min-height: 260px;
+    height: auto;
+  }
+
+  .map-canvas {
+    margin: 8px;
+    container-type: inline-size;
+  }
+
+  .map-board {
+    width: 100%;
   }
 
   .story-panel {
@@ -481,10 +604,6 @@ textarea {
 
   .message {
     max-width: 92%;
-  }
-
-  .map-point-label {
-    font-size: 0.8rem;
   }
 
   .inventory-heading {
