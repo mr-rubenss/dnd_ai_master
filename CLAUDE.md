@@ -69,12 +69,18 @@
 - `npm run lint` — линтер (oxlint).
 - `npm test` — тесты (Vitest), `npm run test:watch` — в режиме наблюдения. Тесты лежат рядом с кодом: `*.test.ts`.
   Логику правил и валидаторы данных покрывать тестами.
+- `npm run test:e2e` — e2e-тесты Playwright (`e2e/*.spec.ts`) на собранном сайте: сначала `npm run build`.
+  Два проекта: `desktop` (1440×900) и `mobile` (iPhone 13 на Chromium). Сайт отдаёт `e2e/serve.mjs`
+  по пути `/dnd_ai_master/`, как GitHub Pages. Случайность в e2e подменяется через `installRngQueue`/`queueRolls`.
+  Новые элементы интерфейса покрывать e2e-тестами, на телефоне проверять отсутствие горизонтальной прокрутки.
 - `base` в `vite.config.ts` при сборке равен `/dnd_ai_master/` (имя репозитория) — нужно для GitHub Pages.
   При переименовании репозитория обновить `REPO_NAME`.
-- `.github/workflows/deploy.yml` прогоняет тесты, собирает и публикует сайт на GitHub Pages при каждом пуше в `main`.
+- `.github/workflows/deploy.yml` прогоняет модульные тесты, собирает сайт, прогоняет e2e-тесты и только при их успехе
+  публикует сайт на GitHub Pages (при каждом пуше в `main`). При падении e2e отчёт Playwright сохраняется
+  как артефакт `playwright-report`.
   В настройках репозитория: Settings → Pages → Source = **GitHub Actions**.
 
 ## Рабочий процесс
 
 - **После каждой завершённой задачи делать коммит и пуш.**
-- Перед коммитом убедиться, что `npm test` и `npm run build` проходят без ошибок.
+- Перед коммитом убедиться, что `npm test`, `npm run build` и `npm run test:e2e` проходят без ошибок.

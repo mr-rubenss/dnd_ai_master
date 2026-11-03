@@ -24,8 +24,25 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Модульные тесты
+        run: npm test
+      - name: Сборка
+        run: npm run build
+      - name: Установка Chromium для Playwright
+        run: npx playwright install --with-deps chromium
+      # E2E-тесты проверяют собранный dist/. Если они упали, шаги ниже не выполняются
+      # и сайт не публикуется.
+      - name: E2E-тесты
+        run: npm run test:e2e
+      - name: Отчёт e2e-тестов
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

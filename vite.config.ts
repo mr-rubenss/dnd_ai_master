@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -9,4 +10,8 @@ const REPO_NAME = 'dnd_ai_master'
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'build' ? `/${REPO_NAME}/` : '/',
+  test: {
+    // Модульные тесты — только в src/; e2e-тесты (e2e/*.spec.ts) запускает Playwright.
+    include: ['src/**/*.test.ts'],
+  },
 }))
