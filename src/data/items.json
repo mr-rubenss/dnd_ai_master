@@ -1,0 +1,93 @@
+[
+  {
+    "id": "greatsword", "name": "Двуручный меч", "category": "weapon", "icon": "⚔️", "weight": 6,
+    "description": "Воинское рукопашное оружие. Длинный клинок, которым рубят обеими руками.",
+    "weapon": { "damage": "2d6", "damageType": "slashing", "properties": ["heavy", "two-handed"], "mastery": "graze" }
+  },
+  {
+    "id": "flail", "name": "Цеп", "category": "weapon", "icon": "🔨", "weight": 2,
+    "description": "Воинское рукопашное оружие. Шипастый шар на цепи, закреплённой на рукояти.",
+    "weapon": { "damage": "1d8", "damageType": "bludgeoning", "properties": [], "mastery": "sap" }
+  },
+  {
+    "id": "javelin", "name": "Метательное копьё", "category": "weapon", "icon": "🎯", "weight": 2,
+    "description": "Простое рукопашное оружие. Лёгкое копьё, которое удобно метать.",
+    "weapon": { "damage": "1d6", "damageType": "piercing", "properties": ["thrown"], "mastery": "slow", "range": { "normal": 30, "long": 120 } }
+  },
+  {
+    "id": "spear", "name": "Копьё", "category": "weapon", "icon": "🔱", "weight": 3,
+    "description": "Простое рукопашное оружие. Можно метать или держать двумя руками.",
+    "weapon": { "damage": "1d6", "damageType": "piercing", "properties": ["thrown", "versatile"], "mastery": "sap", "versatileDamage": "1d8", "range": { "normal": 20, "long": 60 } }
+  },
+  {
+    "id": "shortbow", "name": "Короткий лук", "category": "weapon", "icon": "🏹", "weight": 2,
+    "description": "Простое дальнобойное оружие. Нужны стрелы.",
+    "weapon": { "damage": "1d6", "damageType": "piercing", "properties": ["ammunition", "two-handed"], "mastery": "vex", "range": { "normal": 80, "long": 320 } }
+  },
+  {
+    "id": "arrow", "name": "Стрела", "category": "ammunition", "icon": "🪶", "weight": 0.05,
+    "description": "Боеприпас для лука. После боя половину выпущенных стрел можно найти."
+  },
+  {
+    "id": "quiver", "name": "Колчан", "category": "gear", "icon": "🧺", "weight": 1,
+    "description": "Вмещает до 20 стрел."
+  },
+  {
+    "id": "chain-mail", "name": "Кольчуга", "category": "armor", "icon": "⛓️", "weight": 55,
+    "description": "Тяжёлый доспех из переплетённых металлических колец поверх стёганой подкладки.",
+    "armor": { "type": "heavy", "baseAC": 16, "strength": 13, "stealthDisadvantage": true }
+  },
+  {
+    "id": "shield", "name": "Щит", "category": "armor", "icon": "🛡️", "weight": 6,
+    "description": "Деревянный или металлический щит, который держат в одной руке.",
+    "armor": { "type": "shield", "baseAC": 2 }
+  },
+  {
+    "id": "backpack", "name": "Рюкзак", "category": "gear", "icon": "🎒", "weight": 5,
+    "description": "Вмещает до 30 фунтов снаряжения."
+  },
+  {
+    "id": "caltrops", "name": "Калтропы (мешочек)", "category": "gear", "icon": "📌", "weight": 2,
+    "description": "Рассыпанные по полу шипы. Вошедший на них проходит спасбросок Ловкости Сл 15 или получает 1 колющий урон и теряет скорость до конца хода."
+  },
+  {
+    "id": "crowbar", "name": "Ломик", "category": "gear", "icon": "🔧", "weight": 5,
+    "description": "Даёт преимущество на проверки Силы там, где поможет рычаг."
+  },
+  {
+    "id": "oil", "name": "Масло (фляга)", "category": "consumable", "icon": "🛢️", "weight": 1,
+    "description": "Горючее масло. Флягу можно метнуть или разлить и поджечь."
+  },
+  {
+    "id": "rations", "name": "Рацион (1 день)", "category": "consumable", "icon": "🍖", "weight": 2,
+    "description": "Сухари, вяленое мясо, сушёные фрукты и орехи на один день."
+  },
+  {
+    "id": "rope", "name": "Верёвка (50 футов)", "category": "gear", "icon": "🪢", "weight": 5,
+    "description": "Пеньковая верёвка. Ею можно связать существо или подняться по ней."
+  },
+  {
+    "id": "tinderbox", "name": "Трутница", "category": "gear", "icon": "🔥", "weight": 1,
+    "description": "Кремень, огниво и трут. Позволяет разжечь огонь."
+  },
+  {
+    "id": "torch", "name": "Факел", "category": "consumable", "icon": "🔦", "weight": 1,
+    "description": "Горит 1 час, давая яркий свет в радиусе 20 футов и тусклый ещё на 20 футов."
+  },
+  {
+    "id": "healers-kit", "name": "Набор целителя", "category": "tool", "icon": "🩹", "weight": 3,
+    "description": "Бинты, мази и шины на 10 применений. Позволяет стабилизировать существо с 0 хитов без проверки."
+  },
+  {
+    "id": "dice-set", "name": "Игральные кости", "category": "tool", "icon": "🎲", "weight": 0,
+    "description": "Набор костей для азартных игр. Солдатская привычка."
+  },
+  {
+    "id": "travelers-clothes", "name": "Дорожная одежда", "category": "gear", "icon": "👕", "weight": 4,
+    "description": "Прочная одежда для долгих странствий."
+  },
+  {
+    "id": "silver-amulet", "name": "Серебряный амулет", "category": "treasure", "icon": "📿", "weight": 0,
+    "description": "Потемневший амулет с полустёртым гербом. Память о службе."
+  }
+]

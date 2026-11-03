@@ -15,25 +15,16 @@ import {
   type Npc,
   type Tile,
 } from '../types/location'
+import { isInt, isNonEmptyString, isObject, isOneOf, ValidationError } from './validation'
 
-export class LocationValidationError extends Error {
-  readonly problems: string[]
-
+export class LocationValidationError extends ValidationError {
   constructor(problems: string[]) {
-    super(`Некорректная локация:\n- ${problems.join('\n- ')}`)
+    super('Некорректная локация', problems)
     this.name = 'LocationValidationError'
-    this.problems = problems
   }
 }
 
 const VALID_TILES = new Set<string>([TILE_FLOOR, TILE_WALL, TILE_VOID])
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-const isInt = (value: unknown): value is number => Number.isInteger(value)
-const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== ''
-const isOneOf = <T extends string>(list: readonly T[], value: unknown): value is T =>
-  typeof value === 'string' && (list as readonly string[]).includes(value)
 
 /** Клетка плана по координатам; за пределами карты — пустота. */
 export function tileAt(location: LocationData, x: number, y: number): Tile {

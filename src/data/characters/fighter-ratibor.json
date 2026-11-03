@@ -1,0 +1,39 @@
+{
+  "character": {
+    "id": "ratibor",
+    "name": "Ратибор",
+    "species": "Человек",
+    "classId": "fighter",
+    "className": "Воин",
+    "background": "Солдат",
+    "level": 1,
+    "abilities": { "str": 17, "dex": 14, "con": 14, "int": 8, "wis": 12, "cha": 10 },
+    "maxHp": 12,
+    "hp": 12
+  },
+  "inventory": {
+    "gold": 18,
+    "items": [
+      { "itemId": "greatsword", "quantity": 1 },
+      { "itemId": "flail", "quantity": 1 },
+      { "itemId": "javelin", "quantity": 8 },
+      { "itemId": "spear", "quantity": 1 },
+      { "itemId": "shortbow", "quantity": 1 },
+      { "itemId": "arrow", "quantity": 20 },
+      { "itemId": "quiver", "quantity": 1 },
+      { "itemId": "chain-mail", "quantity": 1 },
+      { "itemId": "backpack", "quantity": 1 },
+      { "itemId": "caltrops", "quantity": 1 },
+      { "itemId": "crowbar", "quantity": 1 },
+      { "itemId": "oil", "quantity": 2 },
+      { "itemId": "rations", "quantity": 10 },
+      { "itemId": "rope", "quantity": 1 },
+      { "itemId": "tinderbox", "quantity": 1 },
+      { "itemId": "torch", "quantity": 10 },
+      { "itemId": "healers-kit", "quantity": 1 },
+      { "itemId": "dice-set", "quantity": 1 },
+      { "itemId": "travelers-clothes", "quantity": 1 }
+    ],
+    "equipped": { "weapon": "greatsword", "armor": "chain-mail", "shield": null }
+  }
+}

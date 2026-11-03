@@ -3,43 +3,55 @@ import { InventoryPanel } from './components/InventoryPanel'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { PlayerInput } from './components/PlayerInput'
-import { drunkenGriffin } from './data/locations'
-import { mockInventory, mockMessages } from './data/mock'
-import type { ChatMessage } from './types/game'
+import { itemCatalog, locations } from './data'
+import { messageAdded } from './game/state'
+import { gameStore, useGameState } from './hooks/useGame'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
 const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий пока не подключён — это заглушка.)'
 
 function App() {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages)
+  const state = useGameState()
+  const location = locations[state.location.id]
   const [waiting, setWaiting] = useState(false)
   const timerRef = useRef<number | undefined>(undefined)
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
   const handleSend = (text: string) => {
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), author: 'player', text }])
+    gameStore.dispatch(messageAdded('player', text))
     setWaiting(true)
     timerRef.current = window.setTimeout(() => {
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), author: 'master', text: STUB_REPLY }])
+      gameStore.dispatch(messageAdded('master', STUB_REPLY))
       setWaiting(false)
     }, 600)
+  }
+
+  const handleNewGame = () => {
+    if (window.confirm('Начать новую игру? Текущий прогресс будет потерян.')) {
+      window.clearTimeout(timerRef.current)
+      setWaiting(false)
+      gameStore.newGame()
+    }
   }
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>ИИ-Мастер</h1>
+        <button type="button" className="header-button" onClick={handleNewGame}>
+          Новая игра
+        </button>
       </header>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={drunkenGriffin} player={drunkenGriffin.playerStart} />
+          <MapPanel location={location} player={state.location.player} />
           <section className="panel story-panel">
-            <NarrationLog messages={messages} />
+            <NarrationLog messages={state.messages} />
             <PlayerInput onSend={handleSend} disabled={waiting} />
           </section>
         </main>
-        <InventoryPanel inventory={mockInventory} />
+        <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
       </div>
     </div>
   )

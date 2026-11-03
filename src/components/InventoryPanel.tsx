@@ -1,27 +1,42 @@
 import { useState } from 'react'
-import type { Inventory, InventoryItem } from '../types/game'
-
-const CATEGORY_LABELS: Record<InventoryItem['category'], string> = {
-  weapon: 'Оружие',
-  armor: 'Доспехи',
-  gear: 'Снаряжение',
-  consumable: 'Расходуемое',
-  treasure: 'Ценности',
-}
-
-const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as InventoryItem['category'][]
+import { armorClass, carryingCapacity, inventoryWeight } from '../game/character'
+import type { Character, Equipment, Inventory } from '../types/character'
+import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types/items'
+import { CATEGORY_LABELS, formatNumber, formatWeight, itemStatLines, itemSummary } from './itemText'
 
 interface Props {
+  character: Character
   inventory: Inventory
+  catalog: ItemCatalog
 }
 
-/** Панель инвентаря. На узком экране сворачивается в кнопку. */
-export function InventoryPanel({ inventory }: Props) {
+const SLOT_LABELS: Record<keyof Equipment, string> = {
+  weapon: 'Оружие',
+  armor: 'Доспех',
+  shield: 'Щит',
+}
+
+const SLOT_ICONS: Record<keyof Equipment, string> = {
+  weapon: '⚔️',
+  armor: '🥋',
+  shield: '🛡️',
+}
+
+/** Панель персонажа и инвентаря. На узком экране сворачивается в кнопку. */
+export function InventoryPanel({ character, inventory, catalog }: Props) {
   const [open, setOpen] = useState(false)
-  const totalWeight = inventory.items.reduce((sum, item) => sum + item.weight * item.quantity, 0)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const ac = armorClass(character.abilities, inventory, catalog)
+  const weight = inventoryWeight(inventory, catalog)
+  const capacity = carryingCapacity(character.abilities)
+  const hpPercent = Math.round((character.hp / character.maxHp) * 100)
+  const equippedIds = new Set(Object.values(inventory.equipped).filter((id): id is string => id !== null))
+  const weapon = inventory.equipped.weapon ? catalog[inventory.equipped.weapon] : undefined
+  const handsBusy = weapon?.weapon?.properties.includes('two-handed') ?? false
 
   return (
-    <aside className={`panel inventory-panel${open ? ' is-open' : ''}`} aria-label="Инвентарь">
+    <aside className={`panel inventory-panel${open ? ' is-open' : ''}`} aria-label="Персонаж и инвентарь">
       <button
         type="button"
         className="inventory-toggle"
@@ -29,49 +44,147 @@ export function InventoryPanel({ inventory }: Props) {
         aria-controls="inventory-content"
         onClick={() => setOpen((value) => !value)}
       >
-        <span>Инвентарь</span>
+        <span>{character.name}</span>
         <span className="inventory-toggle-meta">
-          {inventory.items.length} предм. · {open ? '▲' : '▼'}
+          ХП {character.hp}/{character.maxHp} · КД {ac} · {formatNumber(inventory.gold)} зм · {open ? '▲' : '▼'}
         </span>
       </button>
 
-      <header className="panel-header inventory-heading">
-        <h2>Инвентарь</h2>
-      </header>
-
       <div id="inventory-content" className="inventory-content">
-        <dl className="inventory-summary">
-          <div>
-            <dt>Золото</dt>
-            <dd>{inventory.gold} зм</dd>
-          </div>
-          <div>
-            <dt>Вес</dt>
-            <dd>{totalWeight} фнт.</dd>
-          </div>
-        </dl>
+        <section className="character-card" aria-label="Персонаж">
+          <h2 className="character-name">{character.name}</h2>
+          <p className="character-meta">
+            {character.species} · {character.className} {character.level} ур. · {character.background}
+          </p>
 
-        {CATEGORY_ORDER.map((category) => {
-          const items = inventory.items.filter((item) => item.category === category)
-          if (items.length === 0) return null
-          return (
-            <section key={category} className="inventory-group">
-              <h3>{CATEGORY_LABELS[category]}</h3>
-              <ul>
-                {items.map((item) => (
-                  <li key={item.id} className={item.equipped ? 'is-equipped' : undefined}>
-                    <span className="item-name">
-                      {item.name}
-                      {item.equipped && <span className="item-badge">надето</span>}
-                    </span>
-                    {item.quantity > 1 && <span className="item-qty">×{item.quantity}</span>}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )
-        })}
+          <div className="hp" aria-label={`Хиты: ${character.hp} из ${character.maxHp}`}>
+            <div className="hp-label">
+              <span>Хиты</span>
+              <strong>
+                {character.hp} / {character.maxHp}
+              </strong>
+            </div>
+            <div className="hp-bar">
+              <div
+                className={`hp-fill${hpPercent <= 25 ? ' is-critical' : hpPercent <= 50 ? ' is-wounded' : ''}`}
+                style={{ width: `${hpPercent}%` }}
+              />
+            </div>
+          </div>
+
+          <dl className="character-stats">
+            <div>
+              <dt>КД</dt>
+              <dd>{ac}</dd>
+            </div>
+            <div>
+              <dt>Золото</dt>
+              <dd>{formatNumber(inventory.gold)} зм</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="inventory-section" aria-label="Экипировка">
+          <h3>Экипировка</h3>
+          <ul className="equipment-list">
+            {(Object.keys(SLOT_LABELS) as (keyof Equipment)[]).map((slot) => {
+              const id = inventory.equipped[slot]
+              const item = id ? catalog[id] : undefined
+              const emptyNote = slot === 'shield' && handsBusy ? 'руки заняты двуручным оружием' : 'пусто'
+              return (
+                <li key={slot} className={item ? undefined : 'is-empty'}>
+                  <span className="item-icon" aria-hidden="true">
+                    {item?.icon ?? SLOT_ICONS[slot]}
+                  </span>
+                  <span className="equipment-slot">{SLOT_LABELS[slot]}</span>
+                  <span className="equipment-item">
+                    {item ? item.name : emptyNote}
+                    {item && itemSummary(item) && <small>{itemSummary(item)}</small>}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+
+        <section className="inventory-section" aria-label="Предметы">
+          <h3 className="items-heading">
+            Предметы
+            <span className={weight > capacity ? 'is-overloaded' : undefined}>
+              {formatNumber(weight)} / {formatWeight(capacity)}
+            </span>
+          </h3>
+
+          {ITEM_CATEGORIES.map((category) => {
+            const entries = inventory.items.filter((entry) => catalog[entry.itemId]?.category === category)
+            if (entries.length === 0) return null
+            return (
+              <div key={category} className="inventory-group">
+                <h4>{CATEGORY_LABELS[category]}</h4>
+                <ul>
+                  {entries.map((entry) => (
+                    <ItemRow
+                      key={entry.itemId}
+                      item={catalog[entry.itemId]}
+                      quantity={entry.quantity}
+                      equipped={equippedIds.has(entry.itemId)}
+                      expanded={expandedId === entry.itemId}
+                      onToggle={() => setExpandedId((cur) => (cur === entry.itemId ? null : entry.itemId))}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </section>
       </div>
     </aside>
+  )
+}
+
+interface ItemRowProps {
+  item: ItemDefinition
+  quantity: number
+  equipped: boolean
+  expanded: boolean
+  onToggle: () => void
+}
+
+function ItemRow({ item, quantity, equipped, expanded, onToggle }: ItemRowProps) {
+  const detailsId = `item-details-${item.id}`
+  return (
+    <li className={`item-row${expanded ? ' is-expanded' : ''}`}>
+      <button type="button" className="item-button" aria-expanded={expanded} aria-controls={detailsId} onClick={onToggle}>
+        <span className="item-icon" aria-hidden="true">
+          {item.icon}
+        </span>
+        <span className="item-name">
+          {item.name}
+          {equipped && <span className="item-badge">надето</span>}
+        </span>
+        <span className="item-qty">{quantity > 1 ? `×${quantity}` : ''}</span>
+        <span className="item-weight">{formatNumber(Math.round(item.weight * quantity * 100) / 100)}</span>
+      </button>
+      {expanded && (
+        <div id={detailsId} className="item-details">
+          <p>{item.description}</p>
+          <dl>
+            {itemStatLines(item).map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+            <div>
+              <dt>Вес</dt>
+              <dd>
+                {formatWeight(item.weight)}
+                {quantity > 1 && ` за шт., всего ${formatWeight(Math.round(item.weight * quantity * 100) / 100)}`}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </li>
   )
 }
