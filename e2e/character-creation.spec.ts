@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
-import { collectPageErrors, expectNoHorizontalScroll, face, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
+import { collectPageErrors, continueGame, expectNoHorizontalScroll, face, flushSaves, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
 
 const next = (page: Page) => page.getByRole('button', { name: 'Далее', exact: true })
 const option = (page: Page, group: string, id: string) => page.getByRole('radiogroup', { name: group }).locator(`[data-option="${id}"]`)
@@ -119,11 +119,19 @@ test('полный путь: плут-эльф с предысторией пр�
   await testInfo.attach('итоговый лист', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
   // Начало игры и сохранение: после перезагрузки — стартовый экран с «Продолжить».
+  // «Начать приключение» ведёт к новой истории: герой уже выбран, остаётся название и тон.
   await page.getByRole('button', { name: 'Начать приключение' }).click()
+  await expect(page.getByRole('heading', { name: 'Новая история' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /Тень/ })).toBeChecked()
+  await page.getByLabel('Название').fill('Тень над трактом')
+  await page.getByRole('radio', { name: 'Детектив' }).check()
+  await page.getByRole('button', { name: 'Начать историю' }).click()
   await expect(page.locator('.dice-tray-button')).toBeVisible()
+  await flushSaves(page)
   await page.reload()
+  await expect(page.getByTestId('menu-continue')).toContainText('«Тень над трактом»')
   await expect(page.getByTestId('menu-continue')).toContainText('Тень · Плут 1 ур. · Таверна «Пьяный грифон»')
-  await page.getByTestId('menu-continue').click()
+  await continueGame(page)
   if (await page.locator('.inventory-toggle').isVisible()) await page.locator('.inventory-toggle').click()
   await expect(page.locator('.character-name')).toHaveText('Тень')
   await expect(page.locator('.character-meta')).toHaveText('Эльф · Плут 1 ур. · Преступник')

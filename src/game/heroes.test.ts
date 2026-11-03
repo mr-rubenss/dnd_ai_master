@@ -1,11 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import fighterJson from '../data/characters/fighter-ratibor.json'
-import introJson from '../data/intro-messages.json'
 import itemsJson from '../data/items.json'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
-import storyJson from '../data/story.json'
+import adventureJson from '../data/adventures/drunken-griffin.json'
 import type { CharacterSheet } from '../types/character'
-import type { ChatMessage, GameState } from '../types/game'
+import type { StoryState } from '../types/story'
 import type { HeroRoster } from '../types/heroes'
 import { parseCharacterSheet } from './character'
 import {
@@ -22,18 +21,15 @@ import {
   retireHero,
   type RosterResult,
 } from './heroes'
-import { createHeroStore, HEROES_KEY, HEROES_VERSION } from './heroStore'
 import { parseItemCatalog } from './items'
 import { parseLocation } from './location'
-import { endStory, quickStart, renameEverywhere, saveHero, startStory, type Stores } from './session'
-import { createNewGame, gameReducer, messageAdded, parseGameState } from './state'
-import { createGameStore, type KeyValueStorage } from './store'
-import { beginStory, parseStory } from './story'
+import { parseAdventure } from './adventure'
+import { applyAction, makeAction, newStorySeed, player, storyMeta } from './storyActions'
 
 const catalog = parseItemCatalog(itemsJson)
 const location = parseLocation(drunkenGriffinJson)
 const locations = { [location.id]: location }
-const story = parseStory(storyJson, locations)
+const adventure = parseAdventure(adventureJson, locations)
 const ratibor = parseCharacterSheet(fighterJson, catalog)
 
 /** Другой герой: копия Ратибора с другим id, именем и классом. */
@@ -41,8 +37,15 @@ function otherHero(id = 'hero-2', name = 'Ингрид'): CharacterSheet {
   return { ...structuredClone(ratibor), character: { ...structuredClone(ratibor.character), id, name } }
 }
 
-function gameFor(sheet: CharacterSheet): GameState {
-  return createNewGame({ sheet, location, intro: introJson as ChatMessage[], story: beginStory(story, sheet.character.id) })
+let storySeq = 0
+/** Новая история с отрядом из этих героев. */
+function storyFor(...party: CharacterSheet[]): StoryState {
+  return newStorySeed({ id: `story-${++storySeq}`, title: 'Вечер в «Пьяном грифоне»', tone: 'light-adventure', adventure, locations, party, now: 1000 })
+}
+
+/** Реплика героя в истории (через действие). */
+function say(state: StoryState, heroId: string, text: string): StoryState {
+  return applyAction(state, makeAction(state.id, 1, { type: 'playerSpoke', heroId, messageId: crypto.randomUUID(), text }, player(heroId), 2000))
 }
 
 /** Успешный результат — список героев; при отказе тест падает. */
@@ -100,16 +103,16 @@ describe('список героев', () => {
 })
 
 describe('Зал славы', () => {
-  /** Ратибор в идущей игре с N ходами. */
+  /** Ратибор в идущей истории с N репликами. */
   function playing(turns: number) {
-    let game = gameFor(ratibor)
-    for (let i = 0; i < turns; i++) game = gameReducer(game, messageAdded('player', `ход ${i}`))
-    return { game, roster: ok(joinStory(withRatibor(), 'ratibor', game.story.id)) }
+    let story = storyFor(ratibor)
+    for (let i = 0; i < turns; i++) story = say(story, 'ratibor', `ход ${i}`)
+    return { story, roster: ok(joinStory(withRatibor(), 'ratibor', story.id)) }
   }
 
   it('завершённая история: герой уходит из списка в «Зал славы» с итогом пути', () => {
-    const { game, roster } = playing(3)
-    const result = ok(retireHero(roster, game, 'completed', 5000))
+    const { story, roster } = playing(3)
+    const result = ok(retireHero(roster, story, 'ratibor', 'completed', 5000))
     expect(result.heroes).toEqual([])
     expect(result.hallOfFame).toEqual([
       {
@@ -129,18 +132,25 @@ describe('Зал славы', () => {
   })
 
   it('гибель героя — тоже в «Зал славы», новые записи — первыми', () => {
-    const { game, roster } = playing(1)
-    const first = ok(retireHero(roster, game, 'fallen'))
+    const { story, roster } = playing(1)
+    const first = ok(retireHero(roster, story, 'ratibor', 'fallen'))
     expect(first.hallOfFame[0]).toMatchObject({ fate: 'fallen', summary: expect.stringMatching(/^Гибель в истории «Вечер в «Пьяном грифоне»» на 1-м уровне\. 1 ход,/) })
 
-    const second = gameFor(otherHero())
-    const withSecond = ok(joinStory(ok(addHero(first, createHeroRecord(otherHero()))), 'hero-2', second.story.id))
-    expect(ok(retireHero(withSecond, second, 'completed')).hallOfFame.map((e) => e.name)).toEqual(['Ингрид', 'Ратибор'])
+    const second = storyFor(otherHero())
+    const withSecond = ok(joinStory(ok(addHero(first, createHeroRecord(otherHero()))), 'hero-2', second.id))
+    expect(ok(retireHero(withSecond, second, 'hero-2', 'completed')).hallOfFame.map((e) => e.name)).toEqual(['Ингрид', 'Ратибор'])
+  })
+
+  it('в отряде из двух героев ходы считаются каждому свои', () => {
+    let story = storyFor(ratibor, otherHero())
+    story = say(say(say(story, 'ratibor', 'раз'), 'hero-2', 'два'), 'hero-2', 'три')
+    expect(heroSummary('completed', story, story.party[0])).toContain('1 ход,')
+    expect(heroSummary('completed', story, story.party[1])).toContain('2 хода,')
   })
 
   it('уйти в «Зал славы» может только герой этой истории', () => {
-    const { game } = playing(0)
-    expect(reason(retireHero(withRatibor(), game, 'completed'))).toBe('Ратибор не участвует в этой истории.')
+    const { story } = playing(0)
+    expect(reason(retireHero(withRatibor(), story, 'ratibor', 'completed'))).toBe('Ратибор не участвует в этой истории.')
   })
 
   it.each([
@@ -151,26 +161,28 @@ describe('Зал славы', () => {
     [21, '21 ход'],
     [24, '24 хода'],
   ])('итог пути: %i → «%s»', (turns, text) => {
-    expect(heroSummary('completed', playing(turns).game)).toContain(text)
+    const { story } = playing(turns)
+    expect(heroSummary('completed', story, story.party[0])).toContain(text)
   })
 })
 
-describe('согласование списка героев с сохранённой игрой', () => {
-  it('добавляет героя старого сохранения в список и отмечает его в истории', () => {
-    const game = gameFor(ratibor)
-    const roster = reconcileRoster(EMPTY_ROSTER, game, 1000)
-    expect(roster.heroes).toEqual([{ id: 'ratibor', portrait: '⚔️', createdAt: 1000, sheet: ratibor, storyId: game.story.id }])
+describe('согласование списка героев с историями', () => {
+  it('освобождает героев историй, которых больше нет или которые завершены', () => {
+    const roster = ok(joinStory(withRatibor(), 'ratibor', 'lost-run'))
+    expect(reconcileRoster(roster, []).heroes[0].storyId).toBeNull()
+    const done = { ...storyMeta(storyFor(ratibor), 1), id: 'lost-run', status: 'completed' as const }
+    expect(reconcileRoster(roster, [done]).heroes[0].storyId).toBeNull()
   })
 
-  it('освобождает героев историй, которых больше нет', () => {
-    const roster = ok(joinStory(withRatibor(), 'ratibor', 'lost-run'))
-    expect(reconcileRoster(roster, null).heroes[0].storyId).toBeNull()
+  it('отмечает героя в незавершённой истории, в отряде которой он есть', () => {
+    const story = storyFor(ratibor)
+    expect(reconcileRoster(withRatibor(), [storyMeta(story, 1)]).heroes[0].storyId).toBe(story.id)
   })
 
   it('ничего не меняет, если всё согласовано', () => {
-    const game = gameFor(ratibor)
-    const roster = ok(joinStory(withRatibor(), 'ratibor', game.story.id))
-    expect(reconcileRoster(roster, game)).toBe(roster)
+    const story = storyFor(ratibor)
+    const roster = ok(joinStory(withRatibor(), 'ratibor', story.id))
+    expect(reconcileRoster(roster, [storyMeta(story, 1)])).toBe(roster)
   })
 })
 
@@ -190,99 +202,5 @@ describe('parseRoster', () => {
       hallOfFame: [{ id: 'x', fate: 'vanished' }],
     }
     expect(() => parseRoster(broken, catalog)).toThrow(/heroes\[0\]: id героя не совпадает[\s\S]*heroes\[1\]\.sheet: character\.level[\s\S]*hallOfFame\[0\]/)
-  })
-})
-
-/** localStorage в памяти. */
-function memoryStorage(initial: Record<string, string> = {}): KeyValueStorage & { data: Map<string, string> } {
-  const data = new Map(Object.entries(initial))
-  return {
-    data,
-    getItem: (key) => data.get(key) ?? null,
-    setItem: (key, value) => void data.set(key, value),
-    removeItem: (key) => void data.delete(key),
-  }
-}
-
-/** Оба хранилища — игры и героев — над одним localStorage, как в браузере. */
-function makeStores(storage = memoryStorage()): Stores & { storage: typeof storage } {
-  const game = createGameStore({
-    storage,
-    createNewGame: (sheet) => gameFor(sheet),
-    parseState: (raw) => parseGameState(raw, { catalog, locations }),
-  })
-  const heroes = createHeroStore({ storage, parseRoster: (raw) => parseRoster(raw, catalog), game: game.getState() })
-  return { game, heroes, storage }
-}
-
-describe('сессия: герои и истории', () => {
-  it('быстрый старт добавляет Ратибора и начинает историю; повторный — новая история за того же героя', () => {
-    const stores = makeStores()
-    expect(quickStart(stores, ratibor)).toBeNull()
-    const firstRun = stores.game.getState()!.story.id
-    expect(stores.heroes.getState().heroes).toMatchObject([{ id: 'ratibor', storyId: firstRun }])
-
-    expect(quickStart(stores, ratibor)).toBeNull()
-    const secondRun = stores.game.getState()!.story.id
-    expect(secondRun).not.toBe(firstRun)
-    expect(stores.heroes.getState().heroes).toMatchObject([{ id: 'ratibor', storyId: secondRun }])
-  })
-
-  it('новая история за другого героя прерывает текущую: прежний герой свободен и сохраняет снаряжение', () => {
-    const stores = makeStores()
-    quickStart(stores, ratibor)
-    stores.game.dispatch({ type: 'equipmentChanged', equipped: { mainHand: null, offHand: null, armor: 'chain-mail' }, change: { kind: 'unequip', slot: 'mainHand' } })
-    expect(saveHero(stores, otherHero())).toBeNull()
-    expect(startStory(stores, 'hero-2')).toBeNull()
-
-    expect(stores.game.getState()!.character.name).toBe('Ингрид')
-    const [first, second] = stores.heroes.getState().heroes
-    expect(first).toMatchObject({ id: 'ratibor', storyId: null, sheet: { inventory: { equipped: { mainHand: null } } } })
-    expect(second.storyId).toBe(stores.game.getState()!.story.id)
-  })
-
-  it('неизвестного героя в историю не отправить', () => {
-    expect(startStory(makeStores(), 'nobody')).toBe('Такого героя нет в списке.')
-  })
-
-  it('завершение истории: герой в «Зале славы», игры больше нет', () => {
-    const stores = makeStores()
-    expect(endStory(stores, 'completed')).toBe('Сейчас нет начатой истории.')
-    quickStart(stores, ratibor)
-    expect(endStory(stores, 'completed')).toBeNull()
-    expect(stores.game.getState()).toBeNull()
-    expect(stores.heroes.getState()).toMatchObject({ heroes: [], hallOfFame: [{ name: 'Ратибор', fate: 'completed' }] })
-  })
-
-  it('переименование героя в игре меняет имя и в состоянии игры', () => {
-    const stores = makeStores()
-    quickStart(stores, ratibor)
-    expect(renameEverywhere(stores, 'ratibor', 'Ратибор Гроза')).toBeNull()
-    expect(stores.game.getState()!.character.name).toBe('Ратибор Гроза')
-    expect(stores.heroes.getState().heroes[0].sheet.character.name).toBe('Ратибор Гроза')
-  })
-
-  it('список героев сохраняется и после «перезагрузки» согласуется с игрой', () => {
-    const stores = makeStores()
-    saveHero(stores, otherHero())
-    quickStart(stores, ratibor)
-    const reloaded = makeStores(stores.storage)
-    expect(reloaded.heroes.getState()).toEqual(stores.heroes.getState())
-    expect(JSON.parse(stores.storage.data.get(HEROES_KEY)!).version).toBe(HEROES_VERSION)
-  })
-
-  it('старое сохранение без списка героев: герой игры появляется в «Моих героях»', () => {
-    const storage = memoryStorage()
-    const game = createGameStore({ storage, createNewGame: gameFor, parseState: (raw) => parseGameState(raw, { catalog, locations }) })
-    game.startGame(ratibor)
-    const { heroes } = makeStores(storage)
-    expect(heroes.getState().heroes).toMatchObject([{ id: 'ratibor', storyId: game.getState()!.story.id }])
-  })
-
-  it('повреждённый список героев не ломает игру — начинаем с пустого', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { heroes } = makeStores(memoryStorage({ [HEROES_KEY]: '{oops' }))
-    expect(heroes.getState()).toEqual(EMPTY_ROSTER)
-    warn.mockRestore()
   })
 })

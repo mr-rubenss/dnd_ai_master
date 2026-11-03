@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, flushSaves, startQuickGame } from './helpers'
 
 const createButton = (page: Page) => page.getByTestId('menu-create')
 const quickStart = (page: Page) => page.getByTestId('menu-quick-start')
@@ -42,10 +42,10 @@ test('без сохранения: стартовый экран без «Про
 test('с сохранением: «Продолжить» с именем героя и локацией', async ({ page }, testInfo) => {
   await startQuickGame(page)
   await makeMove(page, 'Сажусь у камина')
+  await flushSaves(page)
   await page.reload()
 
-  await expect(continueButton(page)).toContainText('Ратибор · Воин 1 ур. · Таверна «Пьяный грифон»')
-  await expect(page.locator('.start-menu-note')).toBeVisible()
+  await expect(continueButton(page)).toContainText('«Вечер в «Пьяном грифоне»»: Ратибор · Воин 1 ур. · Таверна «Пьяный грифон»')
   await expectNoHorizontalScroll(page)
   await testInfo.attach('стартовый экран с сохранением', { body: await page.screenshot(), contentType: 'image/png' })
   await continueButton(page).click()
@@ -68,22 +68,18 @@ test('«Создать нового героя» при сохранении о�
   await expect(page.locator('.message--player').last()).toContainText('Старая история')
 })
 
-test('«Быстрый старт» при сохранении тоже спрашивает подтверждение и начинает игру заново', async ({ page }) => {
+test('«Быстрый старт», когда Ратибор уже в истории, продолжает её — без вопросов и без потерь', async ({ page }) => {
   await startQuickGame(page)
   await makeMove(page, 'Старая история')
   await page.getByRole('button', { name: 'В меню' }).click()
 
-  let message = ''
-  page.once('dialog', (dialog) => {
-    message = dialog.message()
-    void dialog.dismiss()
+  page.on('dialog', () => {
+    throw new Error('Быстрый старт не должен ничего прерывать')
   })
   await quickStart(page).click()
-  expect(message).toContain('Текущая история «Вечер в «Пьяном грифоне»» (герой — Ратибор) будет прервана')
-  await expect(continueButton(page)).toBeVisible()
-
-  page.once('dialog', (dialog) => void dialog.accept())
-  await quickStart(page).click()
   await expect(page.locator('.dice-tray-button')).toBeVisible()
-  await expect(page.locator('.message--player')).toHaveCount(0)
+  await expect(page.locator('.message--player').last()).toContainText('Старая история')
+  await page.getByRole('button', { name: 'В меню' }).click()
+  await page.getByTestId('menu-stories').click()
+  await expect(page.locator('.story-card')).toHaveCount(1)
 })

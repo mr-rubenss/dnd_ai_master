@@ -1,8 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, continueGame, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { addHeroCopy, collectPageErrors, continueGame, expectNoHorizontalScroll, flushSaves, startQuickGame } from './helpers'
 
-const HEROES_KEY = 'ai-master:heroes'
 const STORY = 'Вечер в «Пьяном грифоне»'
 
 const heroCard = (page: Page, id: string) => page.getByTestId(`hero-${id}`)
@@ -13,20 +12,10 @@ async function openHeroes(page: Page) {
   await expect(page.getByRole('heading', { name: 'Мои герои' })).toBeVisible()
 }
 
-/** Добавляет в «Мои герои» второго героя — копию Ратибора по имени Ингрид — и перезагружает страницу. */
+/** Добавляет в «Мои герои» второго героя — копию Ратибора по имени Ингрид — и открывает список героев. */
 async function addIngrid(page: Page) {
-  await page.evaluate((key) => {
-    const saved = JSON.parse(localStorage.getItem(key)!)
-    const hero = structuredClone(saved.roster.heroes[0])
-    hero.id = 'ingrid'
-    hero.storyId = null
-    hero.sheet.character.id = 'ingrid'
-    hero.sheet.character.name = 'Ингрид'
-    saved.roster.heroes.push(hero)
-    localStorage.setItem(key, JSON.stringify(saved))
-  }, HEROES_KEY)
-  await page.reload()
-  await page.getByTestId('menu-heroes').click()
+  await addHeroCopy(page, { id: 'ingrid', name: 'Ингрид' })
+  await openHeroes(page)
 }
 
 test.beforeEach(async ({ page }) => {
@@ -83,45 +72,48 @@ test('переименование: в списке и в идущей игре;
   await expect(page.locator('.character-name')).toHaveText('Ратибор Гроза')
 })
 
-test('новая история за другого героя прерывает текущую; свободного героя можно удалить', async ({ page }) => {
-  await openHeroes(page)
+test('новая история за другого героя — отдельная, текущая не прерывается; свободного героя можно удалить', async ({ page }) => {
   await addIngrid(page)
   const ingrid = heroCard(page, 'ingrid')
   await expect(ingrid.getByTestId('hero-story')).toHaveText('Вне истории')
 
-  // Отказ — ничего не меняется.
-  page.once('dialog', (dialog) => void dialog.dismiss())
+  // «Начать историю» — форма новой истории с Ингрид.
   await ingrid.getByRole('button', { name: 'Начать историю' }).click()
+  await expect(page.getByRole('heading', { name: 'Новая история' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /Ингрид/ })).toBeChecked()
+  // Ратибор занят в своей истории — в выборе его нет.
+  await expect(page.getByRole('radio', { name: /Ратибор/ })).toHaveCount(0)
+  await page.getByLabel('Название').fill('Северный тракт')
+  await page.getByRole('button', { name: 'Начать историю' }).click()
+  await expect(page.locator('.dice-tray-button')).toBeVisible()
+
+  await openHeroes(page)
+  await expect(heroCard(page, 'ingrid').getByTestId('hero-story')).toHaveText('В истории «Северный тракт»')
   await expect(heroCard(page, 'ratibor').getByTestId('hero-story')).toHaveText(`В истории «${STORY}»`)
 
-  // Согласие — Ингрид в новой истории, Ратибор свободен.
-  page.once('dialog', (dialog) => void dialog.accept())
-  await ingrid.getByRole('button', { name: 'Начать историю' }).click()
-  await expect(page.locator('.dice-tray-button')).toBeVisible()
+  // Удаление свободного героя — с подтверждением.
+  await addHeroCopy(page, { id: 'brom', name: 'Бром' })
   await openHeroes(page)
-  await expect(heroCard(page, 'ingrid').getByTestId('hero-story')).toHaveText(`В истории «${STORY}»`)
-  const ratibor = heroCard(page, 'ratibor')
-  await expect(ratibor.getByTestId('hero-story')).toHaveText('Вне истории')
-
-  // Удаление — с подтверждением.
+  const brom = heroCard(page, 'brom')
   let message = ''
   page.once('dialog', (dialog) => {
     message = dialog.message()
     void dialog.dismiss()
   })
-  await ratibor.getByRole('button', { name: 'Удалить' }).click()
-  expect(message).toBe('Удалить героя «Ратибор»? Это нельзя отменить.')
-  await expect(ratibor).toBeVisible()
+  await brom.getByRole('button', { name: 'Удалить' }).click()
+  expect(message).toBe('Удалить героя «Бром»? Это нельзя отменить.')
+  await expect(brom).toBeVisible()
   page.once('dialog', (dialog) => void dialog.accept())
-  await ratibor.getByRole('button', { name: 'Удалить' }).click()
-  await expect(ratibor).toHaveCount(0)
-  await expect(page.getByRole('tab', { name: 'Герои (1)' })).toBeVisible()
+  await brom.getByRole('button', { name: 'Удалить' }).click()
+  await expect(brom).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Герои (2)' })).toBeVisible()
 
   // Всё переживает перезагрузку.
+  await flushSaves(page)
   await page.reload()
   await continueGame(page)
   await openHeroes(page)
-  await expect(page.locator('.hero-card')).toHaveCount(1)
+  await expect(page.locator('.hero-card')).toHaveCount(2)
 })
 
 test('завершённая история: герой в «Зале славы» с итогом пути', async ({ page }, testInfo) => {
@@ -147,25 +139,27 @@ test('завершённая история: герой в «Зале славы
 })
 
 test('погибший герой в «Зале славы» отмечен гибелью', async ({ page }) => {
-  await page.evaluate((key) => {
-    const saved = JSON.parse(localStorage.getItem(key)!)
-    saved.roster.hallOfFame.push({
-      id: 'fallen-1',
-      heroId: 'brom',
-      name: 'Бром',
-      species: 'Дварф',
-      className: 'Жрец',
-      level: 3,
-      portrait: '✨',
-      fate: 'fallen',
-      storyTitle: 'Тёмный склеп',
-      summary: 'Гибель в истории «Тёмный склеп» на 3-м уровне. 42 хода, 57 бросков кубиков.',
-      endedAt: Date.UTC(2026, 0, 15),
+  await page.evaluate(async () => {
+    const store = (window as unknown as { __aiMaster: { importRecords(r: unknown): Promise<void>; flush(): Promise<void> } }).__aiMaster
+    await store.importRecords({
+      hall: [
+        {
+          id: 'fallen-1',
+          heroId: 'brom',
+          name: 'Бром',
+          species: 'Дварф',
+          className: 'Жрец',
+          level: 3,
+          portrait: '✨',
+          fate: 'fallen',
+          storyTitle: 'Тёмный склеп',
+          summary: 'Гибель в истории «Тёмный склеп» на 3-м уровне. 42 хода, 57 бросков кубиков.',
+          endedAt: Date.UTC(2026, 0, 15),
+        },
+      ],
     })
-    localStorage.setItem(key, JSON.stringify(saved))
-  }, HEROES_KEY)
-  await page.reload()
-  await page.getByTestId('menu-heroes').click()
+  })
+  await openHeroes(page)
   await page.getByRole('tab', { name: 'Зал славы (1)' }).click()
   const entry = page.getByTestId('hall-brom')
   await expect(entry.locator('.fate-badge')).toHaveText('Гибель')

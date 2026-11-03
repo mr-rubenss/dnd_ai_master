@@ -1,24 +1,22 @@
 // Игровые данные из JSON, проверенные при загрузке.
+import { parseAdventure, type AdventureData } from '../game/adventure'
 import { parseCharacterSheet } from '../game/character'
 import { parseItemCatalog } from '../game/items'
 import { parseRulesData } from '../game/rulesData'
-import type { ChatMessage } from '../types/game'
 import fighterJson from './characters/fighter-ratibor.json'
-import introMessagesJson from './intro-messages.json'
 import itemsJson from './items.json'
 import backgroundsJson from './rules/backgrounds.json'
 import classesJson from './rules/classes.json'
 import featsJson from './rules/feats.json'
 import packsJson from './rules/packs.json'
 import speciesJson from './rules/species.json'
-
-import { parseStory } from '../game/story'
+import drunkenGriffinAdventureJson from './adventures/drunken-griffin.json'
 import { locations } from './locations'
-import storyJson from './story.json'
 
-export { locations, startingLocation } from './locations'
-/** Стартовая история (пока она одна). */
-export const startingStory = parseStory(storyJson, locations)
+export { locations } from './locations'
+/** Приключения для новых историй. Таверна «Пьяный грифон» — по умолчанию. */
+export const defaultAdventure = parseAdventure(drunkenGriffinAdventureJson, locations)
+export const adventures: Record<string, AdventureData> = { [defaultAdventure.id]: defaultAdventure }
 
 export const itemCatalog = parseItemCatalog(itemsJson)
 export const rulesData = parseRulesData(
@@ -27,4 +25,3 @@ export const rulesData = parseRulesData(
 )
 /** Готовый персонаж для быстрого старта. */
 export const startingSheet = parseCharacterSheet(fighterJson, itemCatalog)
-export const introMessages = introMessagesJson as ChatMessage[]

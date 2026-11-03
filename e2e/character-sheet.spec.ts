@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
-import { collectPageErrors, continueGame, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { act, collectPageErrors, ENGINE, expectNoHorizontalScroll, reloadAndContinue, startQuickGame } from './helpers'
 
 async function openStatsTab(page: Page, isMobile: boolean) {
   if (isMobile) await page.locator('.inventory-toggle').tap()
@@ -61,13 +61,9 @@ test('вкладки переключаются стрелками с клави
 })
 
 test('состояния из сохранения: Отравлен снижает пассивное Восприятие, Истощение показывает уровень', async ({ page, isMobile }) => {
-  await page.evaluate(() => {
-    const save = JSON.parse(localStorage.getItem('ai-master:save')!)
-    save.state.character.conditions = [{ id: 'poisoned' }, { id: 'exhaustion', level: 2 }]
-    localStorage.setItem('ai-master:save', JSON.stringify(save))
-  })
-  await page.reload()
-  await continueGame(page)
+  // Состояния накладывает движок — действием в истории.
+  await act(page, { type: 'conditionsChanged', heroId: 'ratibor', conditions: [{ id: 'poisoned' }, { id: 'exhaustion', level: 2 }] }, ENGINE)
+  await reloadAndContinue(page)
   await openStatsTab(page, isMobile)
 
   const stats = page.locator('#sheet-panel-stats')

@@ -1,36 +1,17 @@
-// Единое хранилище состояния игры с сохранением в localStorage.
+// Старый формат сохранения (одна игра в localStorage, версии 1–8). Нужен только для переноса в истории
+// (src/game/legacyImport.ts): загрузка с последовательной миграцией до версии 8.
 
-import type { Character, CharacterSheet } from '../types/character'
+import type { Character } from '../types/character'
 import type { GameState, StoryProgress } from '../types/game'
 import type { ArmorType } from '../types/items'
 import type { LocationData } from '../types/location'
-import { gameReducer, initialDoorStates, type GameAction } from './state'
+import { initialDoorStates } from './legacyState'
 
 export const SAVE_KEY = 'ai-master:save'
 export const SAVE_VERSION = 8
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
-
-export interface GameStore {
-  /** Текущая игра или null, если игры нет (тогда показывается создание персонажа). */
-  getState(): GameState | null
-  subscribe(listener: () => void): () => void
-  /** Изменить состояние идущей игры; без игры — ничего не делает. */
-  dispatch(action: GameAction): void
-  /** Начать игру за готового персонажа и сразу сохранить её. */
-  startGame(sheet: CharacterSheet): void
-  /** Завершить игру и стереть сохранение — дальше снова создание персонажа. */
-  endGame(): void
-}
-
-export interface GameStoreOptions {
-  storage: KeyValueStorage | null
-  createNewGame: (sheet: CharacterSheet) => GameState
-  /** Проверка загруженного состояния; бросает исключение, если сохранение некорректно. */
-  parseState: (raw: unknown) => GameState
-  migration?: MigrationContext
-}
 
 /**
  * Переносит сохранение старой версии на текущую. Каждый шаг — переход на одну версию.
@@ -153,53 +134,5 @@ export function loadSavedGame(
   } catch (error) {
     console.warn('Сохранение повреждено или устарело, начинаем новую игру.', error)
     return null
-  }
-}
-
-export function clearSave(storage: KeyValueStorage | null): void {
-  try {
-    storage?.removeItem(SAVE_KEY)
-  } catch (error) {
-    console.warn('Не удалось удалить сохранение.', error)
-  }
-}
-
-export function saveGame(storage: KeyValueStorage | null, state: GameState): void {
-  if (!storage) return
-  try {
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, state }))
-  } catch (error) {
-    // Переполнение или запрет хранилища (приватный режим) не должны ломать игру.
-    console.warn('Не удалось сохранить игру.', error)
-  }
-}
-
-export function createGameStore({ storage, createNewGame, parseState, migration }: GameStoreOptions): GameStore {
-  let state: GameState | null = loadSavedGame(storage, parseState, migration)
-  const listeners = new Set<() => void>()
-
-  const setState = (next: GameState | null) => {
-    if (next === state) return
-    state = next
-    if (state) saveGame(storage, state)
-    else clearSave(storage)
-    listeners.forEach((listener) => listener())
-  }
-
-  return {
-    getState: () => state,
-    subscribe(listener) {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    dispatch(action) {
-      if (state) setState(gameReducer(state, action))
-    },
-    startGame(sheet) {
-      setState(createNewGame(sheet))
-    },
-    endGame() {
-      setState(null)
-    },
   }
 }

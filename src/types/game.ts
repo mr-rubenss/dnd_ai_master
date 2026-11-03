@@ -8,6 +8,8 @@ export interface ChatMessage {
   id: string
   author: MessageAuthor
   text: string
+  /** Чья реплика (для сообщений игрока в отряде из нескольких героев). */
+  heroId?: string
 }
 
 /** Запись в журнале бросков. */
@@ -20,7 +22,7 @@ export interface RollRecord {
   result: RollResult
 }
 
-/** Прохождение истории: какая история, кто герой, когда начата. */
+/** Прохождение истории в старом формате сохранения (v8, localStorage) — только для переноса. */
 export interface StoryProgress {
   /** id прохождения (уникален для каждой начатой игры). */
   id: string
@@ -32,7 +34,10 @@ export interface StoryProgress {
   startedAt: number
 }
 
-/** Всё состояние игры. Меняется только через gameReducer (src/game/state.ts). */
+/**
+ * Состояние игры старого формата (одно сохранение в localStorage, до историй).
+ * Нужно только для переноса старых сохранений (src/game/legacyImport.ts).
+ */
 export interface GameState {
   story: StoryProgress
   character: Character

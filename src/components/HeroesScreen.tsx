@@ -3,33 +3,39 @@ import { itemCatalog } from '../data'
 import { armorClass } from '../game/character'
 import { MAX_HERO_NAME_LENGTH } from '../game/heroes'
 import type { CharacterSheet } from '../types/character'
-import type { GameState } from '../types/game'
 import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
+import type { StoryMeta, StoryState } from '../types/story'
 import { CharacterStats } from './CharacterStats'
 
 type Tab = 'heroes' | 'hall'
 
 interface Props {
   roster: HeroRoster
-  /** Текущая игра — её герой показывается с актуальным листом. */
-  game: GameState | null
+  stories: StoryMeta[]
+  /** Состояние истории — чтобы показать актуальный лист героя из неё. */
+  readStory: (storyId: string) => Promise<StoryState | null>
   initialTab?: Tab
   onCreate: () => void
+  /** Начать новую историю с этим героем. */
   onStart: (heroId: string) => void
-  onContinue: () => void
+  onContinue: (storyId: string) => void
   /** Возвращают причину отказа или null. */
-  onRename: (heroId: string, name: string) => string | null
-  onDelete: (heroId: string) => string | null
+  onRename: (heroId: string, name: string) => Promise<string | null>
+  onDelete: (heroId: string) => Promise<string | null>
 }
 
 /** «Мои герои»: все созданные персонажи и «Зал славы» тех, чей путь закончен. */
-export function HeroesScreen({ roster, game, initialTab = 'heroes', onCreate, onStart, onContinue, onRename, onDelete }: Props) {
+export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes', onCreate, onStart, onContinue, onRename, onDelete }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab)
-  const [viewing, setViewing] = useState<string | null>(null)
-  const viewed = roster.heroes.find((h) => h.id === viewing)
-  /** Лист героя: у героя идущей игры — из сохранения игры. */
-  const liveSheet = (hero: HeroRecord): CharacterSheet =>
-    game && game.character.id === hero.id ? { character: game.character, inventory: game.inventory } : hero.sheet
+  const [viewing, setViewing] = useState<{ hero: HeroRecord; sheet: CharacterSheet } | null>(null)
+  const storyOf = (hero: HeroRecord) => (hero.storyId ? stories.find((s) => s.id === hero.storyId) : undefined)
+
+  /** Лист героя: у героя в истории — актуальный, из отряда этой истории. */
+  const view = async (hero: HeroRecord) => {
+    const story = hero.storyId ? await readStory(hero.storyId) : null
+    const member = story?.party.find((m) => m.heroId === hero.id)
+    setViewing({ hero, sheet: member ? { character: member.character, inventory: member.inventory } : hero.sheet })
+  }
 
   return (
     <main className="heroes" aria-labelledby="heroes-title">
@@ -59,11 +65,11 @@ export function HeroesScreen({ roster, game, initialTab = 'heroes', onCreate, on
                 <HeroCard
                   key={hero.id}
                   hero={hero}
-                  sheet={liveSheet(hero)}
-                  storyTitle={hero.storyId && game?.story.id === hero.storyId ? game.story.title : null}
-                  onView={() => setViewing(hero.id)}
+                  sheet={hero.sheet}
+                  story={storyOf(hero)}
+                  onView={() => void view(hero)}
                   onStart={() => onStart(hero.id)}
-                  onContinue={onContinue}
+                  onContinue={() => hero.storyId && onContinue(hero.storyId)}
                   onRename={(name) => onRename(hero.id, name)}
                   onDelete={() => onDelete(hero.id)}
                 />
@@ -80,7 +86,7 @@ export function HeroesScreen({ roster, game, initialTab = 'heroes', onCreate, on
           </ul>
         )}
       </section>
-      {viewed && <HeroSheetDialog hero={viewed} sheet={liveSheet(viewed)} onClose={() => setViewing(null)} />}
+      {viewing && <HeroSheetDialog hero={viewing.hero} sheet={viewing.sheet} onClose={() => setViewing(null)} />}
     </main>
   )
 }
@@ -88,31 +94,35 @@ export function HeroesScreen({ roster, game, initialTab = 'heroes', onCreate, on
 interface HeroCardProps {
   hero: HeroRecord
   sheet: CharacterSheet
-  storyTitle: string | null
+  /** Незавершённая история героя. */
+  story: StoryMeta | undefined
   onView: () => void
   onStart: () => void
   onContinue: () => void
-  onRename: (name: string) => string | null
-  onDelete: () => string | null
+  onRename: (name: string) => Promise<string | null>
+  onDelete: () => Promise<string | null>
 }
 
-function HeroCard({ hero, sheet, storyTitle, onView, onStart, onContinue, onRename, onDelete }: HeroCardProps) {
-  const { character } = sheet
+function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, onDelete }: HeroCardProps) {
+  // Имя и уровень героя в истории — из её отряда (они могут меняться только там).
+  const member = story?.party.find((m) => m.heroId === hero.id)
+  const character = { ...sheet.character, ...(member ? { name: member.name, level: member.level } : {}) }
+  const storyTitle = story?.title ?? null
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(character.name)
   const [error, setError] = useState<string | null>(null)
   const inputId = useId()
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault()
-    const reason = onRename(name)
+    const reason = await onRename(name)
     setError(reason)
     if (!reason) setRenaming(false)
   }
 
-  const remove = () => {
+  const remove = async () => {
     if (!window.confirm(`Удалить героя «${character.name}»? Это нельзя отменить.`)) return
-    setError(onDelete())
+    setError(await onDelete())
   }
 
   return (

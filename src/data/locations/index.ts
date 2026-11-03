@@ -9,4 +9,3 @@ export const locations: Record<string, LocationData> = {
   [drunkenGriffin.id]: drunkenGriffin,
 }
 
-export const startingLocation = drunkenGriffin

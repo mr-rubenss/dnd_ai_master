@@ -35,10 +35,10 @@ const STEP_COMPONENTS: Record<Exclude<CreationStep, 'summary'>, (props: StepProp
 }
 
 interface Props {
-  /** Сохранить героя и сразу начать историю. */
-  onStart: (sheet: CharacterSheet) => void
+  /** Сохранить героя и перейти к новой истории с ним. */
+  onStart: (sheet: CharacterSheet) => void | Promise<void>
   /** Только сохранить героя в «Мои герои». */
-  onSave: (sheet: CharacterSheet) => void
+  onSave: (sheet: CharacterSheet) => void | Promise<void>
 }
 
 /** Каждому новому герою — свой id. */

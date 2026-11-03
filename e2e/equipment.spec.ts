@@ -1,8 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, continueGame, expectNoHorizontalScroll, startQuickGame } from './helpers'
-
-const SAVE_KEY = 'ai-master:save'
+import { act, addHeroCopy, collectPageErrors, continueGame, equippedOfLead, expectNoHorizontalScroll, MASTER, reloadAndContinue, startQuickGame } from './helpers'
 
 async function openEquipment(page: Page, isMobile: boolean) {
   if (isMobile && (await page.locator('.inventory-toggle').getAttribute('aria-expanded')) !== 'true') {
@@ -68,25 +66,17 @@ test('смена оружия и доспеха: атака и КД пересч
   await expectNoHorizontalScroll(page)
   await testInfo.attach('экипировка', { body: await page.screenshot({ fullPage: isMobile }), contentType: 'image/png' })
 
-  // Экипировка в состоянии игры — сохраняется после перезагрузки.
-  const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state.inventory.equipped, SAVE_KEY)
-  expect(saved).toEqual({ mainHand: 'spear', offHand: null, armor: 'chain-mail' })
-  await page.reload()
-  await continueGame(page)
+  // Экипировка в состоянии истории — сохраняется после перезагрузки.
+  expect(await equippedOfLead(page)).toEqual({ mainHand: 'spear', offHand: null, armor: 'chain-mail' })
+  await reloadAndContinue(page)
   await openEquipment(page, isMobile)
   await expect(slot(page, 'mainHand')).toContainText('Копьё')
   expect(errors).toEqual([])
 })
 
 test('руки: щит, двуручное и парное оружие — с объяснением, почему нельзя', async ({ page, isMobile }) => {
-  // Добавляем в сохранение щит, короткий меч и два кинжала.
-  await page.evaluate((key) => {
-    const save = JSON.parse(localStorage.getItem(key)!)
-    save.state.inventory.items.push({ itemId: 'shield', quantity: 1 }, { itemId: 'shortsword', quantity: 1 }, { itemId: 'dagger', quantity: 2 })
-    localStorage.setItem(key, JSON.stringify(save))
-  }, SAVE_KEY)
-  await page.reload()
-  await continueGame(page)
+  // Ведущий передаёт герою щит, короткий меч и два кинжала.
+  await act(page, { type: 'itemsGranted', heroId: 'ratibor', items: [{ itemId: 'shield', quantity: 1 }, { itemId: 'shortsword', quantity: 1 }, { itemId: 'dagger', quantity: 2 }] }, MASTER)
   await openEquipment(page, isMobile)
 
   // Щит при двуручном мече — нельзя.
@@ -123,15 +113,14 @@ test('руки: щит, двуручное и парное оружие — с �
 })
 
 test('щит без владения щитами не прибавляет КД — и лист объясняет почему', async ({ page, isMobile }) => {
-  // Ратибор владеет всеми доспехами и щитами; уберём владение щитами и дадим ему щит и короткий меч.
-  await page.evaluate((key) => {
-    const save = JSON.parse(localStorage.getItem(key)!)
-    save.state.character.proficiencies.armor = ['light', 'medium', 'heavy']
-    save.state.inventory.items.push({ itemId: 'shield', quantity: 1 }, { itemId: 'shortsword', quantity: 1 })
-    localStorage.setItem(key, JSON.stringify(save))
-  }, SAVE_KEY)
-  await page.reload()
-  await continueGame(page)
+  // Герой без владения щитами (копия Ратибора) в своей истории; ведущий даёт ему щит и короткий меч.
+  await addHeroCopy(page, { id: 'nils', name: 'Нильс', armor: ['light', 'medium', 'heavy'] })
+  await page.getByRole('button', { name: 'В меню' }).click()
+  await page.getByTestId('menu-heroes').click()
+  await page.getByTestId('hero-nils').getByRole('button', { name: 'Начать историю' }).click()
+  await page.getByRole('button', { name: 'Начать историю' }).click()
+  await expect(page.locator('.dice-tray-button')).toBeVisible()
+  await act(page, { type: 'itemsGranted', heroId: 'nils', items: [{ itemId: 'shield', quantity: 1 }, { itemId: 'shortsword', quantity: 1 }] }, MASTER)
   if (isMobile) await page.locator('.inventory-toggle').click()
   await expect(page.getByTestId('armor-training')).toHaveText('Все доспехи')
 

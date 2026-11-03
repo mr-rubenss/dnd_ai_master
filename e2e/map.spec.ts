@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures'
-import { collectPageErrors, continueGame, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { act, collectPageErrors, expectNoHorizontalScroll, MASTER, reloadAndContinue, startQuickGame } from './helpers'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./')
@@ -48,14 +48,9 @@ test('открытая дверь выглядит иначе, чем закры
   await expect(entrance.locator('.door-leaf-open')).toHaveCount(0)
   const closedShot = await entrance.screenshot()
 
-  // Состояние двери — в состоянии игры; открываем её в сохранении и продолжаем игру.
-  await page.evaluate(() => {
-    const save = JSON.parse(localStorage.getItem('ai-master:save')!)
-    save.state.location.doors.entrance = 'open'
-    localStorage.setItem('ai-master:save', JSON.stringify(save))
-  })
-  await page.reload()
-  await continueGame(page)
+  // Состояние двери — в состоянии истории: ведущий открывает дверь действием, после перезагрузки она открыта.
+  await act(page, { type: 'doorChanged', locationId: 'drunken-griffin', doorId: 'entrance', state: 'open' }, MASTER)
+  await reloadAndContinue(page)
 
   await expect(entrance).toHaveAttribute('data-state', 'open')
   await expect(entrance.locator('.door-leaf')).toHaveCount(0)

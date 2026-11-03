@@ -103,3 +103,70 @@ export async function continueGame(page: Page) {
   await page.getByTestId('menu-continue').click()
   await expect(page.locator('.dice-tray-button')).toBeVisible()
 }
+
+/** Автор действия истории — как в src/types/story.ts. */
+export type ActionAuthor = { kind: 'player'; heroId: string } | { kind: 'engine' } | { kind: 'master' } | { kind: 'system' }
+
+interface DebugStore {
+  dispatch(event: unknown, author: ActionAuthor): string | null
+  flush(): Promise<void>
+  getState(): {
+    active: { id: string; party: { heroId: string; character: unknown; inventory: { equipped: unknown } }[] } | null
+    roster: { heroes: { id: string; sheet: { character: Record<string, unknown> } }[] }
+  }
+  importRecords(records: { heroes?: unknown[]; hall?: unknown[] }): Promise<void>
+  createStory(request: { title: string; tone: string; adventureId: string; heroIds: string[] }): Promise<string | null>
+}
+
+/** Действие в открытой истории — как его совершили бы ведущий, движок или игрок. */
+export async function act(page: Page, event: Record<string, unknown>, author: ActionAuthor) {
+  const reason = await page.evaluate(
+    ([e, a]) => (window as unknown as { __aiMaster: DebugStore }).__aiMaster.dispatch(e, a as ActionAuthor),
+    [event, author] as const,
+  )
+  expect(reason, 'действие отклонено').toBeNull()
+}
+
+export const MASTER: ActionAuthor = { kind: 'master' }
+export const ENGINE: ActionAuthor = { kind: 'engine' }
+
+/** Дождаться записи всех изменений в IndexedDB (перед перезагрузкой). */
+export async function flushSaves(page: Page) {
+  await page.evaluate(() => (window as unknown as { __aiMaster: DebugStore }).__aiMaster.flush())
+}
+
+/** Перезагрузить страницу и продолжить последнюю историю. */
+export async function reloadAndContinue(page: Page) {
+  await flushSaves(page)
+  await page.reload()
+  await continueGame(page)
+}
+
+/** Экипировка героя открытой истории — из состояния игры. */
+export async function equippedOfLead(page: Page) {
+  return page.evaluate(() => (window as unknown as { __aiMaster: DebugStore }).__aiMaster.getState().active?.party[0].inventory.equipped)
+}
+
+/**
+ * Добавляет в «Мои герои» копию первого героя (Ратибора) с другим id и именем и, если нужно,
+ * другим владением доспехами. Нужен уже начатый быстрый старт.
+ */
+export async function addHeroCopy(page: Page, copy: { id: string; name: string; armor?: string[] }) {
+  await page.evaluate(async (c) => {
+    const store = (window as unknown as { __aiMaster: DebugStore }).__aiMaster
+    const hero = structuredClone(store.getState().roster.heroes[0]) as unknown as {
+      id: string
+      storyId: string | null
+      createdAt: number
+      sheet: { character: Record<string, unknown> & { proficiencies: Record<string, unknown> } }
+    }
+    hero.id = c.id
+    hero.storyId = null
+    hero.createdAt = Date.now()
+    hero.sheet.character.id = c.id
+    hero.sheet.character.name = c.name
+    if (c.armor) hero.sheet.character.proficiencies.armor = c.armor
+    await store.importRecords({ heroes: [hero] })
+    await store.flush()
+  }, copy)
+}

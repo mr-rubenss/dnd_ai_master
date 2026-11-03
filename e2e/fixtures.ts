@@ -12,6 +12,8 @@ const WIDE_FONT_CSS = `:root { --font-ui: 'DejaVu Sans', Verdana, 'Liberation Sa
 export const test = base.extend({
   // Параметр назван provide (а не use), чтобы линтер не путал его с React-хуком.
   page: async ({ page, isMobile }, provide) => {
+    // Отладочный доступ к хранилищу (window.__aiMaster): тесты отправляют действия как ведущий или движок.
+    await page.addInitScript(() => localStorage.setItem('ai-master:debug', '1'))
     if (isMobile) {
       await page.addInitScript((css) => {
         const inject = () => {

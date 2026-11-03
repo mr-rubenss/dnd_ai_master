@@ -2862,3 +2862,139 @@ textarea {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ---------- Мои истории и новая история ---------- */
+
+.loading-note {
+  margin: 48px 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.new-story {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 16px;
+}
+
+.new-story-field {
+  min-width: 0;
+  margin: 0 16px;
+  padding: 0;
+  border: none;
+}
+
+.new-story-field legend,
+.new-story-label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+.new-story-field .heroes-empty {
+  padding: 4px 0 8px;
+  text-align: left;
+}
+
+.new-story-options {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.choice-card {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.choice-card.is-selected {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(201, 164, 92, 0.12), var(--bg));
+}
+
+.choice-card input {
+  accent-color: var(--gold);
+}
+
+.choice-card strong,
+.choice-card small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.choice-card small {
+  color: var(--muted);
+}
+
+.choice-card .hero-portrait {
+  width: 40px;
+  height: 40px;
+  font-size: 1.3rem;
+}
+
+.text-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.text-input:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.tone-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.tone-chip.is-selected {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.tone-chip input {
+  accent-color: var(--gold);
+}
+
+.new-story-hint {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.new-story-error {
+  margin: 0 16px;
+}
+
+.new-story-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 16px;
+}

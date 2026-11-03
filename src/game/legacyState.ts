@@ -1,5 +1,5 @@
-// Состояние игры: создание, изменения (редьюсер) и проверка сохранений. Чистые функции.
-// Состояние меняется только через gameReducer — ни UI, ни ИИ не правят его напрямую.
+// Состояние игры старого формата (до историй): создание, редьюсер и проверка. Нужно только для переноса
+// старых сохранений и тестов переноса; новая игра живёт в историях (src/game/storyActions.ts).
 
 import type { CharacterSheet } from '../types/character'
 import type { RollResult } from '../engine/dice'
@@ -8,7 +8,6 @@ import type { ChatMessage, GameState, MessageAuthor, RollRecord, StoryProgress }
 import type { ItemCatalog } from '../types/items'
 import { DOOR_STATES, type DoorState, type LocationData } from '../types/location'
 import { parseCharacterSheet } from './character'
-import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { isFloor } from '../engine/movement'
 import { isNonEmptyString, isObject, isOneOf, ValidationError } from './validation'
 
@@ -33,6 +32,11 @@ export function createNewGame({ sheet, location, intro, story }: NewGameData): G
   })
 }
 
+/** Прохождение стартовой истории для старых сохранений без него (миграция v7 → v8). */
+export function beginLegacyStory(title: string, heroId: string, now: number = Date.now()): StoryProgress {
+  return { id: crypto.randomUUID(), storyId: 'drunken-griffin', title, heroId, startedAt: now }
+}
+
 /** Начальные состояния дверей локации (из её JSON). */
 export function initialDoorStates(location: LocationData): Record<string, DoorState> {
   return Object.fromEntries(location.doors.map((door) => [door.id, door.state]))
@@ -44,8 +48,7 @@ export const MAX_ROLL_LOG = 100
 export type GameAction =
   | { type: 'messageAdded'; message: ChatMessage }
   | { type: 'diceRolled'; roll: RollRecord }
-  /** Смена экипировки: новое состояние слотов и что именно изменилось (для ведущего и журнала). */
-  | { type: 'equipmentChanged'; equipped: Equipment; change: EquipmentChange }
+  | { type: 'equipmentChanged'; equipped: Equipment }
   /** Игрок переименовал героя (в «Моих героях»). */
   | { type: 'characterRenamed'; name: string }
   | { type: 'gameReset'; state: GameState }
@@ -73,25 +76,6 @@ export function messageAdded(author: MessageAuthor, text: string): GameAction {
 /** Создаёт действие «записать бросок в журнал». Сам бросок делает движок (src/engine/dice.ts). */
 export function diceRolled(result: RollResult, label?: string): Extract<GameAction, { type: 'diceRolled' }> {
   return { type: 'diceRolled', roll: { id: crypto.randomUUID(), label, timestamp: Date.now(), result } }
-}
-
-export type EquipmentChange = { kind: 'equip'; itemId: string; slot: EquipmentSlot } | { kind: 'unequip'; slot: EquipmentSlot }
-
-/**
- * Проверяет смену экипировки по правилам и возвращает действие для хранилища
- * или причину, по которой сменить нельзя. Состояние меняет только редьюсер.
- */
-export function changeEquipment(
-  state: GameState,
-  catalog: ItemCatalog,
-  change: EquipmentChange,
-): { ok: true; action: GameAction } | { ok: false; reason: string } {
-  if (change.kind === 'unequip') {
-    return { ok: true, action: { type: 'equipmentChanged', equipped: unequipSlot(state.inventory.equipped, change.slot), change } }
-  }
-  const result = equipItem(state.inventory, catalog, change.itemId, change.slot)
-  if (!result.ok) return result
-  return { ok: true, action: { type: 'equipmentChanged', equipped: result.equipped, change } }
 }
 
 export interface GameStateContext {

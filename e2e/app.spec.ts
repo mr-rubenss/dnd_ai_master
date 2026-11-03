@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, flushSaves, startQuickGame } from './helpers'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./')
@@ -53,6 +53,7 @@ test('ход игрока сохраняется; после перезагру�
   await page.locator('.player-input textarea').press('Enter')
   await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
 
+  await flushSaves(page)
   await page.reload()
   await expect(page.getByTestId('menu-continue')).toContainText('Ратибор · Воин 1 ур. · Таверна «Пьяный грифон»')
   await page.getByTestId('menu-continue').click()

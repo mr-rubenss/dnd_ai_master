@@ -1,11 +1,11 @@
 // «Мои герои» и «Зал славы»: чистые функции над списком героев игрока.
-// Список хранится отдельно от сохранения игры (src/game/heroStore.ts); за согласованность
-// (какой герой в какой истории) отвечает reconcileRoster.
+// Герой (его исходный лист) принадлежит игроку; его состояние в игре — отряду конкретной истории.
+// За согласованность (какой герой в какой истории) отвечает reconcileRoster.
 
 import type { CharacterSheet } from '../types/character'
-import type { GameState } from '../types/game'
 import type { HallOfFameEntry, HeroFate, HeroRecord, HeroRoster } from '../types/heroes'
 import type { ItemCatalog } from '../types/items'
+import type { PartyMember, StoryMeta, StoryState } from '../types/story'
 import { parseCharacterSheet } from './character'
 import { isNonEmptyString, isNumber, isObject, isOneOf, ValidationError } from './validation'
 
@@ -101,9 +101,9 @@ export function leaveStory(roster: HeroRoster, heroId: string, sheet?: Character
   return { ok: true, roster: replaceHero(roster, { ...hero, storyId: null, sheet: sheet ? structuredClone(sheet) : hero.sheet }) }
 }
 
-/** Число ходов игрока в истории. */
-export function playerTurns(state: GameState): number {
-  return state.messages.filter((m) => m.author === 'player').length
+/** Число реплик героя в истории (старые сообщения без героя считаются репликами единственного героя). */
+export function playerTurns(state: StoryState, heroId: string): number {
+  return state.messages.filter((m) => m.author === 'player' && (m.heroId === heroId || (m.heroId === undefined && state.party.length === 1))).length
 }
 
 const plural = (n: number, one: string, few: string, many: string) => {
@@ -114,27 +114,27 @@ const plural = (n: number, one: string, few: string, many: string) => {
   return many
 }
 
-/** Краткий итог пути героя по состоянию игры. */
-export function heroSummary(fate: HeroFate, state: GameState): string {
-  const { character, story } = state
-  const turns = playerTurns(state)
+/** Краткий итог пути героя в истории. */
+export function heroSummary(fate: HeroFate, state: StoryState, member: PartyMember): string {
+  const turns = playerTurns(state, member.heroId)
   const rolls = state.rolls.length
-  const outcome = fate === 'fallen' ? `Гибель в истории «${story.title}»` : `История «${story.title}» завершена`
+  const outcome = fate === 'fallen' ? `Гибель в истории «${state.title}»` : `История «${state.title}» завершена`
   return (
-    `${outcome} на ${character.level}-м уровне. ` +
+    `${outcome} на ${member.character.level}-м уровне. ` +
     `${turns} ${plural(turns, 'ход', 'хода', 'ходов')}, ${rolls} ${plural(rolls, 'бросок', 'броска', 'бросков')} кубиков.`
   )
 }
 
 /**
  * Путь героя закончен (гибель или завершённая история): герой уходит из списка в «Зал славы».
- * `state` — состояние игры этой истории.
+ * `state` — состояние истории, в которой он был.
  */
-export function retireHero(roster: HeroRoster, state: GameState, fate: HeroFate, now: number = Date.now()): RosterResult {
-  const hero = findHero(roster, state.character.id)
-  if (!hero) return notFound()
-  if (hero.storyId !== state.story.id) return { ok: false, reason: `${state.character.name} не участвует в этой истории.` }
-  const { character } = state
+export function retireHero(roster: HeroRoster, state: StoryState, heroId: string, fate: HeroFate, now: number = Date.now()): RosterResult {
+  const hero = findHero(roster, heroId)
+  const member = state.party.find((m) => m.heroId === heroId)
+  if (!hero || !member) return notFound()
+  if (hero.storyId !== state.id) return { ok: false, reason: `${member.character.name} не участвует в этой истории.` }
+  const { character } = member
   const entry: HallOfFameEntry = {
     id: crypto.randomUUID(),
     heroId: hero.id,
@@ -144,8 +144,8 @@ export function retireHero(roster: HeroRoster, state: GameState, fate: HeroFate,
     level: character.level,
     portrait: hero.portrait,
     fate,
-    storyTitle: state.story.title,
-    summary: heroSummary(fate, state),
+    storyTitle: state.title,
+    summary: heroSummary(fate, state, member),
     endedAt: now,
   }
   return {
@@ -155,20 +155,20 @@ export function retireHero(roster: HeroRoster, state: GameState, fate: HeroFate,
 }
 
 /**
- * Согласует список героев с сохранённой игрой:
- * - герой идущей игры есть в списке и отмечен в её истории (старые сохранения создавались без списка);
- * - остальные герои не числятся в историях, которых больше нет.
+ * Согласует список героев с историями: герой числится в истории, только если она не завершена
+ * и он в её отряде; герой из отряда незавершённой истории отмечен в ней.
  */
-export function reconcileRoster(roster: HeroRoster, game: GameState | null, now: number = Date.now()): HeroRoster {
-  let heroes = roster.heroes.map((h) => (h.storyId && h.storyId !== game?.story.id ? { ...h, storyId: null } : h))
-  if (game) {
-    const sheet = { character: game.character, inventory: game.inventory }
-    const existing = heroes.find((h) => h.id === game.character.id)
-    if (existing) heroes = heroes.map((h) => (h.id === existing.id && h.storyId !== game.story.id ? { ...h, storyId: game.story.id } : h))
-    else heroes = [...heroes, { ...createHeroRecord(sheet, now), storyId: game.story.id }]
+export function reconcileRoster(roster: HeroRoster, stories: readonly StoryMeta[]): HeroRoster {
+  const storyOf = new Map<string, string>()
+  for (const story of stories) {
+    if (story.status !== 'active') continue
+    for (const member of story.party) storyOf.set(member.heroId, story.id)
   }
-  const changed = heroes.length !== roster.heroes.length || heroes.some((h, i) => h !== roster.heroes[i])
-  return changed ? { ...roster, heroes } : roster
+  const heroes = roster.heroes.map((h) => {
+    const storyId = storyOf.get(h.id) ?? null
+    return h.storyId === storyId ? h : { ...h, storyId }
+  })
+  return heroes.some((h, i) => h !== roster.heroes[i]) ? { ...roster, heroes } : roster
 }
 
 /** Проверяет список героев (например, загруженный из localStorage). */

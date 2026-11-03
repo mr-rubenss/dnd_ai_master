@@ -1,12 +1,12 @@
 import { expect, test } from './fixtures'
 import {
   collectPageErrors,
-  continueGame,
   expectNoHorizontalScroll,
   expectRollOverlayCentered,
   face,
   installRngQueue,
   queueRolls,
+  reloadAndContinue,
   startQuickGame,
   swipeDown,
 } from './helpers'
@@ -113,8 +113,7 @@ test.describe('игровой стол — десктоп', () => {
     await page.locator('.dice-quick button', { hasText: /^к20$/ }).click()
     await expect(page.locator('.dice-tray-badge.is-nat20')).toHaveText('20')
 
-    await page.reload()
-    await continueGame(page)
+    await reloadAndContinue(page)
     await expect(page.locator('.dice-tray-badge.is-nat20')).toHaveText('20')
     await page.locator('.dice-tray-button').click()
     await expect(page.locator('.roll-entry')).toHaveCount(1)
