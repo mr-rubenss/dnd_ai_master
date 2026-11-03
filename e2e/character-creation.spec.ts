@@ -1,5 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
-import { collectPageErrors, expectNoHorizontalScroll, face, installRngQueue, queueRolls } from './helpers'
+import { expect, test } from './fixtures'
+import type { Page } from '@playwright/test'
+import { collectPageErrors, expectNoHorizontalScroll, face, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
 
 const next = (page: Page) => page.getByRole('button', { name: 'Далее', exact: true })
 const option = (page: Page, group: string, id: string) => page.getByRole('radiogroup', { name: group }).locator(`[data-option="${id}"]`)
@@ -19,10 +20,10 @@ const ABILITY_ROLLS = [
 test.beforeEach(async ({ page }) => {
   await installRngQueue(page)
   await page.goto('./')
+  await openCharacterCreation(page)
 })
 
-test('без сохранения открывается создание персонажа; шаги вперёд закрыты, пока текущий не завершён', async ({ page }) => {
-  await expect(page.getByRole('heading', { name: 'Создание персонажа' })).toBeVisible()
+test('шаги вперёд закрыты, пока текущий не завершён', async ({ page }) => {
   await expect(page.locator('.dice-tray-button')).toHaveCount(0)
   await expect(stepTitle(page)).toHaveText('1. Класс')
   await expect(next(page)).toBeDisabled()
@@ -113,10 +114,12 @@ test('полный путь: плут-эльф с предысторией пр�
   await expectNoHorizontalScroll(page)
   await testInfo.attach('итоговый лист', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
-  // Начало игры и сохранение
+  // Начало игры и сохранение: после перезагрузки — стартовый экран с «Продолжить».
   await page.getByRole('button', { name: 'Начать приключение' }).click()
   await expect(page.locator('.dice-tray-button')).toBeVisible()
   await page.reload()
+  await expect(page.getByTestId('menu-continue')).toContainText('Тень · Плут 1 ур. · Таверна «Пьяный грифон»')
+  await page.getByTestId('menu-continue').click()
   if (await page.locator('.inventory-toggle').isVisible()) await page.locator('.inventory-toggle').click()
   await expect(page.locator('.character-name')).toHaveText('Тень')
   await expect(page.locator('.character-meta')).toHaveText('Эльф · Плут 1 ур. · Преступник')

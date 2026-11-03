@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
 
 test.beforeEach(async ({ page }) => {
@@ -47,22 +47,24 @@ test('описание предмета раскрывается по нажат
   await expectNoHorizontalScroll(page)
 })
 
-test('ход игрока сохраняется после перезагрузки, «Новая игра» возвращает к созданию персонажа', async ({ page }) => {
+test('ход игрока сохраняется; после перезагрузки — стартовый экран с «Продолжить»', async ({ page }) => {
   await page.locator('.player-input textarea').fill('Заказываю кружку эля')
   await page.locator('.player-input textarea').press('Enter')
   await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
 
   await page.reload()
+  await expect(page.getByTestId('menu-continue')).toContainText('Ратибор · Воин 1 ур. · Таверна «Пьяный грифон»')
+  await page.getByTestId('menu-continue').click()
   await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
+})
 
-  // Отказ в подтверждении ничего не меняет.
-  page.once('dialog', (dialog) => dialog.dismiss())
-  await page.locator('.header-button', { hasText: 'Новая игра' }).click()
-  await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
-
-  page.once('dialog', (dialog) => dialog.accept())
-  await page.locator('.header-button', { hasText: 'Новая игра' }).click()
-  await expect(page.getByRole('heading', { name: 'Создание персонажа' })).toBeVisible()
-  await page.reload()
-  await expect(page.getByRole('heading', { name: 'Создание персонажа' })).toBeVisible()
+test('«В меню» из игры и обратно без потери прогресса', async ({ page }) => {
+  await expect(page.locator('.header-button', { hasText: 'Новая игра' })).toHaveCount(0)
+  await page.locator('.player-input textarea').fill('Жду')
+  await page.locator('.player-input textarea').press('Enter')
+  await page.getByRole('button', { name: 'В меню' }).click()
+  await expect(page.getByTestId('menu-continue')).toBeVisible()
+  await expectNoHorizontalScroll(page)
+  await page.getByTestId('menu-continue').click()
+  await expect(page.locator('.message--player').last()).toContainText('Жду')
 })

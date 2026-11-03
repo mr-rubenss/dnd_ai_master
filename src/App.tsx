@@ -1,39 +1,62 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CharacterCreation } from './components/creation/CharacterCreation'
+import { StartMenu } from './components/StartMenu'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { DiceTray } from './components/DiceTray'
 import { InventoryPanel } from './components/InventoryPanel'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { PlayerInput } from './components/PlayerInput'
-import { itemCatalog, locations } from './data'
+import { itemCatalog, locations, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { diceRolled, messageAdded } from './game/state'
 import { gameStore, useGameState } from './hooks/useGame'
+import type { CharacterSheet } from './types/character'
 import type { GameState } from './types/game'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
 const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий пока не подключён — это заглушка.)'
 
+type Screen = 'menu' | 'creation' | 'game'
+
+const REPLACE_WARNING = 'Начать новую игру? Текущая игра будет потеряна — пока можно вести только одну историю.'
+
 function App() {
   const state = useGameState()
+  // При запуске всегда стартовый экран: продолжить, создать героя или быстрый старт.
+  const [screen, setScreen] = useState<Screen>('menu')
+  const current: Screen = screen === 'game' && !state ? 'menu' : screen
 
-  const handleNewGame = () => {
-    if (window.confirm('Начать новую игру? Текущий персонаж и прогресс будут потеряны.')) gameStore.endGame()
+  /** Если есть сохранение — спросить, можно ли его заменить. */
+  const confirmReplace = () => !state || window.confirm(REPLACE_WARNING)
+
+  const startGame = (sheet: CharacterSheet) => {
+    gameStore.startGame(sheet)
+    setScreen('game')
   }
 
   return (
-    <div className={`app${state ? '' : ' app--creation'}`}>
+    <div className={`app${current === 'game' ? '' : ' app--page'}`}>
       <header className="app-header">
         <h1>ИИ-Мастер</h1>
-        {state && (
-          <button type="button" className="header-button" onClick={handleNewGame}>
-            Новая игра
+        {current !== 'menu' && (
+          <button type="button" className="header-button" onClick={() => setScreen('menu')}>
+            В меню
           </button>
         )}
       </header>
+      {current === 'menu' && (
+        <StartMenu
+          save={state}
+          onContinue={() => setScreen('game')}
+          onCreate={() => confirmReplace() && setScreen('creation')}
+          onQuickStart={() => confirmReplace() && startGame(startingSheet)}
+        />
+      )}
+      {/* Подтверждение замены уже получено в меню; игра заменяется только при старте нового героя. */}
+      {current === 'creation' && <CharacterCreation onStart={startGame} />}
       {/* key: новая игра монтирует экран заново, сбрасывая локальное состояние (ожидание ответа, анимации). */}
-      {state ? <GameScreen key={state.character.id} state={state} /> : <CharacterCreation onStart={(sheet) => gameStore.startGame(sheet)} />}
+      {current === 'game' && state && <GameScreen key={state.character.id} state={state} />}
     </div>
   )
 }

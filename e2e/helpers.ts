@@ -86,8 +86,20 @@ export function collectPageErrors(page: Page): string[] {
   return errors
 }
 
-/** Начинает игру за готового персонажа (Ратибор) с экрана создания. */
+/** Начинает игру за готового персонажа (Ратибор) со стартового экрана (сохранения ещё нет). */
 export async function startQuickGame(page: Page) {
-  await page.getByRole('button', { name: /^Быстрый старт/ }).click()
+  await page.getByTestId('menu-quick-start').click()
+  await expect(page.locator('.dice-tray-button')).toBeVisible()
+}
+
+/** Открывает создание персонажа со стартового экрана (сохранения ещё нет). */
+export async function openCharacterCreation(page: Page) {
+  await page.getByTestId('menu-create').click()
+  await expect(page.getByRole('heading', { name: 'Создание персонажа' })).toBeVisible()
+}
+
+/** После перезагрузки — стартовый экран: продолжает сохранённую игру. */
+export async function continueGame(page: Page) {
+  await page.getByTestId('menu-continue').click()
   await expect(page.locator('.dice-tray-button')).toBeVisible()
 }

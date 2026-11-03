@@ -320,12 +320,23 @@ export function AbilitiesStep({ draft, update }: StepProps) {
         </button>
       )}
 
+      <div className="ability-table-wrap">
       <table className="ability-table">
+        <colgroup>
+          <col className="col-name" />
+          <col className="col-value" />
+          <col className="col-bonus" />
+          <col className="col-final" />
+        </colgroup>
         <thead>
           <tr>
-            <th scope="col">Характеристика</th>
+            <th scope="col">
+              <span className="visually-hidden">Характеристика</span>
+            </th>
             <th scope="col">Значение</th>
-            <th scope="col">Прибавка</th>
+            <th scope="col" title="Прибавка предыстории">
+              Приб.
+            </th>
             <th scope="col">Итог</th>
           </tr>
         </thead>
@@ -373,6 +384,7 @@ export function AbilitiesStep({ draft, update }: StepProps) {
           })}
         </tbody>
       </table>
+      </div>
     </>
   )
 }

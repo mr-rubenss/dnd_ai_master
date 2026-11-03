@@ -972,9 +972,93 @@ textarea {
 
 /* ---------- Создание персонажа ---------- */
 
-.app--creation {
+.app--page {
   height: auto;
   min-height: 100dvh;
+}
+
+/* ---------- Стартовый экран ---------- */
+
+.start-menu {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.start-menu-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 24px;
+}
+
+.start-menu-card h2 {
+  font-size: 1.9rem;
+  color: var(--gold-bright);
+  text-align: center;
+}
+
+.start-menu-lead {
+  margin: 4px 0 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.start-menu-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  background: var(--bg);
+  text-align: left;
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.menu-option:hover {
+  border-color: var(--gold);
+  background: var(--panel-raised);
+}
+
+.menu-option:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.menu-option--primary {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(201, 164, 92, 0.16), var(--panel-raised));
+}
+
+.menu-option-title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+.menu-option-text {
+  font-size: 0.88rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.menu-option-text strong {
+  color: var(--fg);
+}
+
+.start-menu-note {
+  margin: 16px 0 0;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--muted);
 }
 
 .creation {
@@ -1346,12 +1430,40 @@ textarea {
   color: var(--gold-bright);
 }
 
-.ability-table {
-  width: 100%;
+.ability-table-wrap {
   max-width: 560px;
   margin-top: 10px;
+  /* Страховка: даже при очень широком шрифте прокручивается таблица, а не вся страница. */
+  overflow-x: auto;
+}
+
+.ability-table {
+  width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.9rem;
+}
+
+.ability-table .col-name { width: 38%; }
+.ability-table .col-value { width: 26%; }
+.ability-table .col-bonus { width: 14%; }
+.ability-table .col-final { width: 22%; }
+
+.ability-table tbody th {
+  overflow-wrap: anywhere;
+}
+
+.final-cell {
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .ability-table th,
@@ -1365,7 +1477,10 @@ textarea {
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
 }
 
@@ -1374,7 +1489,8 @@ textarea {
 }
 
 .ability-table select {
-  min-width: 72px;
+  width: 100%;
+  min-width: 0;
   padding: 4px 6px;
   border: 1px solid var(--border-bright);
   border-radius: 4px;

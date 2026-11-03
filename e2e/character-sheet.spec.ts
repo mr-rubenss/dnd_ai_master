@@ -1,5 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
-import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { expect, test } from './fixtures'
+import type { Page } from '@playwright/test'
+import { collectPageErrors, continueGame, expectNoHorizontalScroll, startQuickGame } from './helpers'
 
 async function openStatsTab(page: Page, isMobile: boolean) {
   if (isMobile) await page.locator('.inventory-toggle').tap()
@@ -65,6 +66,7 @@ test('состояния из сохранения: Отравлен снижа�
     localStorage.setItem('ai-master:save', JSON.stringify(save))
   })
   await page.reload()
+  await continueGame(page)
   await openStatsTab(page, isMobile)
 
   const stats = page.locator('#sheet-panel-stats')

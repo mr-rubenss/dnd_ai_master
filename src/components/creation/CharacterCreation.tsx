@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { itemCatalog, rulesData, startingSheet } from '../../data'
+import { itemCatalog, rulesData } from '../../data'
 import {
   buildCharacterSheet,
   CREATION_STEPS,
@@ -68,9 +68,6 @@ export function CharacterCreation({ onStart }: Props) {
     <main className="creation" aria-labelledby="creation-title">
       <header className="creation-header">
         <h2 id="creation-title">Создание персонажа</h2>
-        <button type="button" className="link-button" onClick={() => onStart(startingSheet)}>
-          Быстрый старт: {startingSheet.character.name}, {startingSheet.character.className.toLowerCase()}
-        </button>
       </header>
 
       <nav className="creation-steps" aria-label="Шаги создания персонажа">

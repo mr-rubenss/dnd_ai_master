@@ -1,6 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import {
   collectPageErrors,
+  continueGame,
   expectNoHorizontalScroll,
   expectRollOverlayCentered,
   face,
@@ -113,6 +114,7 @@ test.describe('игровой стол — десктоп', () => {
     await expect(page.locator('.dice-tray-badge.is-nat20')).toHaveText('20')
 
     await page.reload()
+    await continueGame(page)
     await expect(page.locator('.dice-tray-badge.is-nat20')).toHaveText('20')
     await page.locator('.dice-tray-button').click()
     await expect(page.locator('.roll-entry')).toHaveCount(1)
