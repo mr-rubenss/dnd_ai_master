@@ -754,6 +754,484 @@ textarea {
   margin: 0;
 }
 
+/* ---------- Правая колонка ---------- */
+
+.side-column {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.side-column .inventory-panel {
+  flex: 1 1 auto;
+  min-height: 160px;
+}
+
+/* ---------- Броски ---------- */
+
+.dice-panel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dice-panel.is-open {
+  flex-basis: 46%;
+  min-height: 0;
+}
+
+.dice-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  cursor: pointer;
+}
+
+.dice-toggle-meta {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.dice-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.dice-controls {
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dice-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dice-modes button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 2px;
+  border: none;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.dice-modes button + button {
+  border-left: 1px solid var(--border);
+}
+
+.dice-modes button.is-active {
+  background: var(--panel-raised);
+  color: var(--gold-bright);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+
+.dice-quick {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.dice-quick button,
+.dice-custom button {
+  min-width: 0;
+  padding: 4px 0;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--panel-raised);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.dice-quick button:hover,
+.dice-custom button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.dice-custom {
+  display: flex;
+  gap: 4px;
+}
+
+.dice-custom input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--fg);
+  outline: none;
+}
+
+.dice-custom input:focus {
+  border-color: var(--gold);
+}
+
+.dice-custom input[aria-invalid='true'] {
+  border-color: var(--blood-bright);
+}
+
+.dice-custom button {
+  padding: 4px 10px;
+}
+
+.dice-custom button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dice-error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--blood-bright);
+}
+
+.dice-empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.dice-log {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  scrollbar-color: var(--border-bright) transparent;
+}
+
+.roll-entry {
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.roll-entry + .roll-entry {
+  margin-top: 4px;
+}
+
+.roll-entry:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Новая запись проявляется, когда кубик закончит катиться. */
+.roll-entry.is-new {
+  animation: roll-entry-in 0.3s ease 0.7s both;
+}
+
+@keyframes roll-entry-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.roll-entry.is-crit-success {
+  border-color: var(--gold);
+  background: rgba(201, 164, 92, 0.1);
+  box-shadow: 0 0 10px rgba(227, 194, 127, 0.25);
+}
+
+.roll-entry.is-crit-failure {
+  border-color: var(--blood-bright);
+  background: rgba(142, 42, 34, 0.15);
+}
+
+.roll-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.roll-label {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.roll-notation,
+.roll-time {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.roll-tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--border-bright);
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--gold);
+}
+
+.roll-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.roll-dice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.roll-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.roll-op,
+.roll-mod {
+  margin: 0 2px;
+}
+
+.die-chip {
+  min-width: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--border-bright);
+  border-radius: 3px;
+  background: var(--bg);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.die-chip.is-dropped {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.die-chip.is-nat20 {
+  border-color: var(--gold-bright);
+  background: var(--gold);
+  color: #1a120a;
+  font-weight: 700;
+}
+
+.die-chip.is-nat1 {
+  border-color: var(--blood-bright);
+  background: var(--blood);
+  color: #f6e9d6;
+  font-weight: 700;
+}
+
+.roll-total {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-crit-failure .roll-total {
+  color: var(--blood-bright);
+}
+
+.roll-crit {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+.is-crit-failure .roll-crit {
+  color: var(--blood-bright);
+}
+
+/* ---------- Анимация броска ---------- */
+
+.dice-overlay {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: overlay-in 0.15s ease-out, overlay-out 0.4s ease-in 2.5s forwards;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; transform: translate(-50%, -40%) scale(0.8); }
+}
+
+@keyframes overlay-out {
+  to { opacity: 0; transform: translate(-50%, -60%); }
+}
+
+.dice-overlay-die {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.7));
+}
+
+.dice-overlay-die svg {
+  width: 100%;
+  height: 100%;
+}
+
+.dice-overlay-die polygon {
+  fill: #2a1f16;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.dice-overlay.is-rolling .dice-overlay-die {
+  animation: die-tumble 0.7s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes die-tumble {
+  0% { transform: translateY(-60px) rotate(-200deg) scale(0.6); }
+  60% { transform: translateY(8px) rotate(20deg) scale(1.05); }
+  80% { transform: translateY(-4px) rotate(-6deg); }
+  100% { transform: none; }
+}
+
+.dice-overlay-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.dice-overlay.is-settled .dice-overlay-die {
+  animation: die-land 0.25s ease-out;
+}
+
+@keyframes die-land {
+  from { transform: scale(1.15); }
+}
+
+.dice-overlay.is-crit-success .dice-overlay-die polygon {
+  fill: #5a4318;
+  stroke: var(--gold-bright);
+  stroke-width: 4;
+}
+
+.dice-overlay.is-crit-success .dice-overlay-die {
+  filter: drop-shadow(0 0 18px rgba(227, 194, 127, 0.8)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.7));
+}
+
+.dice-overlay.is-crit-success .dice-overlay-face {
+  color: #fff3d0;
+  text-shadow: 0 0 12px var(--gold);
+}
+
+.dice-overlay.is-crit-failure .dice-overlay-die polygon {
+  fill: #3a0f0b;
+  stroke: var(--blood-bright);
+  stroke-width: 4;
+}
+
+.dice-overlay.is-crit-failure .dice-overlay-die {
+  filter: drop-shadow(0 0 16px rgba(184, 70, 58, 0.7)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.7));
+}
+
+.dice-overlay.is-crit-failure .dice-overlay-face {
+  color: #ff9a8f;
+}
+
+.dice-overlay-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 14px;
+  background: rgba(15, 12, 10, 0.92);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.dice-overlay-caption strong {
+  font-size: 1.15rem;
+  color: var(--gold-bright);
+}
+
+.dice-overlay-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.dice-overlay-crit {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+.is-crit-failure .dice-overlay-crit {
+  color: var(--blood-bright);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice-overlay,
+  .dice-overlay-die,
+  .roll-entry.is-new {
+    animation: none !important;
+  }
+}
+
 /* ---------- Узкий экран ---------- */
 
 @media (max-width: 768px) {
@@ -808,6 +1286,22 @@ textarea {
 
   .message {
     max-width: 92%;
+  }
+
+  .side-column {
+    gap: 8px;
+  }
+
+  .side-column .inventory-panel {
+    min-height: 0;
+  }
+
+  .dice-panel.is-open {
+    flex-basis: auto;
+  }
+
+  .dice-log {
+    max-height: 50dvh;
   }
 
   .inventory-toggle {

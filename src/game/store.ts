@@ -4,7 +4,7 @@ import type { GameState } from '../types/game'
 import { gameReducer, type GameAction } from './state'
 
 export const SAVE_KEY = 'ai-master:save'
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -24,16 +24,29 @@ export interface GameStoreOptions {
   parseState: (raw: unknown) => GameState
 }
 
+/**
+ * Переносит сохранение старой версии на текущую. Каждый шаг — переход на одну версию.
+ * Возвращает null, если версия неизвестна.
+ */
+export function migrateSave(save: unknown): unknown | null {
+  if (typeof save !== 'object' || save === null) return null
+  let { version, state } = save as { version?: unknown; state?: unknown }
+  if (version === 1) {
+    // v2: добавлен журнал бросков.
+    state = { ...(state as object), rolls: [] }
+    version = 2
+  }
+  return version === SAVE_VERSION ? state : null
+}
+
 export function loadSavedGame(storage: KeyValueStorage | null, parseState: (raw: unknown) => GameState): GameState | null {
   if (!storage) return null
   try {
     const text = storage.getItem(SAVE_KEY)
     if (!text) return null
-    const save: unknown = JSON.parse(text)
-    if (typeof save !== 'object' || save === null || (save as { version?: unknown }).version !== SAVE_VERSION) {
-      throw new Error('неподдерживаемая версия сохранения')
-    }
-    return parseState((save as { state: unknown }).state)
+    const state = migrateSave(JSON.parse(text))
+    if (state === null) throw new Error('неподдерживаемая версия сохранения')
+    return parseState(state)
   } catch (error) {
     console.warn('Сохранение повреждено или устарело, начинаем новую игру.', error)
     return null

@@ -7,7 +7,8 @@ import type { ChatMessage } from '../types/game'
 import { parseCharacterSheet } from './character'
 import { parseItemCatalog } from './items'
 import { parseLocation } from './location'
-import { createNewGame, gameReducer, messageAdded, parseGameState } from './state'
+import { roll } from '../engine/dice'
+import { createNewGame, diceRolled, gameReducer, MAX_ROLL_LOG, messageAdded, parseGameState } from './state'
 import { createGameStore, SAVE_KEY, SAVE_VERSION, type KeyValueStorage } from './store'
 
 const catalog = parseItemCatalog(itemsJson)
@@ -51,6 +52,24 @@ describe('состояние игры', () => {
   })
 })
 
+describe('журнал бросков', () => {
+  it('записывает бросок с подписью и результатом движка', () => {
+    const result = roll('1d20+5', { rng: () => 0.5 })
+    const next = gameReducer(newGame(), diceRolled(result, 'Атака'))
+    expect(next.rolls).toHaveLength(1)
+    expect(next.rolls[0]).toMatchObject({ label: 'Атака', result })
+    expect(parseState(next)).toBe(next)
+  })
+
+  it(`хранит не больше ${MAX_ROLL_LOG} последних бросков`, () => {
+    let state = newGame()
+    for (let i = 0; i < MAX_ROLL_LOG + 5; i++) state = gameReducer(state, diceRolled(roll('1d6', { rng: () => 0 }), `#${i}`))
+    expect(state.rolls).toHaveLength(MAX_ROLL_LOG)
+    expect(state.rolls[0].label).toBe('#5')
+    expect(state.rolls.at(-1)?.label).toBe(`#${MAX_ROLL_LOG + 4}`)
+  })
+})
+
 describe('хранилище игры', () => {
   it('без сохранения начинает новую игру', () => {
     const store = createGameStore({ storage: memoryStorage(), createNewGame: newGame, parseState })
@@ -89,6 +108,22 @@ describe('хранилище игры', () => {
     expect(store.getState()).toEqual(newGame())
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  it('переносит сохранение версии 1 (без журнала бросков), не теряя прогресс', () => {
+    const { rolls: _rolls, ...v1State } = gameReducer(newGame(), messageAdded('player', 'Старый ход'))
+    const storage = memoryStorage({ [SAVE_KEY]: JSON.stringify({ version: 1, state: v1State }) })
+    const store = createGameStore({ storage, createNewGame: newGame, parseState })
+    expect(store.getState().messages.at(-1)?.text).toBe('Старый ход')
+    expect(store.getState().rolls).toEqual([])
+  })
+
+  it('сохраняет броски и восстанавливает их после перезагрузки', () => {
+    const storage = memoryStorage()
+    const store = createGameStore({ storage, createNewGame: newGame, parseState })
+    store.dispatch(diceRolled(roll('4d6kh3', { rng: () => 0.99 }), 'Сила'))
+    const reloaded = createGameStore({ storage, createNewGame: newGame, parseState })
+    expect(reloaded.getState().rolls[0].result.total).toBe(18)
   })
 
   it('работает без доступа к хранилищу', () => {

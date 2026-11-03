@@ -1,3 +1,4 @@
+import type { RollResult } from '../engine/dice'
 import type { Character, Inventory } from './character'
 import type { CellPosition } from './location'
 
@@ -9,6 +10,16 @@ export interface ChatMessage {
   text: string
 }
 
+/** Запись в журнале бросков. */
+export interface RollRecord {
+  id: string
+  /** Что бросали: «Атака», «Мудрость (Внимательность)» и т. п. */
+  label?: string
+  /** Время броска, мс с начала эпохи. */
+  timestamp: number
+  result: RollResult
+}
+
 /** Всё состояние игры. Меняется только через gameReducer (src/game/state.ts). */
 export interface GameState {
   character: Character
@@ -18,4 +29,6 @@ export interface GameState {
     player: CellPosition
   }
   messages: ChatMessage[]
+  /** Журнал бросков, новые в конце. */
+  rolls: RollRecord[]
 }

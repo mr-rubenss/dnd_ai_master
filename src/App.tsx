@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { DicePanel } from './components/DicePanel'
+import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { InventoryPanel } from './components/InventoryPanel'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { PlayerInput } from './components/PlayerInput'
 import { itemCatalog, locations } from './data'
-import { messageAdded } from './game/state'
+import { DiceError, roll, type RollMode } from './engine/dice'
+import { diceRolled, messageAdded } from './game/state'
 import { gameStore, useGameState } from './hooks/useGame'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
@@ -15,6 +18,9 @@ function App() {
   const location = locations[state.location.id]
   const [waiting, setWaiting] = useState(false)
   const timerRef = useRef<number | undefined>(undefined)
+  const [animatedRollId, setAnimatedRollId] = useState<string | null>(null)
+  const animatedRoll = animatedRollId ? state.rolls.find((r) => r.id === animatedRollId) : undefined
+  const hideRoll = useCallback(() => setAnimatedRollId(null), [])
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
@@ -25,6 +31,18 @@ function App() {
       gameStore.dispatch(messageAdded('master', STUB_REPLY))
       setWaiting(false)
     }, 600)
+  }
+
+  const handleRoll = (notation: string, mode: RollMode): string | null => {
+    try {
+      const action = diceRolled(roll(notation, { mode }))
+      gameStore.dispatch(action)
+      setAnimatedRollId(action.roll.id)
+      return null
+    } catch (error) {
+      if (error instanceof DiceError) return error.message
+      throw error
+    }
   }
 
   const handleNewGame = () => {
@@ -51,8 +69,12 @@ function App() {
             <PlayerInput onSend={handleSend} disabled={waiting} />
           </section>
         </main>
-        <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
+        <div className="side-column">
+          <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
+          <DicePanel rolls={state.rolls} onRoll={handleRoll} />
+        </div>
       </div>
+      {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}
     </div>
   )
 }

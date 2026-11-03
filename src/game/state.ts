@@ -2,7 +2,8 @@
 // Состояние меняется только через gameReducer — ни UI, ни ИИ не правят его напрямую.
 
 import type { CharacterSheet } from '../types/character'
-import type { ChatMessage, GameState, MessageAuthor } from '../types/game'
+import type { RollResult } from '../engine/dice'
+import type { ChatMessage, GameState, MessageAuthor, RollRecord } from '../types/game'
 import type { ItemCatalog } from '../types/items'
 import type { LocationData } from '../types/location'
 import { parseCharacterSheet } from './character'
@@ -24,17 +25,24 @@ export function createNewGame({ sheet, location, intro }: NewGameData): GameStat
     inventory: sheet.inventory,
     location: { id: location.id, player: location.playerStart },
     messages: intro,
+    rolls: [],
   })
 }
 
+/** Сколько последних бросков хранить в журнале. */
+export const MAX_ROLL_LOG = 100
+
 export type GameAction =
   | { type: 'messageAdded'; message: ChatMessage }
+  | { type: 'diceRolled'; roll: RollRecord }
   | { type: 'gameReset'; state: GameState }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'messageAdded':
       return { ...state, messages: [...state.messages, action.message] }
+    case 'diceRolled':
+      return { ...state, rolls: [...state.rolls, action.roll].slice(-MAX_ROLL_LOG) }
     case 'gameReset':
       return action.state
   }
@@ -43,6 +51,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 /** Создаёт действие «добавить сообщение» с новым id. */
 export function messageAdded(author: MessageAuthor, text: string): GameAction {
   return { type: 'messageAdded', message: { id: crypto.randomUUID(), author, text } }
+}
+
+/** Создаёт действие «записать бросок в журнал». Сам бросок делает движок (src/engine/dice.ts). */
+export function diceRolled(result: RollResult, label?: string): Extract<GameAction, { type: 'diceRolled' }> {
+  return { type: 'diceRolled', roll: { id: crypto.randomUUID(), label, timestamp: Date.now(), result } }
 }
 
 export interface GameStateContext {
@@ -81,6 +94,25 @@ export function parseGameState(raw: unknown, { catalog, locations }: GameStateCo
     raw.messages.forEach((m: unknown, i) => {
       if (!isObject(m) || !isNonEmptyString(m.id) || !isOneOf(MESSAGE_AUTHORS, m.author) || typeof m.text !== 'string') {
         problems.push(`messages[${i}]: ожидается { id, author: master|player|system, text }`)
+      }
+    })
+  }
+
+  if (!Array.isArray(raw.rolls)) {
+    problems.push('rolls: должно быть массивом')
+  } else {
+    raw.rolls.forEach((r: unknown, i) => {
+      const result = isObject(r) ? r.result : undefined
+      if (
+        !isObject(r) ||
+        !isNonEmptyString(r.id) ||
+        typeof r.timestamp !== 'number' ||
+        !isObject(result) ||
+        typeof result.notation !== 'string' ||
+        typeof result.total !== 'number' ||
+        !Array.isArray(result.groups)
+      ) {
+        problems.push(`rolls[${i}]: ожидается { id, timestamp, result: { notation, total, groups } }`)
       }
     })
   }
