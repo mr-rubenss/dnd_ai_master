@@ -4,6 +4,7 @@ import type { CellPosition, LocationData, MapObjectType, NpcAttitude } from '../
 import { MapObjectIcon } from './MapIcons'
 import { DOOR_STATE_LABELS, segmentBox } from './mapDrawing'
 import { DoorIcon, WallLines, WindowIcon } from './MapWalls'
+import { token } from '../theme/css'
 
 const OBJECT_TYPE_LABELS: Record<MapObjectType, string> = {
   table: 'Стол',
@@ -154,7 +155,7 @@ export function LocationMap({ location, player, doors = {} }: Props) {
     <div className="map-canvas">
       <div
         className="map-board"
-        style={{ '--map-w': width + MAP_PAD * 2, '--map-h': height + MAP_PAD * 2 } as CSSProperties}
+        style={{ '--board-w': width + MAP_PAD * 2, '--board-h': height + MAP_PAD * 2 } as CSSProperties}
         onClick={() => setActive(null)}
       >
         <svg viewBox={`${-MAP_PAD} ${-MAP_PAD} ${width + MAP_PAD * 2} ${height + MAP_PAD * 2}`} className="map-svg" role="img" aria-label={`Карта: ${location.name}`}>
@@ -163,12 +164,12 @@ export function LocationMap({ location, player, doors = {} }: Props) {
               <path d="M 1 0 L 0 0 0 1" className="grid-line" />
             </pattern>
             <radialGradient id="fire-glow">
-              <stop offset="0%" stopColor="#ff9a3c" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#ff9a3c" stopOpacity="0" />
+              <stop offset="0%" stopOpacity="0.35" style={{ stopColor: token('map', 'fireGlow') }} />
+              <stop offset="100%" stopOpacity="0" style={{ stopColor: token('map', 'fireGlow') }} />
             </radialGradient>
             <radialGradient id="player-fill" cx="35%" cy="35%">
-              <stop offset="0%" stopColor="#fff1c4" />
-              <stop offset="100%" stopColor="#c9a45c" />
+              <stop offset="0%" style={{ stopColor: token('map', 'playerFillLight') }} />
+              <stop offset="100%" style={{ stopColor: token('map', 'playerFill') }} />
             </radialGradient>
           </defs>
 
