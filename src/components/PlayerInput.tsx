@@ -1,12 +1,14 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 
 interface Props {
   onSend: (text: string) => void
   disabled?: boolean
+  /** Элемент слева от поля ввода (кнопка игрового стола). */
+  leading?: ReactNode
 }
 
 /** Поле ответа игрока. Enter — отправить, Shift+Enter — новая строка. */
-export function PlayerInput({ onSend, disabled }: Props) {
+export function PlayerInput({ onSend, disabled, leading }: Props) {
   const [text, setText] = useState('')
 
   const submit = () => {
@@ -30,6 +32,7 @@ export function PlayerInput({ onSend, disabled }: Props) {
 
   return (
     <form className="player-input" onSubmit={handleSubmit}>
+      {leading}
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}

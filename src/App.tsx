@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DicePanel } from './components/DicePanel'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
+import { DiceTray } from './components/DiceTray'
 import { InventoryPanel } from './components/InventoryPanel'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
@@ -66,13 +66,14 @@ function App() {
           <MapPanel location={location} player={state.location.player} />
           <section className="panel story-panel">
             <NarrationLog messages={state.messages} />
-            <PlayerInput onSend={handleSend} disabled={waiting} />
+            <PlayerInput
+              onSend={handleSend}
+              disabled={waiting}
+              leading={<DiceTray rolls={state.rolls} onRoll={handleRoll} />}
+            />
           </section>
         </main>
-        <div className="side-column">
-          <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
-          <DicePanel rolls={state.rolls} onRoll={handleRoll} />
-        </div>
+        <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
       </div>
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}
     </div>
