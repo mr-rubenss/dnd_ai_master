@@ -199,11 +199,11 @@ textarea {
   stroke-linecap: square;
   pointer-events: none;
 }
-.wall-line--stone { stroke: #120e0b; stroke-width: 0.17; }
-.wall-line--wood { stroke: #23160b; stroke-width: 0.12; }
+.wall-line--stone { stroke: #120e0b; stroke-width: 0.2; }
+.wall-line--wood { stroke: #23160b; stroke-width: 0.17; }
 .wall-halo { stroke: #7a6a56; stroke-opacity: 0.55; stroke-linecap: square; pointer-events: none; }
-.wall-halo--stone { stroke-width: 0.25; }
-.wall-halo--wood { stroke-width: 0.18; }
+.wall-halo--stone { stroke-width: 0.24; }
+.wall-halo--wood { stroke-width: 0.22; }
 
 .window-glass { stroke: #8fb3c4; stroke-width: 0.1; opacity: 0.85; }
 .window-frame { stroke: #120e0b; stroke-width: 0.04; }
