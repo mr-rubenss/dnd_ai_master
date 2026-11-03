@@ -1,18 +1,11 @@
 // Правила персонажа (SRD 5.2) и валидация листа персонажа. Чистые функции.
 
-import { ABILITIES, type AbilityScores, type Character, type CharacterSheet, type Inventory } from '../types/character'
+import { ABILITIES, abilityModifier, type AbilityScores } from '../engine/abilities'
+import { CONDITIONS, MAX_EXHAUSTION } from '../engine/conditions'
+import { SKILLS } from '../engine/skills'
+import type { Character, CharacterSheet, Inventory } from '../types/character'
 import type { ItemCatalog } from '../types/items'
 import { isInt, isNonEmptyString, isNumber, isObject, ValidationError } from './validation'
-
-/** Модификатор характеристики: (значение − 10) / 2 с округлением вниз. */
-export function abilityModifier(score: number): number {
-  return Math.floor((score - 10) / 2)
-}
-
-/** Бонус мастерства по уровню персонажа: +2 на 1–4, +3 на 5–8 … +6 на 17–20. */
-export function proficiencyBonus(level: number): number {
-  return 2 + Math.floor((level - 1) / 4)
-}
 
 /**
  * Класс доспеха от надетой экипировки.
@@ -68,6 +61,45 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
     }
     if (!isInt(ch.maxHp) || ch.maxHp < 1) fail('character.maxHp: положительное целое')
     if (!isInt(ch.hp) || ch.hp < 0 || (isInt(ch.maxHp) && ch.hp > ch.maxHp)) fail('character.hp: целое от 0 до maxHp')
+
+    const prof = ch.proficiencies
+    if (!isObject(prof)) {
+      fail('character.proficiencies: должно быть объектом { savingThrows, skills }')
+    } else {
+      if (!Array.isArray(prof.savingThrows) || !prof.savingThrows.every((a) => (ABILITIES as readonly unknown[]).includes(a))) {
+        fail(`character.proficiencies.savingThrows: массив из ${ABILITIES.join(', ')}`)
+      } else if (new Set(prof.savingThrows).size !== prof.savingThrows.length) {
+        fail('character.proficiencies.savingThrows: характеристики не должны повторяться')
+      }
+      if (!isObject(prof.skills)) {
+        fail('character.proficiencies.skills: должно быть объектом { навык: "proficient" | "expertise" }')
+      } else {
+        for (const [skill, level] of Object.entries(prof.skills)) {
+          if (!(SKILLS as readonly string[]).includes(skill)) fail(`character.proficiencies.skills: неизвестный навык "${skill}"`)
+          else if (level !== 'proficient' && level !== 'expertise') {
+            fail(`character.proficiencies.skills.${skill}: "proficient" или "expertise", а не ${JSON.stringify(level)}`)
+          }
+        }
+      }
+    }
+
+    if (!Array.isArray(ch.conditions)) {
+      fail('character.conditions: должно быть массивом состояний')
+    } else {
+      const seen = new Set<string>()
+      ch.conditions.forEach((c: unknown, i) => {
+        const where = `character.conditions[${i}]`
+        if (!isObject(c) || !(CONDITIONS as readonly unknown[]).includes(c.id)) return fail(`${where}: неизвестное состояние`)
+        const id = c.id as string
+        if (seen.has(id)) fail(`${where}: состояние "${id}" указано дважды`)
+        seen.add(id)
+        if (id === 'exhaustion') {
+          if (!isInt(c.level) || c.level < 1 || c.level > MAX_EXHAUSTION) fail(`${where}: уровень Истощения — целое от 1 до ${MAX_EXHAUSTION}`)
+        } else if (c.level !== undefined) {
+          fail(`${where}: уровень есть только у Истощения`)
+        }
+      })
+    }
   }
 
   const inv = raw.inventory

@@ -9,7 +9,17 @@
     "level": 1,
     "abilities": { "str": 17, "dex": 14, "con": 14, "int": 8, "wis": 12, "cha": 10 },
     "maxHp": 12,
-    "hp": 12
+    "hp": 12,
+    "proficiencies": {
+      "savingThrows": ["str", "con"],
+      "skills": {
+        "athletics": "proficient",
+        "intimidation": "proficient",
+        "perception": "proficient",
+        "survival": "proficient"
+      }
+    },
+    "conditions": []
   },
   "inventory": {
     "gold": 18,

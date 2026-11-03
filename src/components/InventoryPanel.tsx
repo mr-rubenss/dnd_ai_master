@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
+import { CharacterStats } from './CharacterStats'
 import { armorClass, carryingCapacity, inventoryWeight } from '../game/character'
 import type { Character, Equipment, Inventory } from '../types/character'
 import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types/items'
@@ -16,6 +17,13 @@ const SLOT_LABELS: Record<keyof Equipment, string> = {
   shield: 'Щит',
 }
 
+type Tab = 'equipment' | 'stats'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'equipment', label: 'Снаряжение' },
+  { id: 'stats', label: 'Характеристики' },
+]
+
 const SLOT_ICONS: Record<keyof Equipment, string> = {
   weapon: '⚔️',
   armor: '🥋',
@@ -26,6 +34,17 @@ const SLOT_ICONS: Record<keyof Equipment, string> = {
 export function InventoryPanel({ character, inventory, catalog }: Props) {
   const [open, setOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('equipment')
+
+  // Стрелки влево/вправо переключают вкладки (паттерн ARIA tabs).
+  const onTabKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const index = TABS.findIndex((t) => t.id === tab)
+    const next = TABS[(index + (event.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length]
+    setTab(next.id)
+    document.getElementById(`sheet-tab-${next.id}`)?.focus()
+  }
 
   const ac = armorClass(character.abilities, inventory, catalog)
   const weight = inventoryWeight(inventory, catalog)
@@ -84,59 +103,84 @@ export function InventoryPanel({ character, inventory, catalog }: Props) {
           </dl>
         </section>
 
-        <section className="inventory-section" aria-label="Экипировка">
-          <h3>Экипировка</h3>
-          <ul className="equipment-list">
-            {(Object.keys(SLOT_LABELS) as (keyof Equipment)[]).map((slot) => {
-              const id = inventory.equipped[slot]
-              const item = id ? catalog[id] : undefined
-              const emptyNote = slot === 'shield' && handsBusy ? 'руки заняты двуручным оружием' : 'пусто'
+        <div className="sheet-tabs" role="tablist" aria-label="Лист персонажа">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              id={`sheet-tab-${t.id}`}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              aria-controls={`sheet-panel-${t.id}`}
+              tabIndex={tab === t.id ? 0 : -1}
+              className={tab === t.id ? 'is-active' : undefined}
+              onClick={() => setTab(t.id)}
+              onKeyDown={onTabKeyDown}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div id="sheet-panel-equipment" role="tabpanel" aria-labelledby="sheet-tab-equipment" hidden={tab !== 'equipment'}>
+          <section className="inventory-section" aria-label="Экипировка">
+            <h3>Экипировка</h3>
+            <ul className="equipment-list">
+              {(Object.keys(SLOT_LABELS) as (keyof Equipment)[]).map((slot) => {
+                const id = inventory.equipped[slot]
+                const item = id ? catalog[id] : undefined
+                const emptyNote = slot === 'shield' && handsBusy ? 'руки заняты двуручным оружием' : 'пусто'
+                return (
+                  <li key={slot} className={item ? undefined : 'is-empty'}>
+                    <span className="item-icon" aria-hidden="true">
+                      {item?.icon ?? SLOT_ICONS[slot]}
+                    </span>
+                    <span className="equipment-slot">{SLOT_LABELS[slot]}</span>
+                    <span className="equipment-item">
+                      {item ? item.name : emptyNote}
+                      {item && itemSummary(item) && <small>{itemSummary(item)}</small>}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+
+          <section className="inventory-section" aria-label="Предметы">
+            <h3 className="items-heading">
+              Предметы
+              <span className={weight > capacity ? 'is-overloaded' : undefined}>
+                {formatNumber(weight)} / {formatWeight(capacity)}
+              </span>
+            </h3>
+
+            {ITEM_CATEGORIES.map((category) => {
+              const entries = inventory.items.filter((entry) => catalog[entry.itemId]?.category === category)
+              if (entries.length === 0) return null
               return (
-                <li key={slot} className={item ? undefined : 'is-empty'}>
-                  <span className="item-icon" aria-hidden="true">
-                    {item?.icon ?? SLOT_ICONS[slot]}
-                  </span>
-                  <span className="equipment-slot">{SLOT_LABELS[slot]}</span>
-                  <span className="equipment-item">
-                    {item ? item.name : emptyNote}
-                    {item && itemSummary(item) && <small>{itemSummary(item)}</small>}
-                  </span>
-                </li>
+                <div key={category} className="inventory-group">
+                  <h4>{CATEGORY_LABELS[category]}</h4>
+                  <ul>
+                    {entries.map((entry) => (
+                      <ItemRow
+                        key={entry.itemId}
+                        item={catalog[entry.itemId]}
+                        quantity={entry.quantity}
+                        equipped={equippedIds.has(entry.itemId)}
+                        expanded={expandedId === entry.itemId}
+                        onToggle={() => setExpandedId((cur) => (cur === entry.itemId ? null : entry.itemId))}
+                      />
+                    ))}
+                  </ul>
+                </div>
               )
             })}
-          </ul>
-        </section>
+          </section>
+        </div>
 
-        <section className="inventory-section" aria-label="Предметы">
-          <h3 className="items-heading">
-            Предметы
-            <span className={weight > capacity ? 'is-overloaded' : undefined}>
-              {formatNumber(weight)} / {formatWeight(capacity)}
-            </span>
-          </h3>
-
-          {ITEM_CATEGORIES.map((category) => {
-            const entries = inventory.items.filter((entry) => catalog[entry.itemId]?.category === category)
-            if (entries.length === 0) return null
-            return (
-              <div key={category} className="inventory-group">
-                <h4>{CATEGORY_LABELS[category]}</h4>
-                <ul>
-                  {entries.map((entry) => (
-                    <ItemRow
-                      key={entry.itemId}
-                      item={catalog[entry.itemId]}
-                      quantity={entry.quantity}
-                      equipped={equippedIds.has(entry.itemId)}
-                      expanded={expandedId === entry.itemId}
-                      onToggle={() => setExpandedId((cur) => (cur === entry.itemId ? null : entry.itemId))}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </section>
+        <div id="sheet-panel-stats" role="tabpanel" aria-labelledby="sheet-tab-stats" hidden={tab !== 'stats'}>
+          {tab === 'stats' && <CharacterStats character={character} />}
+        </div>
       </div>
     </aside>
   )

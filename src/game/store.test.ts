@@ -113,9 +113,29 @@ describe('хранилище игры', () => {
   it('переносит сохранение версии 1 (без журнала бросков), не теряя прогресс', () => {
     const { rolls: _rolls, ...v1State } = gameReducer(newGame(), messageAdded('player', 'Старый ход'))
     const storage = memoryStorage({ [SAVE_KEY]: JSON.stringify({ version: 1, state: v1State }) })
-    const store = createGameStore({ storage, createNewGame: newGame, parseState })
+    const store = createGameStore({
+      storage,
+      createNewGame: newGame,
+      parseState,
+      migration: { proficienciesFor: () => sheet.character.proficiencies },
+    })
     expect(store.getState().messages.at(-1)?.text).toBe('Старый ход')
     expect(store.getState().rolls).toEqual([])
+  })
+
+  it('переносит сохранение версии 2: владения из шаблона персонажа, состояний нет', () => {
+    const current = gameReducer(newGame(), messageAdded('player', 'Ход до обновления'))
+    const { proficiencies: _p, conditions: _c, ...v2Character } = current.character
+    const storage = memoryStorage({ [SAVE_KEY]: JSON.stringify({ version: 2, state: { ...current, character: v2Character } }) })
+    const store = createGameStore({
+      storage,
+      createNewGame: newGame,
+      parseState,
+      migration: { proficienciesFor: (id) => (id === sheet.character.id ? sheet.character.proficiencies : undefined) },
+    })
+    expect(store.getState().messages.at(-1)?.text).toBe('Ход до обновления')
+    expect(store.getState().character.proficiencies).toEqual(sheet.character.proficiencies)
+    expect(store.getState().character.conditions).toEqual([])
   })
 
   it('сохраняет броски и восстанавливает их после перезагрузки', () => {

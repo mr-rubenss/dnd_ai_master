@@ -2,14 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import itemsJson from '../data/items.json'
 import type { AbilityScores, Inventory } from '../types/character'
-import {
-  abilityModifier,
-  armorClass,
-  carryingCapacity,
-  inventoryWeight,
-  parseCharacterSheet,
-  proficiencyBonus,
-} from './character'
+import { abilityModifier } from '../engine/abilities'
+import { armorClass, carryingCapacity, inventoryWeight, parseCharacterSheet } from './character'
 import { parseItemCatalog } from './items'
 import { ValidationError } from './validation'
 
@@ -32,19 +26,6 @@ function problemsOf(raw: unknown): string[] {
 }
 
 describe('правила персонажа', () => {
-  it('считает модификатор характеристики', () => {
-    expect(abilityModifier(1)).toBe(-5)
-    expect(abilityModifier(8)).toBe(-1)
-    expect(abilityModifier(10)).toBe(0)
-    expect(abilityModifier(11)).toBe(0)
-    expect(abilityModifier(17)).toBe(3)
-    expect(abilityModifier(20)).toBe(5)
-  })
-
-  it('считает бонус мастерства по уровню', () => {
-    expect([1, 4, 5, 8, 9, 13, 17, 20].map(proficiencyBonus)).toEqual([2, 2, 3, 3, 4, 5, 6, 6])
-  })
-
   it('КД без доспеха — 10 + Ловкость', () => {
     expect(armorClass(abilities, inventoryWith({ weapon: null, armor: null, shield: null }), catalog)).toBe(12)
   })
@@ -103,6 +84,40 @@ describe('parseCharacterSheet', () => {
     raw.inventory.items.push({ itemId: 'shield', quantity: 1 })
     raw.inventory.equipped.shield = 'shield'
     expect(problemsOf(raw)).toEqual(['inventory.equipped: двуручное оружие нельзя использовать вместе со щитом'])
+  })
+
+  it('у Ратибора владения воина и солдата: спасброски Силы и Телосложения, 4 навыка', () => {
+    const sheet = parseCharacterSheet(fighterJson, catalog)
+    expect(sheet.character.proficiencies.savingThrows).toEqual(['str', 'con'])
+    expect(Object.keys(sheet.character.proficiencies.skills).sort()).toEqual(['athletics', 'intimidation', 'perception', 'survival'])
+    expect(sheet.character.conditions).toEqual([])
+  })
+
+  it('отклоняет неизвестный навык и неверный уровень владения', () => {
+    const raw = base()
+    raw.character.proficiencies = { savingThrows: ['str', 'luck'], skills: { flying: 'proficient', stealth: 'master' } }
+    expect(problemsOf(raw)).toEqual([
+      'character.proficiencies.savingThrows: массив из str, dex, con, int, wis, cha',
+      'character.proficiencies.skills: неизвестный навык "flying"',
+      'character.proficiencies.skills.stealth: "proficient" или "expertise", а не "master"',
+    ])
+  })
+
+  it('проверяет состояния: известные, без повторов, уровень только у Истощения (1–6)', () => {
+    const raw = base()
+    raw.character.conditions = [
+      { id: 'poisoned' },
+      { id: 'poisoned' },
+      { id: 'exhaustion', level: 7 },
+      { id: 'frightened', level: 1 },
+      { id: 'cursed' },
+    ]
+    expect(problemsOf(raw)).toEqual([
+      'character.conditions[1]: состояние "poisoned" указано дважды',
+      'character.conditions[2]: уровень Истощения — целое от 1 до 6',
+      'character.conditions[3]: уровень есть только у Истощения',
+      'character.conditions[4]: неизвестное состояние',
+    ])
   })
 
   it('отклоняет не-оружие в слоте оружия и хиты больше максимума', () => {

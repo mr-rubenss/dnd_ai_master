@@ -754,6 +754,222 @@ textarea {
   margin: 0;
 }
 
+/* ---------- Вкладки листа персонажа ---------- */
+
+.sheet-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-tabs button {
+  min-width: 0;
+  padding: 9px 4px 7px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sheet-tabs button:hover {
+  color: var(--fg);
+}
+
+.sheet-tabs button.is-active {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold);
+}
+
+.sheet-tabs button:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: -3px;
+}
+
+.sheet-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px 0;
+}
+
+.sheet-summary div {
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.sheet-summary dt {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.sheet-summary dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gold-bright);
+}
+
+.ability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ability-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ability-abbr {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.ability-mod {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.ability-score {
+  min-width: 30px;
+  margin-top: 2px;
+  padding: 0 6px;
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--fg);
+}
+
+.stat-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stat-list li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.stat-list li.is-proficient,
+.stat-list li:has(.prof-mark--proficient),
+.stat-list li:has(.prof-mark--expertise) {
+  color: var(--fg);
+}
+
+.stat-ability {
+  margin-left: 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.stat-mod {
+  min-width: 28px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.prof-mark {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+
+.prof-mark--proficient {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.prof-mark--expertise {
+  background: var(--gold-bright);
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--gold);
+}
+
+.stat-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.stat-legend .prof-mark--expertise {
+  margin-left: 8px;
+}
+
+.conditions-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.condition-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.condition-chip {
+  padding: 6px 8px;
+  border: 1px solid var(--blood);
+  border-left: 3px solid var(--blood-bright);
+  border-radius: 4px;
+  background: rgba(142, 42, 34, 0.12);
+  font-size: 0.8rem;
+}
+
+.condition-chip strong {
+  display: block;
+  color: #f0b8ae;
+}
+
+.condition-chip span {
+  color: var(--muted);
+}
+
 /* ---------- Игровой стол (броски) ---------- */
 
 .dice-tray {

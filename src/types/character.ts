@@ -1,8 +1,10 @@
 // Типы персонажа и инвентаря. Пример — src/data/characters/fighter-ratibor.json.
 
-export const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const
-export type Ability = (typeof ABILITIES)[number]
-export type AbilityScores = Record<Ability, number>
+import type { AbilityScores } from '../engine/abilities'
+import type { Proficiencies } from '../engine/checks'
+import type { ActiveCondition } from '../engine/conditions'
+
+export { ABILITIES, type Ability, type AbilityScores } from '../engine/abilities'
 
 export interface Character {
   id: string
@@ -17,6 +19,10 @@ export interface Character {
   abilities: AbilityScores
   maxHp: number
   hp: number
+  /** Владение спасбросками и навыками (с компетентностью). */
+  proficiencies: Proficiencies
+  /** Действующие состояния (Отравлен, Истощение 2 и т. п.). */
+  conditions: ActiveCondition[]
 }
 
 export interface InventoryEntry {
