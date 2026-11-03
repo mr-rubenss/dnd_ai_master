@@ -71,84 +71,125 @@ describe('журнал бросков', () => {
 })
 
 describe('хранилище игры', () => {
-  it('без сохранения начинает новую игру', () => {
-    const store = createGameStore({ storage: memoryStorage(), createNewGame: newGame, parseState })
-    expect(store.getState().messages).toHaveLength(introJson.length)
+  const createNew = (s: typeof sheet = sheet) => createNewGame({ sheet: s, location, intro: introJson as ChatMessage[] })
+  const options = (storage: ReturnType<typeof memoryStorage> | null) => ({
+    storage,
+    createNewGame: createNew,
+    parseState,
+    migration: { characterTemplate: (id: string) => (id === sheet.character.id ? sheet.character : undefined) },
+  })
+  /** Хранилище с уже начатой игрой. */
+  const started = (storage: ReturnType<typeof memoryStorage> | null = memoryStorage()) => {
+    const store = createGameStore(options(storage))
+    store.startGame(sheet)
+    return store
+  }
+
+  it('без сохранения игры нет — показывается создание персонажа', () => {
+    const storage = memoryStorage()
+    const store = createGameStore(options(storage))
+    expect(store.getState()).toBeNull()
+    store.dispatch(messageAdded('player', 'В пустоту'))
+    expect(store.getState()).toBeNull()
+    expect(storage.data.has(SAVE_KEY)).toBe(false)
+  })
+
+  it('startGame начинает игру за персонажа и сразу сохраняет её', () => {
+    const storage = memoryStorage()
+    const store = createGameStore(options(storage))
+    const listener = vi.fn()
+    store.subscribe(listener)
+    store.startGame(sheet)
+    expect(listener).toHaveBeenCalledOnce()
+    expect(store.getState()!.character.name).toBe('Ратибор')
+    expect(store.getState()!.messages).toHaveLength(introJson.length)
+    expect(JSON.parse(storage.data.get(SAVE_KEY)!).version).toBe(SAVE_VERSION)
   })
 
   it('сохраняет каждое изменение и восстанавливает его после «перезагрузки»', () => {
     const storage = memoryStorage()
-    const store = createGameStore({ storage, createNewGame: newGame, parseState })
-    const listener = vi.fn()
-    store.subscribe(listener)
+    const store = started(storage)
     store.dispatch(messageAdded('player', 'Подхожу к стойке'))
-    expect(listener).toHaveBeenCalledOnce()
-
-    const reloaded = createGameStore({ storage, createNewGame: newGame, parseState })
+    const reloaded = createGameStore(options(storage))
     expect(reloaded.getState()).toEqual(store.getState())
-    expect(reloaded.getState().messages.at(-1)?.text).toBe('Подхожу к стойке')
+    expect(reloaded.getState()!.messages.at(-1)?.text).toBe('Подхожу к стойке')
   })
 
-  it('новая игра заменяет сохранение', () => {
+  it('endGame стирает сохранение — после перезагрузки снова создание персонажа', () => {
     const storage = memoryStorage()
-    const store = createGameStore({ storage, createNewGame: newGame, parseState })
-    store.dispatch(messageAdded('player', 'Привет'))
-    store.newGame()
-    const saved = JSON.parse(storage.data.get(SAVE_KEY)!)
-    expect(saved.state.messages).toHaveLength(introJson.length)
+    const store = started(storage)
+    store.endGame()
+    expect(store.getState()).toBeNull()
+    expect(storage.data.has(SAVE_KEY)).toBe(false)
+    expect(createGameStore(options(storage)).getState()).toBeNull()
   })
 
   it.each([
     ['не JSON', '{oops'],
     ['другая версия', JSON.stringify({ version: SAVE_VERSION + 1, state: {} })],
-    ['неизвестная локация', JSON.stringify({ version: SAVE_VERSION, state: { ...newGame(), location: { id: 'nowhere', player: { x: 1, y: 1 } } } })],
-  ])('при повреждённом сохранении (%s) начинает новую игру', (_, saved) => {
+    ['неизвестная локация', JSON.stringify({ version: SAVE_VERSION, state: { ...createNew(), location: { id: 'nowhere', player: { x: 1, y: 1 } } } })],
+  ])('при повреждённом сохранении (%s) игры нет', (_, saved) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const store = createGameStore({ storage: memoryStorage({ [SAVE_KEY]: saved }), createNewGame: newGame, parseState })
-    expect(store.getState()).toEqual(newGame())
+    const store = createGameStore(options(memoryStorage({ [SAVE_KEY]: saved })))
+    expect(store.getState()).toBeNull()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
   })
 
+  /** Сохранение старой версии: убираем поля, которых тогда не было. */
+  function oldSave(version: number, strip: (state: Record<string, unknown> & { character: Record<string, unknown> }) => void) {
+    const state = structuredClone(gameReducer(createNew(), messageAdded('player', 'Старый ход'))) as unknown as Record<string, unknown> & {
+      character: Record<string, unknown>
+    }
+    strip(state)
+    return memoryStorage({ [SAVE_KEY]: JSON.stringify({ version, state }) })
+  }
+  const stripV4 = (s: { character: Record<string, unknown> }) => {
+    for (const key of ['speciesId', 'backgroundId', 'speciesOption', 'feats', 'appearance']) delete s.character[key]
+  }
+  const stripV3 = (s: { character: Record<string, unknown> }) => {
+    stripV4(s)
+    delete s.character.proficiencies
+    delete s.character.conditions
+  }
+
   it('переносит сохранение версии 1 (без журнала бросков), не теряя прогресс', () => {
-    const { rolls: _rolls, ...v1State } = gameReducer(newGame(), messageAdded('player', 'Старый ход'))
-    const storage = memoryStorage({ [SAVE_KEY]: JSON.stringify({ version: 1, state: v1State }) })
-    const store = createGameStore({
-      storage,
-      createNewGame: newGame,
-      parseState,
-      migration: { proficienciesFor: () => sheet.character.proficiencies },
-    })
-    expect(store.getState().messages.at(-1)?.text).toBe('Старый ход')
-    expect(store.getState().rolls).toEqual([])
+    const store = createGameStore(options(oldSave(1, (s) => (stripV3(s), delete s.rolls))))
+    expect(store.getState()!.messages.at(-1)?.text).toBe('Старый ход')
+    expect(store.getState()!.rolls).toEqual([])
+    expect(store.getState()!.character).toEqual(sheet.character)
   })
 
   it('переносит сохранение версии 2: владения из шаблона персонажа, состояний нет', () => {
-    const current = gameReducer(newGame(), messageAdded('player', 'Ход до обновления'))
-    const { proficiencies: _p, conditions: _c, ...v2Character } = current.character
-    const storage = memoryStorage({ [SAVE_KEY]: JSON.stringify({ version: 2, state: { ...current, character: v2Character } }) })
-    const store = createGameStore({
-      storage,
-      createNewGame: newGame,
-      parseState,
-      migration: { proficienciesFor: (id) => (id === sheet.character.id ? sheet.character.proficiencies : undefined) },
+    const store = createGameStore(options(oldSave(2, stripV3)))
+    expect(store.getState()!.messages.at(-1)?.text).toBe('Старый ход')
+    expect(store.getState()!.character.proficiencies).toEqual(sheet.character.proficiencies)
+    expect(store.getState()!.character.conditions).toEqual([])
+  })
+
+  it('переносит сохранение версии 3: вид, предыстория и черты из шаблона', () => {
+    const store = createGameStore(options(oldSave(3, stripV4)))
+    expect(store.getState()!.character).toMatchObject({ speciesId: 'human', backgroundId: 'soldier', feats: ['savage-attacker', 'alert'] })
+    expect(store.getState()!.messages.at(-1)?.text).toBe('Старый ход')
+  })
+
+  it('сохранение версии 3 неизвестного персонажа тоже загружается', () => {
+    const storage = oldSave(3, (s) => {
+      stripV4(s)
+      s.character.id = 'someone-else'
     })
-    expect(store.getState().messages.at(-1)?.text).toBe('Ход до обновления')
-    expect(store.getState().character.proficiencies).toEqual(sheet.character.proficiencies)
-    expect(store.getState().character.conditions).toEqual([])
+    expect(createGameStore(options(storage)).getState()!.character).toMatchObject({ speciesId: 'unknown', feats: [], appearance: '' })
   })
 
   it('сохраняет броски и восстанавливает их после перезагрузки', () => {
     const storage = memoryStorage()
-    const store = createGameStore({ storage, createNewGame: newGame, parseState })
-    store.dispatch(diceRolled(roll('4d6kh3', { rng: () => 0.99 }), 'Сила'))
-    const reloaded = createGameStore({ storage, createNewGame: newGame, parseState })
-    expect(reloaded.getState().rolls[0].result.total).toBe(18)
+    started(storage).dispatch(diceRolled(roll('4d6kh3', { rng: () => 0.99 }), 'Сила'))
+    expect(createGameStore(options(storage)).getState()!.rolls[0].result.total).toBe(18)
   })
 
   it('работает без доступа к хранилищу', () => {
-    const store = createGameStore({ storage: null, createNewGame: newGame, parseState })
+    const store = started(null)
     store.dispatch(messageAdded('player', 'Тест'))
-    expect(store.getState().messages.at(-1)?.text).toBe('Тест')
+    expect(store.getState()!.messages.at(-1)?.text).toBe('Тест')
   })
 })

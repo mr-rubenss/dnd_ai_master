@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { collectPageErrors, expectNoHorizontalScroll } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
 
 async function openStatsTab(page: Page, isMobile: boolean) {
   if (isMobile) await page.locator('.inventory-toggle').tap()
@@ -10,6 +10,7 @@ async function openStatsTab(page: Page, isMobile: boolean) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./')
+  await startQuickGame(page)
 })
 
 test('вкладка «Характеристики»: характеристики, спасброски, навыки Ратибора', async ({ page, isMobile }, testInfo) => {
@@ -31,13 +32,14 @@ test('вкладка «Характеристики»: характеристи�
   await expect(stats.locator('[data-save="dex"] .stat-mod')).toHaveText('+2')
   await expect(stats.locator('[data-save="dex"] .prof-mark--none')).toHaveCount(1)
 
-  // Навыки: Атлетика с владением, Скрытность и Магия — без.
+  // Навыки: Атлетика (солдат) и Проницательность (Умелость человека) с владением, Скрытность и Магия — без.
   await expect(stats.locator('[data-skill]')).toHaveCount(18)
   await expect(stats.locator('[data-skill="athletics"] .stat-mod')).toHaveText('+5')
   await expect(stats.locator('[data-skill="perception"] .stat-mod')).toHaveText('+3')
   await expect(stats.locator('[data-skill="stealth"] .stat-mod')).toHaveText('+2')
   await expect(stats.locator('[data-skill="arcana"] .stat-mod')).toHaveText('−1')
-  await expect(stats.locator('[data-skill] .prof-mark--proficient')).toHaveCount(4)
+  await expect(stats.locator('[data-skill="insight"] .stat-mod')).toHaveText('+3')
+  await expect(stats.locator('[data-skill] .prof-mark--proficient')).toHaveCount(5)
 
   await expect(stats.locator('.conditions-empty')).toHaveText('Нет')
   await expectNoHorizontalScroll(page)
@@ -57,10 +59,6 @@ test('вкладки переключаются стрелками с клави
 })
 
 test('состояния из сохранения: Отравлен снижает пассивное Восприятие, Истощение показывает уровень', async ({ page, isMobile }) => {
-  // Сохранение появляется после первого изменения состояния — делаем ход.
-  await page.locator('.player-input textarea').fill('Осматриваюсь')
-  await page.locator('.player-input textarea').press('Enter')
-  await expect(page.locator('.message--player')).toHaveCount(1)
   await page.evaluate(() => {
     const save = JSON.parse(localStorage.getItem('ai-master:save')!)
     save.state.character.conditions = [{ id: 'poisoned' }, { id: 'exhaustion', level: 2 }]

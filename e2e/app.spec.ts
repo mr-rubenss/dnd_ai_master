@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { collectPageErrors, expectNoHorizontalScroll } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./')
+  await startQuickGame(page)
 })
 
 test('главный экран: карта таверны, персонаж, лента ведущего', async ({ page, isMobile }, testInfo) => {
@@ -46,7 +47,7 @@ test('описание предмета раскрывается по нажат
   await expectNoHorizontalScroll(page)
 })
 
-test('ход игрока сохраняется после перезагрузки, «Новая игра» сбрасывает', async ({ page }) => {
+test('ход игрока сохраняется после перезагрузки, «Новая игра» возвращает к созданию персонажа', async ({ page }) => {
   await page.locator('.player-input textarea').fill('Заказываю кружку эля')
   await page.locator('.player-input textarea').press('Enter')
   await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
@@ -54,7 +55,14 @@ test('ход игрока сохраняется после перезагруз
   await page.reload()
   await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
 
+  // Отказ в подтверждении ничего не меняет.
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.locator('.header-button', { hasText: 'Новая игра' }).click()
+  await expect(page.locator('.message--player').last()).toContainText('Заказываю кружку эля')
+
   page.once('dialog', (dialog) => dialog.accept())
   await page.locator('.header-button', { hasText: 'Новая игра' }).click()
-  await expect(page.locator('.message--player')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Создание персонажа' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Создание персонажа' })).toBeVisible()
 })

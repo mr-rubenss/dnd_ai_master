@@ -58,9 +58,9 @@ describe('тестовый воин Ратибор (SRD 5.2)', () => {
     expect(sheet.inventory.equipped).toEqual({ weapon: 'greatsword', armor: 'chain-mail', shield: null })
   })
 
-  it('стартовое золото 18 (4 зм воина + 14 зм солдата), вес снаряжения 143 фнт.', () => {
+  it('стартовое золото 18 (4 зм воина + 14 зм солдата), вес снаряжения 148 фнт.', () => {
     expect(sheet.inventory.gold).toBe(18)
-    expect(inventoryWeight(sheet.inventory, catalog)).toBe(143)
+    expect(inventoryWeight(sheet.inventory, catalog)).toBe(148)
   })
 })
 
@@ -86,10 +86,11 @@ describe('parseCharacterSheet', () => {
     expect(problemsOf(raw)).toEqual(['inventory.equipped: двуручное оружие нельзя использовать вместе со щитом'])
   })
 
-  it('у Ратибора владения воина и солдата: спасброски Силы и Телосложения, 4 навыка', () => {
+  it('у Ратибора владения воина, солдата и человека: спасброски Силы и Телосложения, 5 навыков', () => {
     const sheet = parseCharacterSheet(fighterJson, catalog)
     expect(sheet.character.proficiencies.savingThrows).toEqual(['str', 'con'])
-    expect(Object.keys(sheet.character.proficiencies.skills).sort()).toEqual(['athletics', 'intimidation', 'perception', 'survival'])
+    expect(Object.keys(sheet.character.proficiencies.skills).sort()).toEqual(['athletics', 'insight', 'intimidation', 'perception', 'survival'])
+    expect(sheet.character).toMatchObject({ speciesId: 'human', backgroundId: 'soldier', feats: ['savage-attacker', 'alert'] })
     expect(sheet.character.conditions).toEqual([])
   })
 

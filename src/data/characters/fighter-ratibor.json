@@ -3,47 +3,131 @@
     "id": "ratibor",
     "name": "Ратибор",
     "species": "Человек",
+    "speciesId": "human",
+    "speciesOption": null,
     "classId": "fighter",
     "className": "Воин",
     "background": "Солдат",
+    "backgroundId": "soldier",
     "level": 1,
-    "abilities": { "str": 17, "dex": 14, "con": 14, "int": 8, "wis": 12, "cha": 10 },
+    "abilities": {
+      "str": 17,
+      "dex": 14,
+      "con": 14,
+      "int": 8,
+      "wis": 12,
+      "cha": 10
+    },
     "maxHp": 12,
     "hp": 12,
     "proficiencies": {
-      "savingThrows": ["str", "con"],
+      "savingThrows": [
+        "str",
+        "con"
+      ],
       "skills": {
         "athletics": "proficient",
         "intimidation": "proficient",
         "perception": "proficient",
-        "survival": "proficient"
+        "survival": "proficient",
+        "insight": "proficient"
       }
     },
-    "conditions": []
+    "conditions": [],
+    "feats": [
+      "savage-attacker",
+      "alert"
+    ],
+    "appearance": "Широкоплечий ветеран с коротко стриженной бородой и шрамом через бровь. Носит потёртую кольчугу со знаком своего бывшего отряда."
   },
   "inventory": {
     "gold": 18,
     "items": [
-      { "itemId": "greatsword", "quantity": 1 },
-      { "itemId": "flail", "quantity": 1 },
-      { "itemId": "javelin", "quantity": 8 },
-      { "itemId": "spear", "quantity": 1 },
-      { "itemId": "shortbow", "quantity": 1 },
-      { "itemId": "arrow", "quantity": 20 },
-      { "itemId": "quiver", "quantity": 1 },
-      { "itemId": "chain-mail", "quantity": 1 },
-      { "itemId": "backpack", "quantity": 1 },
-      { "itemId": "caltrops", "quantity": 1 },
-      { "itemId": "crowbar", "quantity": 1 },
-      { "itemId": "oil", "quantity": 2 },
-      { "itemId": "rations", "quantity": 10 },
-      { "itemId": "rope", "quantity": 1 },
-      { "itemId": "tinderbox", "quantity": 1 },
-      { "itemId": "torch", "quantity": 10 },
-      { "itemId": "healers-kit", "quantity": 1 },
-      { "itemId": "dice-set", "quantity": 1 },
-      { "itemId": "travelers-clothes", "quantity": 1 }
+      {
+        "itemId": "greatsword",
+        "quantity": 1
+      },
+      {
+        "itemId": "flail",
+        "quantity": 1
+      },
+      {
+        "itemId": "javelin",
+        "quantity": 8
+      },
+      {
+        "itemId": "spear",
+        "quantity": 1
+      },
+      {
+        "itemId": "shortbow",
+        "quantity": 1
+      },
+      {
+        "itemId": "arrow",
+        "quantity": 20
+      },
+      {
+        "itemId": "quiver",
+        "quantity": 1
+      },
+      {
+        "itemId": "chain-mail",
+        "quantity": 1
+      },
+      {
+        "itemId": "backpack",
+        "quantity": 1
+      },
+      {
+        "itemId": "caltrops",
+        "quantity": 1
+      },
+      {
+        "itemId": "crowbar",
+        "quantity": 1
+      },
+      {
+        "itemId": "oil",
+        "quantity": 2
+      },
+      {
+        "itemId": "rations",
+        "quantity": 10
+      },
+      {
+        "itemId": "rope",
+        "quantity": 1
+      },
+      {
+        "itemId": "tinderbox",
+        "quantity": 1
+      },
+      {
+        "itemId": "torch",
+        "quantity": 10
+      },
+      {
+        "itemId": "healers-kit",
+        "quantity": 1
+      },
+      {
+        "itemId": "dice-set",
+        "quantity": 1
+      },
+      {
+        "itemId": "waterskin",
+        "quantity": 1
+      },
+      {
+        "itemId": "travelers-clothes",
+        "quantity": 1
+      }
     ],
-    "equipped": { "weapon": "greatsword", "armor": "chain-mail", "shield": null }
+    "equipped": {
+      "weapon": "greatsword",
+      "armor": "chain-mail",
+      "shield": null
+    }
   }
 }

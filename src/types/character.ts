@@ -15,6 +15,10 @@ export interface Character {
   /** Название класса для игрока. */
   className: string
   background: string
+  /** id вида, предыстории и вариант вида (ветвь, предок) — ссылки на src/data/rules/. */
+  speciesId: string
+  backgroundId: string
+  speciesOption: string | null
   level: number
   abilities: AbilityScores
   maxHp: number
@@ -23,6 +27,10 @@ export interface Character {
   proficiencies: Proficiencies
   /** Действующие состояния (Отравлен, Истощение 2 и т. п.). */
   conditions: ActiveCondition[]
+  /** Черты (id из src/data/rules/feats.json). */
+  feats: string[]
+  /** Внешность — свободный текст игрока. */
+  appearance: string
 }
 
 export interface InventoryEntry {

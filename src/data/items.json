@@ -1,93 +1,674 @@
 [
   {
-    "id": "greatsword", "name": "Двуручный меч", "category": "weapon", "icon": "⚔️", "weight": 6,
+    "id": "greatsword",
+    "name": "Двуручный меч",
+    "category": "weapon",
+    "icon": "⚔️",
+    "weight": 6,
     "description": "Воинское рукопашное оружие. Длинный клинок, которым рубят обеими руками.",
-    "weapon": { "damage": "2d6", "damageType": "slashing", "properties": ["heavy", "two-handed"], "mastery": "graze" }
+    "weapon": {
+      "damage": "2d6",
+      "damageType": "slashing",
+      "properties": [
+        "heavy",
+        "two-handed"
+      ],
+      "mastery": "graze"
+    }
   },
   {
-    "id": "flail", "name": "Цеп", "category": "weapon", "icon": "🔨", "weight": 2,
+    "id": "flail",
+    "name": "Цеп",
+    "category": "weapon",
+    "icon": "🔨",
+    "weight": 2,
     "description": "Воинское рукопашное оружие. Шипастый шар на цепи, закреплённой на рукояти.",
-    "weapon": { "damage": "1d8", "damageType": "bludgeoning", "properties": [], "mastery": "sap" }
+    "weapon": {
+      "damage": "1d8",
+      "damageType": "bludgeoning",
+      "properties": [],
+      "mastery": "sap"
+    }
   },
   {
-    "id": "javelin", "name": "Метательное копьё", "category": "weapon", "icon": "🎯", "weight": 2,
+    "id": "javelin",
+    "name": "Метательное копьё",
+    "category": "weapon",
+    "icon": "🎯",
+    "weight": 2,
     "description": "Простое рукопашное оружие. Лёгкое копьё, которое удобно метать.",
-    "weapon": { "damage": "1d6", "damageType": "piercing", "properties": ["thrown"], "mastery": "slow", "range": { "normal": 30, "long": 120 } }
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "piercing",
+      "properties": [
+        "thrown"
+      ],
+      "mastery": "slow",
+      "range": {
+        "normal": 30,
+        "long": 120
+      }
+    }
   },
   {
-    "id": "spear", "name": "Копьё", "category": "weapon", "icon": "🔱", "weight": 3,
+    "id": "spear",
+    "name": "Копьё",
+    "category": "weapon",
+    "icon": "🔱",
+    "weight": 3,
     "description": "Простое рукопашное оружие. Можно метать или держать двумя руками.",
-    "weapon": { "damage": "1d6", "damageType": "piercing", "properties": ["thrown", "versatile"], "mastery": "sap", "versatileDamage": "1d8", "range": { "normal": 20, "long": 60 } }
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "piercing",
+      "properties": [
+        "thrown",
+        "versatile"
+      ],
+      "mastery": "sap",
+      "versatileDamage": "1d8",
+      "range": {
+        "normal": 20,
+        "long": 60
+      }
+    }
   },
   {
-    "id": "shortbow", "name": "Короткий лук", "category": "weapon", "icon": "🏹", "weight": 2,
+    "id": "shortbow",
+    "name": "Короткий лук",
+    "category": "weapon",
+    "icon": "🏹",
+    "weight": 2,
     "description": "Простое дальнобойное оружие. Нужны стрелы.",
-    "weapon": { "damage": "1d6", "damageType": "piercing", "properties": ["ammunition", "two-handed"], "mastery": "vex", "range": { "normal": 80, "long": 320 } }
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "two-handed"
+      ],
+      "mastery": "vex",
+      "range": {
+        "normal": 80,
+        "long": 320
+      }
+    }
   },
   {
-    "id": "arrow", "name": "Стрела", "category": "ammunition", "icon": "🪶", "weight": 0.05,
+    "id": "arrow",
+    "name": "Стрела",
+    "category": "ammunition",
+    "icon": "🪶",
+    "weight": 0.05,
     "description": "Боеприпас для лука. После боя половину выпущенных стрел можно найти."
   },
   {
-    "id": "quiver", "name": "Колчан", "category": "gear", "icon": "🧺", "weight": 1,
+    "id": "quiver",
+    "name": "Колчан",
+    "category": "gear",
+    "icon": "🧺",
+    "weight": 1,
     "description": "Вмещает до 20 стрел."
   },
   {
-    "id": "chain-mail", "name": "Кольчуга", "category": "armor", "icon": "⛓️", "weight": 55,
+    "id": "chain-mail",
+    "name": "Кольчуга",
+    "category": "armor",
+    "icon": "⛓️",
+    "weight": 55,
     "description": "Тяжёлый доспех из переплетённых металлических колец поверх стёганой подкладки.",
-    "armor": { "type": "heavy", "baseAC": 16, "strength": 13, "stealthDisadvantage": true }
+    "armor": {
+      "type": "heavy",
+      "baseAC": 16,
+      "strength": 13,
+      "stealthDisadvantage": true
+    }
   },
   {
-    "id": "shield", "name": "Щит", "category": "armor", "icon": "🛡️", "weight": 6,
+    "id": "shield",
+    "name": "Щит",
+    "category": "armor",
+    "icon": "🛡️",
+    "weight": 6,
     "description": "Деревянный или металлический щит, который держат в одной руке.",
-    "armor": { "type": "shield", "baseAC": 2 }
+    "armor": {
+      "type": "shield",
+      "baseAC": 2
+    }
   },
   {
-    "id": "backpack", "name": "Рюкзак", "category": "gear", "icon": "🎒", "weight": 5,
+    "id": "backpack",
+    "name": "Рюкзак",
+    "category": "gear",
+    "icon": "🎒",
+    "weight": 5,
     "description": "Вмещает до 30 фунтов снаряжения."
   },
   {
-    "id": "caltrops", "name": "Калтропы (мешочек)", "category": "gear", "icon": "📌", "weight": 2,
+    "id": "caltrops",
+    "name": "Калтропы (мешочек)",
+    "category": "gear",
+    "icon": "📌",
+    "weight": 2,
     "description": "Рассыпанные по полу шипы. Вошедший на них проходит спасбросок Ловкости Сл 15 или получает 1 колющий урон и теряет скорость до конца хода."
   },
   {
-    "id": "crowbar", "name": "Ломик", "category": "gear", "icon": "🔧", "weight": 5,
+    "id": "crowbar",
+    "name": "Ломик",
+    "category": "gear",
+    "icon": "🔧",
+    "weight": 5,
     "description": "Даёт преимущество на проверки Силы там, где поможет рычаг."
   },
   {
-    "id": "oil", "name": "Масло (фляга)", "category": "consumable", "icon": "🛢️", "weight": 1,
+    "id": "oil",
+    "name": "Масло (фляга)",
+    "category": "consumable",
+    "icon": "🛢️",
+    "weight": 1,
     "description": "Горючее масло. Флягу можно метнуть или разлить и поджечь."
   },
   {
-    "id": "rations", "name": "Рацион (1 день)", "category": "consumable", "icon": "🍖", "weight": 2,
+    "id": "rations",
+    "name": "Рацион (1 день)",
+    "category": "consumable",
+    "icon": "🍖",
+    "weight": 2,
     "description": "Сухари, вяленое мясо, сушёные фрукты и орехи на один день."
   },
   {
-    "id": "rope", "name": "Верёвка (50 футов)", "category": "gear", "icon": "🪢", "weight": 5,
+    "id": "rope",
+    "name": "Верёвка (50 футов)",
+    "category": "gear",
+    "icon": "🪢",
+    "weight": 5,
     "description": "Пеньковая верёвка. Ею можно связать существо или подняться по ней."
   },
   {
-    "id": "tinderbox", "name": "Трутница", "category": "gear", "icon": "🔥", "weight": 1,
+    "id": "tinderbox",
+    "name": "Трутница",
+    "category": "gear",
+    "icon": "🔥",
+    "weight": 1,
     "description": "Кремень, огниво и трут. Позволяет разжечь огонь."
   },
   {
-    "id": "torch", "name": "Факел", "category": "consumable", "icon": "🔦", "weight": 1,
+    "id": "torch",
+    "name": "Факел",
+    "category": "consumable",
+    "icon": "🔦",
+    "weight": 1,
     "description": "Горит 1 час, давая яркий свет в радиусе 20 футов и тусклый ещё на 20 футов."
   },
   {
-    "id": "healers-kit", "name": "Набор целителя", "category": "tool", "icon": "🩹", "weight": 3,
+    "id": "healers-kit",
+    "name": "Набор целителя",
+    "category": "tool",
+    "icon": "🩹",
+    "weight": 3,
     "description": "Бинты, мази и шины на 10 применений. Позволяет стабилизировать существо с 0 хитов без проверки."
   },
   {
-    "id": "dice-set", "name": "Игральные кости", "category": "tool", "icon": "🎲", "weight": 0,
+    "id": "dice-set",
+    "name": "Игральные кости",
+    "category": "tool",
+    "icon": "🎲",
+    "weight": 0,
     "description": "Набор костей для азартных игр. Солдатская привычка."
   },
   {
-    "id": "travelers-clothes", "name": "Дорожная одежда", "category": "gear", "icon": "👕", "weight": 4,
+    "id": "travelers-clothes",
+    "name": "Дорожная одежда",
+    "category": "gear",
+    "icon": "👕",
+    "weight": 4,
     "description": "Прочная одежда для долгих странствий."
   },
   {
-    "id": "silver-amulet", "name": "Серебряный амулет", "category": "treasure", "icon": "📿", "weight": 0,
+    "id": "silver-amulet",
+    "name": "Серебряный амулет",
+    "category": "treasure",
+    "icon": "📿",
+    "weight": 0,
     "description": "Потемневший амулет с полустёртым гербом. Память о службе."
+  },
+  {
+    "id": "greataxe",
+    "name": "Секира",
+    "category": "weapon",
+    "icon": "🪓",
+    "weight": 7,
+    "description": "Воинское рукопашное оружие. Тяжёлый двуручный топор.",
+    "weapon": {
+      "damage": "1d12",
+      "damageType": "slashing",
+      "properties": [
+        "heavy",
+        "two-handed"
+      ],
+      "mastery": "cleave"
+    }
+  },
+  {
+    "id": "handaxe",
+    "name": "Ручной топор",
+    "category": "weapon",
+    "icon": "🪓",
+    "weight": 2,
+    "description": "Простое рукопашное оружие. Лёгкий топорик, который можно метнуть.",
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "slashing",
+      "properties": [
+        "light",
+        "thrown"
+      ],
+      "mastery": "vex",
+      "range": {
+        "normal": 20,
+        "long": 60
+      }
+    }
+  },
+  {
+    "id": "dagger",
+    "name": "Кинжал",
+    "category": "weapon",
+    "icon": "🗡️",
+    "weight": 1,
+    "description": "Простое рукопашное оружие. Удобно прятать и метать.",
+    "weapon": {
+      "damage": "1d4",
+      "damageType": "piercing",
+      "properties": [
+        "finesse",
+        "light",
+        "thrown"
+      ],
+      "mastery": "nick",
+      "range": {
+        "normal": 20,
+        "long": 60
+      }
+    }
+  },
+  {
+    "id": "mace",
+    "name": "Булава",
+    "category": "weapon",
+    "icon": "🔨",
+    "weight": 4,
+    "description": "Простое рукопашное оружие. Окованная металлом дубина.",
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "bludgeoning",
+      "properties": [],
+      "mastery": "sap"
+    }
+  },
+  {
+    "id": "sickle",
+    "name": "Серп",
+    "category": "weapon",
+    "icon": "🌙",
+    "weight": 2,
+    "description": "Простое рукопашное оружие. Изогнутый клинок на короткой рукояти.",
+    "weapon": {
+      "damage": "1d4",
+      "damageType": "slashing",
+      "properties": [
+        "light"
+      ],
+      "mastery": "nick"
+    }
+  },
+  {
+    "id": "quarterstaff",
+    "name": "Боевой посох",
+    "category": "weapon",
+    "icon": "🦯",
+    "weight": 4,
+    "description": "Простое рукопашное оружие. Может служить фокусировкой для заклинаний.",
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "bludgeoning",
+      "properties": [
+        "versatile"
+      ],
+      "mastery": "topple",
+      "versatileDamage": "1d8"
+    }
+  },
+  {
+    "id": "scimitar",
+    "name": "Скимитар",
+    "category": "weapon",
+    "icon": "🗡️",
+    "weight": 3,
+    "description": "Воинское рукопашное оружие. Лёгкий изогнутый клинок.",
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "slashing",
+      "properties": [
+        "finesse",
+        "light"
+      ],
+      "mastery": "nick"
+    }
+  },
+  {
+    "id": "shortsword",
+    "name": "Короткий меч",
+    "category": "weapon",
+    "icon": "🗡️",
+    "weight": 2,
+    "description": "Воинское рукопашное оружие. Короткий клинок для ловкого бойца.",
+    "weapon": {
+      "damage": "1d6",
+      "damageType": "piercing",
+      "properties": [
+        "finesse",
+        "light"
+      ],
+      "mastery": "vex"
+    }
+  },
+  {
+    "id": "longsword",
+    "name": "Длинный меч",
+    "category": "weapon",
+    "icon": "⚔️",
+    "weight": 3,
+    "description": "Воинское рукопашное оружие. Можно держать одной или двумя руками.",
+    "weapon": {
+      "damage": "1d8",
+      "damageType": "slashing",
+      "properties": [
+        "versatile"
+      ],
+      "mastery": "sap",
+      "versatileDamage": "1d10"
+    }
+  },
+  {
+    "id": "longbow",
+    "name": "Длинный лук",
+    "category": "weapon",
+    "icon": "🏹",
+    "weight": 2,
+    "description": "Воинское дальнобойное оружие. Нужны стрелы.",
+    "weapon": {
+      "damage": "1d8",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "heavy",
+        "two-handed"
+      ],
+      "mastery": "slow",
+      "range": {
+        "normal": 150,
+        "long": 600
+      }
+    }
+  },
+  {
+    "id": "leather-armor",
+    "name": "Кожаный доспех",
+    "category": "armor",
+    "icon": "🦺",
+    "weight": 10,
+    "description": "Лёгкий доспех из прокипячённой в масле кожи.",
+    "armor": {
+      "type": "light",
+      "baseAC": 11
+    }
+  },
+  {
+    "id": "studded-leather",
+    "name": "Проклёпанный кожаный доспех",
+    "category": "armor",
+    "icon": "🦺",
+    "weight": 13,
+    "description": "Лёгкий доспех из кожи, усиленной заклёпками.",
+    "armor": {
+      "type": "light",
+      "baseAC": 12
+    }
+  },
+  {
+    "id": "chain-shirt",
+    "name": "Кольчужная рубаха",
+    "category": "armor",
+    "icon": "⛓️",
+    "weight": 20,
+    "description": "Средний доспех: кольчуга, которую носят под одеждой.",
+    "armor": {
+      "type": "medium",
+      "baseAC": 13
+    }
+  },
+  {
+    "id": "holy-symbol",
+    "name": "Священный символ",
+    "category": "gear",
+    "icon": "✝️",
+    "weight": 1,
+    "description": "Амулет с символом божества. Служит фокусировкой для жреческих заклинаний."
+  },
+  {
+    "id": "druidic-focus",
+    "name": "Друидическая фокусировка",
+    "category": "gear",
+    "icon": "🌿",
+    "weight": 0,
+    "description": "Веточка омелы — фокусировка для друидических заклинаний."
+  },
+  {
+    "id": "arcane-focus-crystal",
+    "name": "Магическая фокусировка (кристалл)",
+    "category": "gear",
+    "icon": "🔮",
+    "weight": 1,
+    "description": "Кристалл, через который направляют магию."
+  },
+  {
+    "id": "arcane-focus-orb",
+    "name": "Магическая фокусировка (сфера)",
+    "category": "gear",
+    "icon": "🔮",
+    "weight": 3,
+    "description": "Хрустальная сфера, через которую направляют магию."
+  },
+  {
+    "id": "book",
+    "name": "Книга",
+    "category": "gear",
+    "icon": "📕",
+    "weight": 5,
+    "description": "Книга молитв, истории или тайного знания."
+  },
+  {
+    "id": "spellbook",
+    "name": "Книга заклинаний",
+    "category": "gear",
+    "icon": "📖",
+    "weight": 3,
+    "description": "Книга волшебника с записанными заклинаниями."
+  },
+  {
+    "id": "robe",
+    "name": "Мантия",
+    "category": "gear",
+    "icon": "🥻",
+    "weight": 4,
+    "description": "Длинное одеяние жреца или учёного."
+  },
+  {
+    "id": "parchment",
+    "name": "Пергамент (лист)",
+    "category": "consumable",
+    "icon": "📜",
+    "weight": 0,
+    "description": "Лист пергамента для письма."
+  },
+  {
+    "id": "pouch",
+    "name": "Поясной кошель",
+    "category": "gear",
+    "icon": "👝",
+    "weight": 1,
+    "description": "Небольшой кожаный мешочек."
+  },
+  {
+    "id": "bedroll",
+    "name": "Спальник",
+    "category": "gear",
+    "icon": "🛏️",
+    "weight": 7,
+    "description": "Скатка для ночлега под открытым небом."
+  },
+  {
+    "id": "waterskin",
+    "name": "Бурдюк",
+    "category": "gear",
+    "icon": "💧",
+    "weight": 5,
+    "description": "Вмещает 4 пинты воды (вес указан полного)."
+  },
+  {
+    "id": "ball-bearings",
+    "name": "Шарики (мешочек)",
+    "category": "gear",
+    "icon": "⚪",
+    "weight": 2,
+    "description": "Тысяча металлических шариков. Рассыпанные по полу, заставляют проходить спасбросок Ловкости Сл 10 или упасть."
+  },
+  {
+    "id": "bell",
+    "name": "Колокольчик",
+    "category": "gear",
+    "icon": "🔔",
+    "weight": 0,
+    "description": "Маленький медный колокольчик."
+  },
+  {
+    "id": "candle",
+    "name": "Свеча",
+    "category": "consumable",
+    "icon": "🕯️",
+    "weight": 0,
+    "description": "Горит 1 час, давая тусклый свет в радиусе 5 футов."
+  },
+  {
+    "id": "hooded-lantern",
+    "name": "Закрытый фонарь",
+    "category": "gear",
+    "icon": "🏮",
+    "weight": 2,
+    "description": "Горит на масле 6 часов: яркий свет на 30 футов. Заслонку можно опустить."
+  },
+  {
+    "id": "bullseye-lantern",
+    "name": "Направленный фонарь",
+    "category": "gear",
+    "icon": "🔦",
+    "weight": 2,
+    "description": "Горит на масле 6 часов: яркий свет конусом на 60 футов."
+  },
+  {
+    "id": "costume",
+    "name": "Костюм",
+    "category": "gear",
+    "icon": "🎭",
+    "weight": 4,
+    "description": "Сценический наряд."
+  },
+  {
+    "id": "mirror",
+    "name": "Зеркальце",
+    "category": "gear",
+    "icon": "🪞",
+    "weight": 0.5,
+    "description": "Небольшое стальное зеркало."
+  },
+  {
+    "id": "blanket",
+    "name": "Одеяло",
+    "category": "gear",
+    "icon": "🧣",
+    "weight": 3,
+    "description": "Тёплое шерстяное одеяло."
+  },
+  {
+    "id": "holy-water",
+    "name": "Святая вода (фляга)",
+    "category": "consumable",
+    "icon": "💧",
+    "weight": 1,
+    "description": "Брошенная в нежить или исчадие, наносит 2к8 урона излучением."
+  },
+  {
+    "id": "lamp",
+    "name": "Лампа",
+    "category": "gear",
+    "icon": "🪔",
+    "weight": 1,
+    "description": "Горит на масле 6 часов: яркий свет на 15 футов."
+  },
+  {
+    "id": "ink",
+    "name": "Чернила (флакон)",
+    "category": "consumable",
+    "icon": "🖋️",
+    "weight": 0,
+    "description": "Унция чернил."
+  },
+  {
+    "id": "ink-pen",
+    "name": "Перо",
+    "category": "gear",
+    "icon": "🪶",
+    "weight": 0,
+    "description": "Перо для письма."
+  },
+  {
+    "id": "calligraphers-supplies",
+    "name": "Каллиграфические принадлежности",
+    "category": "tool",
+    "icon": "✒️",
+    "weight": 5,
+    "description": "Инструменты каллиграфа."
+  },
+  {
+    "id": "thieves-tools",
+    "name": "Воровские инструменты",
+    "category": "tool",
+    "icon": "🗝️",
+    "weight": 1,
+    "description": "Отмычки, щупы и напильник для вскрытия замков и обезвреживания ловушек."
+  },
+  {
+    "id": "herbalism-kit",
+    "name": "Набор травника",
+    "category": "tool",
+    "icon": "🌱",
+    "weight": 3,
+    "description": "Ножницы, ступка и мешочки для трав. Нужен для изготовления зелий лечения."
+  },
+  {
+    "id": "woodcarvers-tools",
+    "name": "Инструменты резчика по дереву",
+    "category": "tool",
+    "icon": "🪵",
+    "weight": 5,
+    "description": "Ножи и стамески для работы по дереву."
+  },
+  {
+    "id": "lute",
+    "name": "Лютня",
+    "category": "tool",
+    "icon": "🪕",
+    "weight": 2,
+    "description": "Музыкальный инструмент."
   }
 ]

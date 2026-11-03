@@ -9,13 +9,17 @@ import { isInt, isNonEmptyString, isNumber, isObject, ValidationError } from './
 
 /**
  * Класс доспеха от надетой экипировки.
- * Без доспеха: 10 + Лов. Лёгкий: база + Лов. Средний: база + Лов (макс. +2). Тяжёлый: база. Щит: +бонус.
+ * Без доспеха: 10 + Лов (или Защита без доспехов Варвара и Монаха). Лёгкий: база + Лов. Средний: база + Лов (макс. +2). Тяжёлый: база. Щит: +бонус.
  */
-export function armorClass(abilities: AbilityScores, inventory: Inventory, catalog: ItemCatalog): number {
+export function armorClass(abilities: AbilityScores, inventory: Inventory, catalog: ItemCatalog, classId?: string): number {
   const dex = abilityModifier(abilities.dex)
   const armor = inventory.equipped.armor ? catalog[inventory.equipped.armor]?.armor : undefined
+  const hasShield = Boolean(inventory.equipped.shield)
   let ac: number
-  if (!armor) ac = 10 + dex
+  // Защита без доспехов: Варвар — 10 + ЛОВ + ТЕЛ (щит можно), Монах — 10 + ЛОВ + МДР (без щита).
+  if (!armor && classId === 'barbarian') ac = 10 + dex + abilityModifier(abilities.con)
+  else if (!armor && classId === 'monk' && !hasShield) ac = 10 + dex + abilityModifier(abilities.wis)
+  else if (!armor) ac = 10 + dex
   else if (armor.type === 'light') ac = armor.baseAC + dex
   else if (armor.type === 'medium') ac = armor.baseAC + Math.min(dex, 2)
   else ac = armor.baseAC
@@ -47,7 +51,7 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
   if (!isObject(ch)) {
     fail('"character" должно быть объектом')
   } else {
-    for (const key of ['id', 'name', 'species', 'classId', 'className', 'background'] as const) {
+    for (const key of ['id', 'name', 'species', 'classId', 'className', 'background', 'speciesId', 'backgroundId'] as const) {
       if (!isNonEmptyString(ch[key])) fail(`character.${key}: должно быть непустой строкой`)
     }
     if (!isInt(ch.level) || ch.level < 1 || ch.level > 20) fail('character.level: целое от 1 до 20')
@@ -61,6 +65,10 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
     }
     if (!isInt(ch.maxHp) || ch.maxHp < 1) fail('character.maxHp: положительное целое')
     if (!isInt(ch.hp) || ch.hp < 0 || (isInt(ch.maxHp) && ch.hp > ch.maxHp)) fail('character.hp: целое от 0 до maxHp')
+
+    if (ch.speciesOption !== null && typeof ch.speciesOption !== 'string') fail('character.speciesOption: строка или null')
+    if (!Array.isArray(ch.feats) || !ch.feats.every((f) => typeof f === 'string')) fail('character.feats: массив id черт')
+    if (typeof ch.appearance !== 'string') fail('character.appearance: строка')
 
     const prof = ch.proficiencies
     if (!isObject(prof)) {

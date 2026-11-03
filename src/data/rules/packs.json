@@ -1,0 +1,52 @@
+[
+  {
+    "id": "burglars-pack", "name": "Набор взломщика",
+    "contents": [
+      { "itemId": "backpack", "quantity": 1 }, { "itemId": "ball-bearings", "quantity": 1 }, { "itemId": "bell", "quantity": 1 },
+      { "itemId": "candle", "quantity": 10 }, { "itemId": "crowbar", "quantity": 1 }, { "itemId": "hooded-lantern", "quantity": 1 },
+      { "itemId": "oil", "quantity": 7 }, { "itemId": "rations", "quantity": 5 }, { "itemId": "rope", "quantity": 1 },
+      { "itemId": "tinderbox", "quantity": 1 }, { "itemId": "waterskin", "quantity": 1 }
+    ]
+  },
+  {
+    "id": "dungeoneers-pack", "name": "Набор исследователя подземелий",
+    "contents": [
+      { "itemId": "backpack", "quantity": 1 }, { "itemId": "caltrops", "quantity": 1 }, { "itemId": "crowbar", "quantity": 1 },
+      { "itemId": "oil", "quantity": 2 }, { "itemId": "rations", "quantity": 10 }, { "itemId": "rope", "quantity": 1 },
+      { "itemId": "tinderbox", "quantity": 1 }, { "itemId": "torch", "quantity": 10 }, { "itemId": "waterskin", "quantity": 1 }
+    ]
+  },
+  {
+    "id": "entertainers-pack", "name": "Набор артиста",
+    "contents": [
+      { "itemId": "backpack", "quantity": 1 }, { "itemId": "bedroll", "quantity": 1 }, { "itemId": "bell", "quantity": 1 },
+      { "itemId": "bullseye-lantern", "quantity": 1 }, { "itemId": "costume", "quantity": 3 }, { "itemId": "mirror", "quantity": 1 },
+      { "itemId": "oil", "quantity": 8 }, { "itemId": "rations", "quantity": 9 }, { "itemId": "tinderbox", "quantity": 1 },
+      { "itemId": "waterskin", "quantity": 1 }
+    ]
+  },
+  {
+    "id": "explorers-pack", "name": "Набор путешественника",
+    "contents": [
+      { "itemId": "backpack", "quantity": 1 }, { "itemId": "bedroll", "quantity": 1 }, { "itemId": "oil", "quantity": 2 },
+      { "itemId": "rations", "quantity": 10 }, { "itemId": "rope", "quantity": 1 }, { "itemId": "tinderbox", "quantity": 1 },
+      { "itemId": "waterskin", "quantity": 1 }
+    ]
+  },
+  {
+    "id": "priests-pack", "name": "Набор священника",
+    "contents": [
+      { "itemId": "backpack", "quantity": 1 }, { "itemId": "blanket", "quantity": 1 }, { "itemId": "holy-water", "quantity": 1 },
+      { "itemId": "lamp", "quantity": 1 }, { "itemId": "rations", "quantity": 7 }, { "itemId": "robe", "quantity": 1 },
+      { "itemId": "tinderbox", "quantity": 1 }
+    ]
+  },
+  {
+    "id": "scholars-pack", "name": "Набор учёного",
+    "contents": [
+      { "itemId": "backpack", "quantity": 1 }, { "itemId": "book", "quantity": 1 }, { "itemId": "ink", "quantity": 1 },
+      { "itemId": "ink-pen", "quantity": 1 }, { "itemId": "lamp", "quantity": 1 }, { "itemId": "oil", "quantity": 10 },
+      { "itemId": "parchment", "quantity": 10 }, { "itemId": "tinderbox", "quantity": 1 }
+    ]
+  }
+]

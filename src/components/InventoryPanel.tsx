@@ -46,7 +46,7 @@ export function InventoryPanel({ character, inventory, catalog }: Props) {
     document.getElementById(`sheet-tab-${next.id}`)?.focus()
   }
 
-  const ac = armorClass(character.abilities, inventory, catalog)
+  const ac = armorClass(character.abilities, inventory, catalog, character.classId)
   const weight = inventoryWeight(inventory, catalog)
   const capacity = carryingCapacity(character.abilities)
   const hpPercent = Math.round((character.hp / character.maxHp) * 100)

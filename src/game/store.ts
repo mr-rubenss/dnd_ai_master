@@ -1,26 +1,30 @@
 // Единое хранилище состояния игры с сохранением в localStorage.
 
-import type { Proficiencies } from '../engine/checks'
+import type { Character, CharacterSheet } from '../types/character'
 import type { GameState } from '../types/game'
 import { gameReducer, type GameAction } from './state'
 
 export const SAVE_KEY = 'ai-master:save'
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 export interface GameStore {
-  getState(): GameState
+  /** Текущая игра или null, если игры нет (тогда показывается создание персонажа). */
+  getState(): GameState | null
   subscribe(listener: () => void): () => void
+  /** Изменить состояние идущей игры; без игры — ничего не делает. */
   dispatch(action: GameAction): void
-  /** Начать новую игру, стерев сохранение. */
-  newGame(): void
+  /** Начать игру за готового персонажа и сразу сохранить её. */
+  startGame(sheet: CharacterSheet): void
+  /** Завершить игру и стереть сохранение — дальше снова создание персонажа. */
+  endGame(): void
 }
 
 export interface GameStoreOptions {
   storage: KeyValueStorage | null
-  createNewGame: () => GameState
+  createNewGame: (sheet: CharacterSheet) => GameState
   /** Проверка загруженного состояния; бросает исключение, если сохранение некорректно. */
   parseState: (raw: unknown) => GameState
   migration?: MigrationContext
@@ -42,16 +46,34 @@ export function migrateSave(save: unknown, context: MigrationContext = {}): unkn
     // v3: у персонажа появились владения и состояния. Владения берём из стартового шаблона персонажа.
     const s = state as { character?: { id?: unknown } }
     const id = typeof s.character?.id === 'string' ? s.character.id : ''
-    const proficiencies = context.proficienciesFor?.(id) ?? { savingThrows: [], skills: {} }
+    const proficiencies = context.characterTemplate?.(id)?.proficiencies ?? { savingThrows: [], skills: {} }
     state = { ...s, character: { ...s.character, proficiencies: structuredClone(proficiencies), conditions: [] } }
     version = 3
+  }
+  if (version === 3) {
+    // v4: вид, предыстория, черты и внешность (появились вместе с созданием персонажа).
+    const s = state as { character?: { id?: unknown } }
+    const id = typeof s.character?.id === 'string' ? s.character.id : ''
+    const template = context.characterTemplate?.(id)
+    state = {
+      ...s,
+      character: {
+        ...s.character,
+        speciesId: template?.speciesId ?? 'unknown',
+        backgroundId: template?.backgroundId ?? 'unknown',
+        speciesOption: template?.speciesOption ?? null,
+        feats: structuredClone(template?.feats ?? []),
+        appearance: template?.appearance ?? '',
+      },
+    }
+    version = 4
   }
   return version === SAVE_VERSION ? state : null
 }
 
 export interface MigrationContext {
-  /** Владения персонажа по id — для сохранений, сделанных до их появления (v2 → v3). */
-  proficienciesFor?: (characterId: string) => Proficiencies | undefined
+  /** Стартовый шаблон персонажа по id — источник полей, которых не было в старых сохранениях. */
+  characterTemplate?: (characterId: string) => Character | undefined
 }
 
 export function loadSavedGame(
@@ -72,6 +94,14 @@ export function loadSavedGame(
   }
 }
 
+export function clearSave(storage: KeyValueStorage | null): void {
+  try {
+    storage?.removeItem(SAVE_KEY)
+  } catch (error) {
+    console.warn('Не удалось удалить сохранение.', error)
+  }
+}
+
 export function saveGame(storage: KeyValueStorage | null, state: GameState): void {
   if (!storage) return
   try {
@@ -83,13 +113,14 @@ export function saveGame(storage: KeyValueStorage | null, state: GameState): voi
 }
 
 export function createGameStore({ storage, createNewGame, parseState, migration }: GameStoreOptions): GameStore {
-  let state = loadSavedGame(storage, parseState, migration) ?? createNewGame()
+  let state: GameState | null = loadSavedGame(storage, parseState, migration)
   const listeners = new Set<() => void>()
 
-  const setState = (next: GameState) => {
+  const setState = (next: GameState | null) => {
     if (next === state) return
     state = next
-    saveGame(storage, state)
+    if (state) saveGame(storage, state)
+    else clearSave(storage)
     listeners.forEach((listener) => listener())
   }
 
@@ -100,10 +131,13 @@ export function createGameStore({ storage, createNewGame, parseState, migration 
       return () => listeners.delete(listener)
     },
     dispatch(action) {
-      setState(gameReducer(state, action))
+      if (state) setState(gameReducer(state, action))
     },
-    newGame() {
-      setState(createNewGame())
+    startGame(sheet) {
+      setState(createNewGame(sheet))
+    },
+    endGame() {
+      setState(null)
     },
   }
 }

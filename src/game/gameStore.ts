@@ -13,9 +13,9 @@ function browserStorage(): KeyValueStorage | null {
 
 export const gameStore = createGameStore({
   storage: browserStorage(),
-  createNewGame: () => createNewGame({ sheet: startingSheet, location: startingLocation, intro: introMessages }),
+  createNewGame: (sheet) => createNewGame({ sheet, location: startingLocation, intro: introMessages }),
   parseState: (raw) => parseGameState(raw, { catalog: itemCatalog, locations }),
   migration: {
-    proficienciesFor: (id) => (id === startingSheet.character.id ? startingSheet.character.proficiencies : undefined),
+    characterTemplate: (id) => (id === startingSheet.character.id ? startingSheet.character : undefined),
   },
 })

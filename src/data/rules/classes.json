@@ -1,0 +1,851 @@
+[
+  {
+    "id": "barbarian",
+    "name": "Варвар",
+    "description": "Свирепый воин, черпающий силу в первобытной ярости.",
+    "hitDie": 12,
+    "primary": [
+      "str"
+    ],
+    "savingThrows": [
+      "str",
+      "con"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "animal-handling",
+        "athletics",
+        "intimidation",
+        "nature",
+        "perception",
+        "survival"
+      ]
+    },
+    "armorTraining": "Лёгкие и средние доспехи, щиты",
+    "features": [
+      {
+        "name": "Ярость",
+        "description": "Бонусным действием впадаете в ярость: сопротивление урону, бонус к урону Силой и преимущество на проверки Силы."
+      },
+      {
+        "name": "Защита без доспехов",
+        "description": "Без доспеха ваш КД равен 10 + модификатор Ловкости + модификатор Телосложения (щит разрешён)."
+      },
+      {
+        "name": "Приёмы оружия",
+        "description": "Используете особые свойства двух видов оружия."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "greataxe"
+          },
+          {
+            "itemId": "handaxe",
+            "quantity": 4
+          },
+          {
+            "packId": "explorers-pack"
+          }
+        ],
+        "gold": 15
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 75
+      }
+    ]
+  },
+  {
+    "id": "bard",
+    "name": "Бард",
+    "description": "Вдохновляющий исполнитель, чья музыка и слово творят магию.",
+    "hitDie": 8,
+    "primary": [
+      "cha"
+    ],
+    "savingThrows": [
+      "dex",
+      "cha"
+    ],
+    "skillChoices": {
+      "count": 3,
+      "from": "any"
+    },
+    "armorTraining": "Лёгкие доспехи",
+    "features": [
+      {
+        "name": "Бардовское вдохновение",
+        "description": "Бонусным действием даёте союзнику кость вдохновения к6 для броска к20."
+      },
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания барда, используя Харизму."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "leather-armor"
+          },
+          {
+            "itemId": "dagger",
+            "quantity": 2
+          },
+          {
+            "itemId": "lute"
+          },
+          {
+            "packId": "entertainers-pack"
+          }
+        ],
+        "gold": 19
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 90
+      }
+    ]
+  },
+  {
+    "id": "cleric",
+    "name": "Жрец",
+    "description": "Служитель божества, несущий его силу в мир.",
+    "hitDie": 8,
+    "primary": [
+      "wis"
+    ],
+    "savingThrows": [
+      "wis",
+      "cha"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "history",
+        "insight",
+        "medicine",
+        "persuasion",
+        "religion"
+      ]
+    },
+    "armorTraining": "Лёгкие и средние доспехи, щиты",
+    "features": [
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания жреца, используя Мудрость."
+      },
+      {
+        "name": "Божественный порядок",
+        "description": "Выбираете роль защитника (тяжёлые доспехи, воинское оружие) или чудотворца (дополнительный заговор)."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "chain-shirt"
+          },
+          {
+            "itemId": "shield"
+          },
+          {
+            "itemId": "mace"
+          },
+          {
+            "itemId": "holy-symbol"
+          },
+          {
+            "packId": "priests-pack"
+          }
+        ],
+        "gold": 7
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 110
+      }
+    ]
+  },
+  {
+    "id": "druid",
+    "name": "Друид",
+    "description": "Жрец древних сил природы, способный принимать облик зверей.",
+    "hitDie": 8,
+    "primary": [
+      "wis"
+    ],
+    "savingThrows": [
+      "int",
+      "wis"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "arcana",
+        "animal-handling",
+        "insight",
+        "medicine",
+        "nature",
+        "perception",
+        "religion",
+        "survival"
+      ]
+    },
+    "armorTraining": "Лёгкие доспехи, щиты",
+    "features": [
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания друида, используя Мудрость."
+      },
+      {
+        "name": "Друидический язык",
+        "description": "Знаете тайный язык друидов."
+      },
+      {
+        "name": "Изначальный порядок",
+        "description": "Выбираете роль заклинателя (дополнительный заговор) или стража (воинское оружие, средние доспехи)."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "leather-armor"
+          },
+          {
+            "itemId": "shield"
+          },
+          {
+            "itemId": "sickle"
+          },
+          {
+            "itemId": "quarterstaff"
+          },
+          {
+            "itemId": "herbalism-kit"
+          },
+          {
+            "packId": "explorers-pack"
+          }
+        ],
+        "gold": 9
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
+    ]
+  },
+  {
+    "id": "fighter",
+    "name": "Воин",
+    "description": "Мастер оружия и доспехов, готовый к любому бою.",
+    "hitDie": 10,
+    "primary": [
+      "str",
+      "dex"
+    ],
+    "savingThrows": [
+      "str",
+      "con"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "acrobatics",
+        "animal-handling",
+        "athletics",
+        "history",
+        "insight",
+        "intimidation",
+        "persuasion",
+        "perception",
+        "survival"
+      ]
+    },
+    "armorTraining": "Все доспехи, щиты",
+    "features": [
+      {
+        "name": "Боевой стиль",
+        "description": "Выбираете особый стиль боя, например Оборону (+1 к КД в доспехе)."
+      },
+      {
+        "name": "Второе дыхание",
+        "description": "Бонусным действием восстанавливаете 1к10 + уровень воина хитов."
+      },
+      {
+        "name": "Приёмы оружия",
+        "description": "Используете особые свойства трёх видов оружия."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "chain-mail"
+          },
+          {
+            "itemId": "greatsword"
+          },
+          {
+            "itemId": "flail"
+          },
+          {
+            "itemId": "javelin",
+            "quantity": 8
+          },
+          {
+            "packId": "dungeoneers-pack"
+          }
+        ],
+        "gold": 4
+      },
+      {
+        "id": "B",
+        "items": [
+          {
+            "itemId": "studded-leather"
+          },
+          {
+            "itemId": "scimitar"
+          },
+          {
+            "itemId": "shortsword"
+          },
+          {
+            "itemId": "longbow"
+          },
+          {
+            "itemId": "arrow",
+            "quantity": 20
+          },
+          {
+            "itemId": "quiver"
+          },
+          {
+            "packId": "dungeoneers-pack"
+          }
+        ],
+        "gold": 11
+      },
+      {
+        "id": "C",
+        "items": [],
+        "gold": 155
+      }
+    ]
+  },
+  {
+    "id": "monk",
+    "name": "Монах",
+    "description": "Мастер боевых искусств, направляющий внутреннюю энергию.",
+    "hitDie": 8,
+    "primary": [
+      "dex",
+      "wis"
+    ],
+    "savingThrows": [
+      "str",
+      "dex"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "acrobatics",
+        "athletics",
+        "history",
+        "insight",
+        "religion",
+        "stealth"
+      ]
+    },
+    "armorTraining": "Нет",
+    "features": [
+      {
+        "name": "Боевые искусства",
+        "description": "Безоружные удары и оружие монаха используют Ловкость и кость боевых искусств к6."
+      },
+      {
+        "name": "Защита без доспехов",
+        "description": "Без доспеха и щита ваш КД равен 10 + модификатор Ловкости + модификатор Мудрости."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "spear"
+          },
+          {
+            "itemId": "dagger",
+            "quantity": 5
+          },
+          {
+            "itemId": "woodcarvers-tools"
+          },
+          {
+            "packId": "explorers-pack"
+          }
+        ],
+        "gold": 11
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
+    ]
+  },
+  {
+    "id": "paladin",
+    "name": "Паладин",
+    "description": "Святой воин, связанный священной клятвой.",
+    "hitDie": 10,
+    "primary": [
+      "str",
+      "cha"
+    ],
+    "savingThrows": [
+      "wis",
+      "cha"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "athletics",
+        "insight",
+        "intimidation",
+        "medicine",
+        "persuasion",
+        "religion"
+      ]
+    },
+    "armorTraining": "Все доспехи, щиты",
+    "features": [
+      {
+        "name": "Наложение рук",
+        "description": "Запас целительной силы: 5 × уровень паладина хитов в день."
+      },
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания паладина, используя Харизму."
+      },
+      {
+        "name": "Приёмы оружия",
+        "description": "Используете особые свойства двух видов оружия."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "chain-mail"
+          },
+          {
+            "itemId": "shield"
+          },
+          {
+            "itemId": "longsword"
+          },
+          {
+            "itemId": "javelin",
+            "quantity": 6
+          },
+          {
+            "itemId": "holy-symbol"
+          },
+          {
+            "packId": "priests-pack"
+          }
+        ],
+        "gold": 9
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 150
+      }
+    ]
+  },
+  {
+    "id": "ranger",
+    "name": "Следопыт",
+    "description": "Охотник и разведчик диких земель.",
+    "hitDie": 10,
+    "primary": [
+      "dex",
+      "wis"
+    ],
+    "savingThrows": [
+      "str",
+      "dex"
+    ],
+    "skillChoices": {
+      "count": 3,
+      "from": [
+        "animal-handling",
+        "athletics",
+        "insight",
+        "investigation",
+        "nature",
+        "perception",
+        "stealth",
+        "survival"
+      ]
+    },
+    "armorTraining": "Лёгкие и средние доспехи, щиты",
+    "features": [
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания следопыта, используя Мудрость."
+      },
+      {
+        "name": "Избранный враг",
+        "description": "Всегда подготовлено заклинание «Метка охотника»."
+      },
+      {
+        "name": "Приёмы оружия",
+        "description": "Используете особые свойства двух видов оружия."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "studded-leather"
+          },
+          {
+            "itemId": "scimitar"
+          },
+          {
+            "itemId": "shortsword"
+          },
+          {
+            "itemId": "longbow"
+          },
+          {
+            "itemId": "arrow",
+            "quantity": 20
+          },
+          {
+            "itemId": "quiver"
+          },
+          {
+            "itemId": "druidic-focus"
+          },
+          {
+            "packId": "explorers-pack"
+          }
+        ],
+        "gold": 7
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 150
+      }
+    ]
+  },
+  {
+    "id": "rogue",
+    "name": "Плут",
+    "description": "Ловкач, полагающийся на скрытность, хитрость и точный удар.",
+    "hitDie": 8,
+    "primary": [
+      "dex"
+    ],
+    "savingThrows": [
+      "dex",
+      "int"
+    ],
+    "skillChoices": {
+      "count": 4,
+      "from": [
+        "acrobatics",
+        "athletics",
+        "deception",
+        "insight",
+        "intimidation",
+        "investigation",
+        "perception",
+        "persuasion",
+        "sleight-of-hand",
+        "stealth"
+      ]
+    },
+    "expertise": 2,
+    "armorTraining": "Лёгкие доспехи",
+    "features": [
+      {
+        "name": "Компетентность",
+        "description": "Удваиваете бонус мастерства для двух навыков, которыми владеете."
+      },
+      {
+        "name": "Скрытая атака",
+        "description": "Раз в ход наносите дополнительно 1к6 урона, если у атаки есть преимущество или рядом с целью союзник."
+      },
+      {
+        "name": "Воровской жаргон",
+        "description": "Знаете тайный язык и знаки преступного мира."
+      },
+      {
+        "name": "Приёмы оружия",
+        "description": "Используете особые свойства двух видов оружия."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "leather-armor"
+          },
+          {
+            "itemId": "dagger",
+            "quantity": 2
+          },
+          {
+            "itemId": "shortsword"
+          },
+          {
+            "itemId": "shortbow"
+          },
+          {
+            "itemId": "arrow",
+            "quantity": 20
+          },
+          {
+            "itemId": "quiver"
+          },
+          {
+            "itemId": "thieves-tools"
+          },
+          {
+            "packId": "burglars-pack"
+          }
+        ],
+        "gold": 8
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 100
+      }
+    ]
+  },
+  {
+    "id": "sorcerer",
+    "name": "Чародей",
+    "description": "Заклинатель, чья магия — врождённый дар крови.",
+    "hitDie": 6,
+    "primary": [
+      "cha"
+    ],
+    "savingThrows": [
+      "con",
+      "cha"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "arcana",
+        "deception",
+        "insight",
+        "intimidation",
+        "persuasion",
+        "religion"
+      ]
+    },
+    "armorTraining": "Нет",
+    "features": [
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания чародея, используя Харизму."
+      },
+      {
+        "name": "Врождённое колдовство",
+        "description": "Бонусным действием на минуту усиливаете свою магию: Сл спасбросков +1 и преимущество на атаки заклинаниями."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "spear"
+          },
+          {
+            "itemId": "dagger",
+            "quantity": 2
+          },
+          {
+            "itemId": "arcane-focus-crystal"
+          },
+          {
+            "packId": "dungeoneers-pack"
+          }
+        ],
+        "gold": 28
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 50
+      }
+    ]
+  },
+  {
+    "id": "warlock",
+    "name": "Колдун",
+    "description": "Искатель тайного знания, заключивший договор с могущественным покровителем.",
+    "hitDie": 8,
+    "primary": [
+      "cha"
+    ],
+    "savingThrows": [
+      "wis",
+      "cha"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "arcana",
+        "deception",
+        "history",
+        "intimidation",
+        "investigation",
+        "nature",
+        "religion"
+      ]
+    },
+    "armorTraining": "Лёгкие доспехи",
+    "features": [
+      {
+        "name": "Таинственные воззвания",
+        "description": "Получаете особые магические способности от покровителя."
+      },
+      {
+        "name": "Магия договора",
+        "description": "Творите заклинания колдуна, используя Харизму; ячейки восстанавливаются после короткого отдыха."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "leather-armor"
+          },
+          {
+            "itemId": "sickle"
+          },
+          {
+            "itemId": "dagger",
+            "quantity": 2
+          },
+          {
+            "itemId": "arcane-focus-orb"
+          },
+          {
+            "itemId": "book"
+          },
+          {
+            "packId": "scholars-pack"
+          }
+        ],
+        "gold": 15
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 100
+      }
+    ]
+  },
+  {
+    "id": "wizard",
+    "name": "Волшебник",
+    "description": "Учёный маг, постигающий тайны мироздания по книгам.",
+    "hitDie": 6,
+    "primary": [
+      "int"
+    ],
+    "savingThrows": [
+      "int",
+      "wis"
+    ],
+    "skillChoices": {
+      "count": 2,
+      "from": [
+        "arcana",
+        "history",
+        "insight",
+        "investigation",
+        "medicine",
+        "nature",
+        "religion"
+      ]
+    },
+    "armorTraining": "Нет",
+    "features": [
+      {
+        "name": "Использование заклинаний",
+        "description": "Творите заклинания волшебника из книги заклинаний, используя Интеллект."
+      },
+      {
+        "name": "Ритуальный адепт",
+        "description": "Можете сотворить любое ритуальное заклинание из книги, не готовя его."
+      },
+      {
+        "name": "Магическое восстановление",
+        "description": "Раз в день после короткого отдыха восстанавливаете часть ячеек заклинаний."
+      }
+    ],
+    "equipment": [
+      {
+        "id": "A",
+        "items": [
+          {
+            "itemId": "dagger",
+            "quantity": 2
+          },
+          {
+            "itemId": "quarterstaff"
+          },
+          {
+            "itemId": "robe"
+          },
+          {
+            "itemId": "spellbook"
+          },
+          {
+            "packId": "scholars-pack"
+          }
+        ],
+        "gold": 5
+      },
+      {
+        "id": "B",
+        "items": [],
+        "gold": 55
+      }
+    ]
+  }
+]

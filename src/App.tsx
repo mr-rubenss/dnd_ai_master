@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { CharacterCreation } from './components/creation/CharacterCreation'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { DiceTray } from './components/DiceTray'
 import { InventoryPanel } from './components/InventoryPanel'
@@ -9,12 +10,35 @@ import { itemCatalog, locations } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { diceRolled, messageAdded } from './game/state'
 import { gameStore, useGameState } from './hooks/useGame'
+import type { GameState } from './types/game'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
 const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий пока не подключён — это заглушка.)'
 
 function App() {
   const state = useGameState()
+
+  const handleNewGame = () => {
+    if (window.confirm('Начать новую игру? Текущий персонаж и прогресс будут потеряны.')) gameStore.endGame()
+  }
+
+  return (
+    <div className={`app${state ? '' : ' app--creation'}`}>
+      <header className="app-header">
+        <h1>ИИ-Мастер</h1>
+        {state && (
+          <button type="button" className="header-button" onClick={handleNewGame}>
+            Новая игра
+          </button>
+        )}
+      </header>
+      {/* key: новая игра монтирует экран заново, сбрасывая локальное состояние (ожидание ответа, анимации). */}
+      {state ? <GameScreen key={state.character.id} state={state} /> : <CharacterCreation onStart={(sheet) => gameStore.startGame(sheet)} />}
+    </div>
+  )
+}
+
+function GameScreen({ state }: { state: GameState }) {
   const location = locations[state.location.id]
   const [waiting, setWaiting] = useState(false)
   const timerRef = useRef<number | undefined>(undefined)
@@ -45,38 +69,20 @@ function App() {
     }
   }
 
-  const handleNewGame = () => {
-    if (window.confirm('Начать новую игру? Текущий прогресс будет потерян.')) {
-      window.clearTimeout(timerRef.current)
-      setWaiting(false)
-      gameStore.newGame()
-    }
-  }
-
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>ИИ-Мастер</h1>
-        <button type="button" className="header-button" onClick={handleNewGame}>
-          Новая игра
-        </button>
-      </header>
+    <>
       <div className="layout">
         <main className="main-column">
           <MapPanel location={location} player={state.location.player} />
           <section className="panel story-panel">
             <NarrationLog messages={state.messages} />
-            <PlayerInput
-              onSend={handleSend}
-              disabled={waiting}
-              leading={<DiceTray rolls={state.rolls} onRoll={handleRoll} />}
-            />
+            <PlayerInput onSend={handleSend} disabled={waiting} leading={<DiceTray rolls={state.rolls} onRoll={handleRoll} />} />
           </section>
         </main>
         <InventoryPanel character={state.character} inventory={state.inventory} catalog={itemCatalog} />
       </div>
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}
-    </div>
+    </>
   )
 }
 

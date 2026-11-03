@@ -85,3 +85,9 @@ export function collectPageErrors(page: Page): string[] {
   page.on('pageerror', (error) => errors.push(error.message))
   return errors
 }
+
+/** Начинает игру за готового персонажа (Ратибор) с экрана создания. */
+export async function startQuickGame(page: Page) {
+  await page.getByRole('button', { name: /^Быстрый старт/ }).click()
+  await expect(page.locator('.dice-tray-button')).toBeVisible()
+}

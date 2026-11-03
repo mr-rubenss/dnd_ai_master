@@ -6,6 +6,7 @@ import {
   face,
   installRngQueue,
   queueRolls,
+  startQuickGame,
   swipeDown,
 } from './helpers'
 
@@ -14,7 +15,7 @@ const ADV_DIS_ERROR = 'Преимущество и помеха применяю
 test.beforeEach(async ({ page }) => {
   await installRngQueue(page)
   await page.goto('./')
-  await expect(page.locator('.dice-tray-button')).toBeVisible()
+  await startQuickGame(page)
 })
 
 test.describe('игровой стол — десктоп', () => {
