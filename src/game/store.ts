@@ -2,10 +2,11 @@
 
 import type { Character, CharacterSheet } from '../types/character'
 import type { GameState } from '../types/game'
-import { gameReducer, type GameAction } from './state'
+import type { LocationData } from '../types/location'
+import { gameReducer, initialDoorStates, type GameAction } from './state'
 
 export const SAVE_KEY = 'ai-master:save'
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 /** Минимальный интерфейс хранилища (совместим с window.localStorage). */
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -87,12 +88,31 @@ export function migrateSave(save: unknown, context: MigrationContext = {}): unkn
     }
     version = 5
   }
+  if (version === 5) {
+    // v6: тонкие стены по границам клеток вместо стен-клеток. Карты перерисованы, старые координаты
+    // больше ничего не значат — игрок возвращается на стартовую клетку локации. Появились двери с состоянием.
+    const s = state as { location?: { id?: unknown } }
+    const id = typeof s.location?.id === 'string' ? s.location.id : ''
+    const location = context.location?.(id)
+    if (!location) return null
+    state = {
+      ...s,
+      location: {
+        id,
+        player: { ...location.playerStart },
+        doors: initialDoorStates(location),
+      },
+    }
+    version = 6
+  }
   return version === SAVE_VERSION ? state : null
 }
 
 export interface MigrationContext {
   /** Стартовый шаблон персонажа по id — источник полей, которых не было в старых сохранениях. */
   characterTemplate?: (characterId: string) => Character | undefined
+  /** Локация по id — для переноса позиции и дверей на новый формат карт. */
+  location?: (locationId: string) => LocationData | undefined
 }
 
 export function loadSavedGame(

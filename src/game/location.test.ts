@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
+import { edgeKey } from '../engine/movement'
 import { LocationValidationError, parseLocation } from './location'
 
-/** Минимальная корректная комната 6×5: стены по краям, пол внутри. */
+/** Минимальная корректная локация: одна комната 4×3 (упрощённая запись) на карте 6×5. */
 function makeRoom(overrides: Record<string, unknown> = {}) {
   return {
     id: 'test-room',
@@ -12,13 +13,27 @@ function makeRoom(overrides: Record<string, unknown> = {}) {
     width: 6,
     height: 5,
     floor: 'stone',
-    walls: 'stone',
-    tiles: ['######', '#....#', '#....#', '#....#', '######'],
+    wallMaterial: 'stone',
+    rooms: [{ id: 'room', x: 1, y: 1, w: 4, h: 3 }],
     objects: [],
     npcs: [],
     playerStart: { x: 1, y: 3 },
     ...overrides,
   }
+}
+
+/** Две комнаты 3×3 бок о бок (общая стена x = 3) на карте 6×3. */
+function twoRooms(overrides: Record<string, unknown> = {}) {
+  return makeRoom({
+    width: 6,
+    height: 3,
+    rooms: [
+      { id: 'west', x: 0, y: 0, w: 3, h: 3 },
+      { id: 'east', x: 3, y: 0, w: 3, h: 3 },
+    ],
+    playerStart: { x: 0, y: 0 },
+    ...overrides,
+  })
 }
 
 /** Запускает валидацию и возвращает список ошибок (пустой, если локация корректна). */
@@ -32,57 +47,189 @@ function problemsOf(raw: unknown): string[] {
   }
 }
 
-describe('parseLocation', () => {
-  it('принимает таверну «Пьяный грифон»', () => {
-    const location = parseLocation(drunkenGriffinJson)
-    expect(location.name).toBe('Таверна «Пьяный грифон»')
-    expect(location.width).toBe(20)
-    expect(location.height).toBe(14)
-    expect(location.objects.filter((obj) => obj.type === 'table')).toHaveLength(5)
-    expect(location.npcs).toHaveLength(4)
+const wallKeys = (raw: unknown) => new Set(parseLocation(raw).walls.map((w) => edgeKey(w.side, w.x, w.y)))
+
+describe('parseLocation: таверна «Пьяный грифон»', () => {
+  const tavern = parseLocation(drunkenGriffinJson)
+
+  it('принимается и сохраняет обстановку', () => {
+    expect(tavern.name).toBe('Таверна «Пьяный грифон»')
+    expect(tavern.objects.filter((obj) => obj.type === 'table')).toHaveLength(5)
+    expect(tavern.npcs).toHaveLength(4)
   })
 
-  it('принимает минимальную корректную комнату', () => {
-    expect(problemsOf(makeRoom())).toEqual([])
+  it('стены не съедают клетки: вся карта 20×14 — пол', () => {
+    expect(tavern.floorPlan).toHaveLength(14)
+    expect(tavern.floorPlan.every((row) => row === '.'.repeat(20))).toBe(true)
   })
 
-  it('отклоняет объект за пределами карты', () => {
-    const problems = problemsOf(
-      makeRoom({ objects: [{ id: 'far-barrel', type: 'barrel', name: 'Бочка', x: 10, y: 2 }] }),
-    )
-    expect(problems).toEqual(['objects[0] "far-barrel": клетка (10, 2) за пределами карты 6×5'])
+  it('кладовая отделена тонкой деревянной перегородкой с запертой дверью', () => {
+    const door = tavern.doors.find((d) => d.id === 'storage-door')
+    expect(door).toMatchObject({ state: 'locked', x1: 15, x2: 15 })
+    const partition = tavern.walls.filter((w) => w.side === 'v' && w.x === 15 && w.y < 5)
+    expect(partition).toHaveLength(5)
+    expect(partition.every((w) => w.material === 'wood')).toBe(true)
+    // Внешние стены — каменные, проём между зоной у стойки и общим залом — без стены.
+    expect(tavern.walls.find((w) => w.side === 'v' && w.x === 0 && w.y === 0)?.material).toBe('stone')
+    expect(tavern.walls.some((w) => w.side === 'h' && w.y === 5 && w.x < 15)).toBe(false)
+  })
+})
+
+describe('parseLocation: упрощённая запись', () => {
+  it('принимает минимальную комнату и ставит стены по периметру', () => {
+    const location = parseLocation(makeRoom())
+    expect(location.walls).toHaveLength(2 * (4 + 3))
+    expect(location.floorPlan).toEqual(['      ', ' .... ', ' .... ', ' .... ', '      '])
   })
 
-  it('отклоняет объект, который начинается на карте, но выходит за её край', () => {
-    const problems = problemsOf(
-      makeRoom({ objects: [{ id: 'long-bar', type: 'bar', name: 'Стойка', x: 2, y: 2, w: 5 }] }),
-    )
-    expect(problems).toEqual([
-      'objects[0] "long-bar": объект размером 5×1 в клетке (2, 2) выходит за пределы карты 6×5',
+  it('у соседних комнат общая стена; дверь на ней соединяет комнаты', () => {
+    const raw = twoRooms({ doors: [{ id: 'door', name: 'Дверь', state: 'locked', x1: 3, y1: 1, x2: 3, y2: 2 }] })
+    expect(problemsOf(raw)).toEqual([])
+    expect(wallKeys(raw).has('v:3,1')).toBe(true)
+  })
+
+  it('проём убирает стену, перегородка добавляет — со своим материалом', () => {
+    const raw = makeRoom({
+      walls: [{ x1: 3, y1: 1, x2: 3, y2: 3, material: 'wood' }],
+      openings: [{ x1: 1, y1: 4, x2: 3, y2: 4 }],
+    })
+    const location = parseLocation(raw)
+    const keys = wallKeys(raw)
+    expect(keys.has('h:1,4')).toBe(false)
+    expect(keys.has('h:2,4')).toBe(false)
+    expect(keys.has('h:3,4')).toBe(true)
+    expect(location.walls.filter((w) => w.material === 'wood')).toHaveLength(2)
+  })
+
+  it('полная и упрощённая запись дают одинаковые стены', () => {
+    const full = makeRoom({
+      rooms: undefined,
+      floorPlan: ['      ', ' .... ', ' .... ', ' .... ', '      '],
+      walls: [
+        { x1: 1, y1: 1, x2: 5, y2: 1 },
+        { x1: 5, y1: 1, x2: 5, y2: 4 },
+        { x1: 5, y1: 4, x2: 1, y2: 4 },
+        { x1: 1, y1: 4, x2: 1, y2: 1 },
+      ],
+    })
+    expect(problemsOf(full)).toEqual([])
+    expect(wallKeys(full)).toEqual(wallKeys(makeRoom()))
+  })
+
+  it('отклоняет пересекающиеся комнаты', () => {
+    const raw = makeRoom({ rooms: [{ id: 'a', x: 0, y: 0, w: 3, h: 3 }, { id: 'b', x: 2, y: 2, w: 2, h: 2 }], playerStart: { x: 0, y: 0 } })
+    expect(problemsOf(raw)).toContain('rooms[1] "b": пересекается с комнатой "a" в клетке (2, 2)')
+  })
+
+  it('требует план пола или комнаты', () => {
+    expect(problemsOf(makeRoom({ rooms: undefined }))).toEqual(['нужен план пола "floorPlan" или комнаты "rooms"'])
+  })
+
+  it('в плане пола только "." и пробел — стен-клеток больше нет', () => {
+    const raw = makeRoom({ rooms: undefined, floorPlan: ['######', '#....#', '#....#', '#....#', '######'] })
+    expect(problemsOf(raw)[0]).toBe('floorPlan[0]: недопустимый символ "#" (разрешены "." и пробел)')
+  })
+})
+
+describe('parseLocation: двери, окна, проёмы — только на стенах', () => {
+  it('отклоняет дверь не на стене', () => {
+    const raw = makeRoom({ doors: [{ id: 'door', name: 'Дверь', state: 'closed', x1: 2, y1: 2, x2: 3, y2: 2 }] })
+    expect(problemsOf(raw)).toEqual(['doors[0] "door": дверь должна стоять на стене, а на границе (2, 2)–(3, 2) стены нет'])
+  })
+
+  it('отклоняет широкую дверь, часть которой не на стене', () => {
+    const raw = makeRoom({ doors: [{ id: 'gate', name: 'Ворота', state: 'open', x1: 4, y1: 4, x2: 6, y2: 4 }] })
+    expect(problemsOf(raw)).toEqual(['doors[0] "gate": дверь должна стоять на стене, а на границе (5, 4)–(6, 4) стены нет'])
+  })
+
+  it('отклоняет окно и проём не на стене', () => {
+    const raw = makeRoom({
+      windows: [{ id: 'win', x1: 2, y1: 2, x2: 2, y2: 3 }],
+      openings: [{ x1: 2, y1: 2, x2: 3, y2: 2 }],
+    })
+    expect(problemsOf(raw)).toEqual([
+      'openings[0]: проём можно сделать только в стене, а на границе (2, 2)–(3, 2) стены нет',
+      'windows[0] "win": окно должно стоять на стене, а на границе (2, 2)–(2, 3) стены нет',
     ])
   })
 
-  it('отклоняет дверь не на стене', () => {
-    const problems = problemsOf(
-      makeRoom({ objects: [{ id: 'door', type: 'door', name: 'Дверь', x: 2, y: 2 }] }),
-    )
-    expect(problems).toEqual(['objects[0] "door": дверь должна стоять на клетке стены "#", а клетка (2, 2) — не стена'])
+  it('отклоняет неизвестное состояние двери', () => {
+    const raw = makeRoom({ doors: [{ id: 'door', name: 'Дверь', state: 'ajar', x1: 2, y1: 4, x2: 3, y2: 4 }] })
+    expect(problemsOf(raw)).toEqual(['doors[0] "door": "state" должно быть одним из: open, closed, locked'])
   })
 
-  it('отклоняет широкую дверь, вторая клетка которой не на стене', () => {
-    const problems = problemsOf(
-      makeRoom({ objects: [{ id: 'gate', type: 'door', name: 'Ворота', x: 0, y: 3, w: 2 }] }),
-    )
-    expect(problems).toEqual(['objects[0] "gate": дверь должна стоять на клетке стены "#", а клетка (1, 3) — не стена'])
+  it('отклоняет наклонный отрезок и отрезок за пределами карты', () => {
+    const raw = makeRoom({ walls: [{ x1: 1, y1: 1, x2: 2, y2: 2 }, { x1: 0, y1: 0, x2: 0, y2: 9 }] })
+    expect(problemsOf(raw)).toEqual([
+      'walls[0]: отрезок (1, 1)–(2, 2) должен идти строго по горизонтали или вертикали и иметь длину',
+      'walls[1]: отрезок (0, 0)–(0, 9) выходит за пределы карты (узлы от (0, 0) до (6, 5))',
+    ])
   })
 
-  it('принимает дверь на стене', () => {
-    expect(problemsOf(makeRoom({ objects: [{ id: 'door', type: 'door', name: 'Дверь', x: 2, y: 4 }] }))).toEqual([])
+  it('отклоняет дверь и окно на одной границе', () => {
+    const raw = makeRoom({
+      doors: [{ id: 'door', name: 'Дверь', state: 'closed', x1: 2, y1: 4, x2: 3, y2: 4 }],
+      windows: [{ id: 'win', x1: 2, y1: 4, x2: 4, y2: 4 }],
+    })
+    expect(problemsOf(raw)).toEqual(['windows[0] "win": граница (2, 4)–(3, 4) уже занята: doors[0] "door"'])
   })
 
-  it('отклоняет НПС в стене', () => {
-    const problems = problemsOf(makeRoom({ npcs: [{ id: 'ghost', name: 'Призрак', x: 0, y: 2 }] }))
-    expect(problems).toEqual(['npcs[0] "ghost": НПС должен стоять на полу ".", а клетка (0, 2) — стена'])
+  it('подсказывает, что двери-объекты из старого формата теперь задаются отрезками', () => {
+    const raw = makeRoom({ objects: [{ id: 'door', type: 'door', name: 'Дверь', x: 2, y: 2 }] })
+    expect(problemsOf(raw)[0]).toMatch(/двери теперь задаются в "doors"/)
+  })
+})
+
+describe('parseLocation: достижимость от входа', () => {
+  it('комнаты без двери и проёма между ними — ошибка со списком клеток', () => {
+    expect(problemsOf(twoRooms())).toEqual([
+      'клетки пола недостижимы от входа playerStart (всего 9): (3, 0), (4, 0), (5, 0), (3, 1), (4, 1), … — добавьте проём или дверь',
+    ])
+  })
+
+  it('запертая дверь не мешает достижимости: её можно отпереть', () => {
+    expect(problemsOf(twoRooms({ doors: [{ id: 'd', name: 'Дверь', state: 'locked', x1: 3, y1: 0, x2: 3, y2: 1 }] }))).toEqual([])
+  })
+
+  it('окно не соединяет комнаты', () => {
+    expect(problemsOf(twoRooms({ windows: [{ id: 'w', x1: 3, y1: 0, x2: 3, y2: 1 }] }))).toHaveLength(1)
+  })
+
+  it('проём соединяет комнаты', () => {
+    expect(problemsOf(twoRooms({ openings: [{ x1: 3, y1: 2, x2: 3, y2: 3 }] }))).toEqual([])
+  })
+})
+
+describe('parseLocation: объекты и НПС на полу', () => {
+  it('отклоняет объект за пределами карты', () => {
+    const problems = problemsOf(makeRoom({ objects: [{ id: 'far-barrel', type: 'barrel', name: 'Бочка', x: 10, y: 2 }] }))
+    expect(problems).toEqual(['objects[0] "far-barrel": клетка (10, 2) за пределами карты 6×5'])
+  })
+
+  it('отклоняет объект, который выходит за край карты', () => {
+    const problems = problemsOf(makeRoom({ objects: [{ id: 'long-bar', type: 'bar', name: 'Стойка', x: 2, y: 2, w: 5 }] }))
+    expect(problems).toEqual(['objects[0] "long-bar": объект размером 5×1 в клетке (2, 2) выходит за пределы карты 6×5'])
+  })
+
+  it('отклоняет объект в пустоте за стеной', () => {
+    const problems = problemsOf(makeRoom({ objects: [{ id: 'barrel', type: 'barrel', name: 'Бочка', x: 0, y: 2 }] }))
+    expect(problems).toEqual(['objects[0] "barrel": объект должен стоять на полу, а клетка (0, 2) — не пол'])
+  })
+
+  it('отклоняет стол поперёк перегородки', () => {
+    const raw = makeRoom({
+      walls: [{ x1: 3, y1: 1, x2: 3, y2: 3 }],
+      objects: [{ id: 'table', type: 'table', name: 'Стол', x: 2, y: 1, w: 2 }],
+    })
+    expect(problemsOf(raw)).toEqual(['objects[0] "table": объект пересекает стену на границе (3, 1)–(3, 2)'])
+  })
+
+  it('отклоняет НПС и игрока в пустоте', () => {
+    const raw = makeRoom({ npcs: [{ id: 'ghost', name: 'Призрак', x: 0, y: 2 }], playerStart: { x: 5, y: 4 } })
+    expect(problemsOf(raw)).toEqual([
+      'npcs[0] "ghost": НПС должен стоять на полу, а клетка (0, 2) — пустота',
+      'playerStart: игрок должен стоять на полу',
+    ])
   })
 
   it('отклоняет два объекта в одной клетке', () => {
@@ -107,10 +254,10 @@ describe('parseLocation', () => {
 
   it('собирает все ошибки сразу и выдаёт их в сообщении исключения', () => {
     const room = makeRoom({
-      objects: [{ id: 'door', type: 'door', name: 'Дверь', x: 2, y: 2 }],
+      doors: [{ id: 'door', name: 'Дверь', state: 'closed', x1: 2, y1: 2, x2: 3, y2: 2 }],
       npcs: [{ id: 'ghost', name: 'Призрак', x: 0, y: 0 }],
     })
     expect(problemsOf(room)).toHaveLength(2)
-    expect(() => parseLocation(room)).toThrow(/Некорректная локация:\n- objects\[0\] "door"/)
+    expect(() => parseLocation(room)).toThrow(/Некорректная локация:\n- doors\[0\] "door"/)
   })
 })

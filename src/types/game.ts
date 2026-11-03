@@ -1,6 +1,6 @@
 import type { RollResult } from '../engine/dice'
 import type { Character, Inventory } from './character'
-import type { CellPosition } from './location'
+import type { CellPosition, DoorState } from './location'
 
 export type MessageAuthor = 'master' | 'player' | 'system'
 
@@ -27,6 +27,8 @@ export interface GameState {
   location: {
     id: string
     player: CellPosition
+    /** Текущее состояние каждой двери локации по id (открыта/закрыта/заперта). */
+    doors: Record<string, DoorState>
   }
   messages: ChatMessage[]
   /** Журнал бросков, новые в конце. */

@@ -17,5 +17,6 @@ export const gameStore = createGameStore({
   parseState: (raw) => parseGameState(raw, { catalog: itemCatalog, locations }),
   migration: {
     characterTemplate: (id) => (id === startingSheet.character.id ? startingSheet.character : undefined),
+    location: (id) => locations[id],
   },
 })

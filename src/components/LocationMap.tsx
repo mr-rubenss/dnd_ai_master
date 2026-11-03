@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
-import { tileAt } from '../game/location'
-import {
-  TILE_FLOOR,
-  TILE_WALL,
-  type CellPosition,
-  type LocationData,
-  type MapObjectType,
-  type NpcAttitude,
-} from '../types/location'
+import { doorState, isFloor, type DoorStates } from '../engine/movement'
+import type { CellPosition, LocationData, MapObjectType, NpcAttitude } from '../types/location'
 import { MapObjectIcon } from './MapIcons'
+import { DOOR_STATE_LABELS, segmentBox } from './mapDrawing'
+import { DoorIcon, WallLines, WindowIcon } from './MapWalls'
 
 const OBJECT_TYPE_LABELS: Record<MapObjectType, string> = {
   table: 'Стол',
@@ -16,14 +11,17 @@ const OBJECT_TYPE_LABELS: Record<MapObjectType, string> = {
   bar: 'Стойка',
   fireplace: 'Камин',
   barrel: 'Бочка',
-  door: 'Дверь',
 }
+
 
 const ATTITUDE_LABELS: Record<NpcAttitude, string> = {
   friendly: 'Дружелюбен',
   neutral: 'Нейтрален',
   hostile: 'Враждебен',
 }
+
+/** Поле вокруг карты в клетках: чтобы внешние стены на краю не обрезались. */
+const MAP_PAD = 0.25
 
 /** Элемент карты, на который можно навести или нажать. */
 interface MapEntity {
@@ -45,10 +43,12 @@ interface ActiveEntity {
 interface Props {
   location: LocationData
   player: CellPosition
+  /** Текущие состояния дверей (из состояния игры). */
+  doors?: DoorStates
 }
 
 /** Тактическая карта локации: сетка клеток, объекты, НПС и фишка игрока. Масштабируется под контейнер. */
-export function LocationMap({ location, player }: Props) {
+export function LocationMap({ location, player, doors = {} }: Props) {
   const { width, height } = location
   const [active, setActive] = useState<ActiveEntity | null>(null)
 
@@ -66,6 +66,24 @@ export function LocationMap({ location, player }: Props) {
         h: obj.h ?? 1,
       })
     }
+    for (const door of location.doors) {
+      map.set(`door:${door.id}`, {
+        key: `door:${door.id}`,
+        name: door.name,
+        kindLabel: `Дверь · ${DOOR_STATE_LABELS[doorState(door, doors)]}`,
+        description: door.description,
+        ...segmentBox(door, 0.3),
+      })
+    }
+    for (const win of location.windows) {
+      map.set(`window:${win.id}`, {
+        key: `window:${win.id}`,
+        name: win.name ?? 'Окно',
+        kindLabel: 'Окно',
+        description: win.description,
+        ...segmentBox(win, 0.3),
+      })
+    }
     for (const npc of location.npcs) {
       map.set(`npc:${npc.id}`, {
         key: `npc:${npc.id}`,
@@ -79,7 +97,7 @@ export function LocationMap({ location, player }: Props) {
       })
     }
     return map
-  }, [location])
+  }, [location, doors])
 
   // Закрыть подсказку по Escape.
   useEffect(() => {
@@ -119,15 +137,15 @@ export function LocationMap({ location, player }: Props) {
   const activeEntity = active ? entities.get(active.key) : undefined
 
   const cells = []
+  /** Контур пола — по нему обрезается сетка, чтобы линии клеток не рисовались в пустоте. */
+  let floorOutline = ''
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const tile = tileAt(location, x, y)
-      if (tile === TILE_FLOOR) {
+      if (isFloor(location, x, y)) {
+        floorOutline += `M${x} ${y}h1v1h-1z`
         cells.push(
           <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} className={`floor floor--${location.floor}${y % 2 ? ' floor--alt' : ''}`} />,
         )
-      } else if (tile === TILE_WALL) {
-        cells.push(<rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} className={`wall wall--${location.walls}`} />)
       }
     }
   }
@@ -136,10 +154,10 @@ export function LocationMap({ location, player }: Props) {
     <div className="map-canvas">
       <div
         className="map-board"
-        style={{ '--map-w': width, '--map-h': height } as CSSProperties}
+        style={{ '--map-w': width + MAP_PAD * 2, '--map-h': height + MAP_PAD * 2 } as CSSProperties}
         onClick={() => setActive(null)}
       >
-        <svg viewBox={`0 0 ${width} ${height}`} className="map-svg" role="img" aria-label={`Карта: ${location.name}`}>
+        <svg viewBox={`${-MAP_PAD} ${-MAP_PAD} ${width + MAP_PAD * 2} ${height + MAP_PAD * 2}`} className="map-svg" role="img" aria-label={`Карта: ${location.name}`}>
           <defs>
             <pattern id="cell-grid" width={1} height={1} patternUnits="userSpaceOnUse">
               <path d="M 1 0 L 0 0 0 1" className="grid-line" />
@@ -154,8 +172,11 @@ export function LocationMap({ location, player }: Props) {
             </radialGradient>
           </defs>
 
+          <clipPath id="floor-clip">
+            <path d={floorOutline} />
+          </clipPath>
           <g>{cells}</g>
-          <rect width={width} height={height} fill="url(#cell-grid)" pointerEvents="none" />
+          <rect width={width} height={height} fill="url(#cell-grid)" clipPath="url(#floor-clip)" pointerEvents="none" />
 
           <g>
             {location.objects.map((obj) => (
@@ -164,6 +185,26 @@ export function LocationMap({ location, player }: Props) {
                 <MapObjectIcon object={obj} />
               </g>
             ))}
+          </g>
+
+          <WallLines location={location} />
+
+          <g>
+            {location.windows.map((win) => (
+              <g key={win.id} {...interactiveProps(`window:${win.id}`)} data-testid={`window-${win.id}`}>
+                <rect {...hitBox(entities.get(`window:${win.id}`))} className="hit-area" />
+                <WindowIcon window={win} />
+              </g>
+            ))}
+            {location.doors.map((door) => {
+              const state = doorState(door, doors)
+              return (
+                <g key={door.id} {...interactiveProps(`door:${door.id}`)} data-testid={`door-${door.id}`} data-state={state}>
+                  <rect {...hitBox(entities.get(`door:${door.id}`))} className="hit-area" />
+                  <DoorIcon door={door} state={state} location={location} />
+                </g>
+              )
+            })}
           </g>
 
           <g>
@@ -198,6 +239,10 @@ export function LocationMap({ location, player }: Props) {
   )
 }
 
+function hitBox(entity: MapEntity | undefined) {
+  return entity ? { x: entity.x, y: entity.y, width: entity.w, height: entity.h } : {}
+}
+
 interface TooltipProps {
   entity: MapEntity
   mapWidth: number
@@ -205,12 +250,15 @@ interface TooltipProps {
 }
 
 function MapTooltip({ entity, mapWidth, mapHeight }: TooltipProps) {
-  const centerX = (entity.x + entity.w / 2) / mapWidth
+  // Доли ширины/высоты доски с учётом поля вокруг карты.
+  const fx = (x: number) => (x + MAP_PAD) / (mapWidth + MAP_PAD * 2)
+  const fy = (y: number) => (y + MAP_PAD) / (mapHeight + MAP_PAD * 2)
+  const centerX = fx(entity.x + entity.w / 2)
   // Элементы в верхней половине карты — подсказка снизу, иначе сверху, чтобы она не выходила за карту.
   const below = entity.y + entity.h / 2 < mapHeight / 2
-  const top = (below ? entity.y + entity.h : entity.y) / mapHeight
+  const top = fy(below ? entity.y + entity.h : entity.y)
   const align = centerX < 0.25 ? 'left' : centerX > 0.75 ? 'right' : 'center'
-  const left = align === 'left' ? entity.x / mapWidth : align === 'right' ? (entity.x + entity.w) / mapWidth : centerX
+  const left = align === 'left' ? fx(entity.x) : align === 'right' ? fx(entity.x + entity.w) : centerX
 
   return (
     <div

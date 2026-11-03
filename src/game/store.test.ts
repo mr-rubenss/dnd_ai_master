@@ -33,7 +33,11 @@ describe('состояние игры', () => {
   it('новая игра: воин в таверне на стартовой клетке и вступительные сообщения', () => {
     const state = newGame()
     expect(state.character.name).toBe('Ратибор')
-    expect(state.location).toEqual({ id: 'drunken-griffin', player: location.playerStart })
+    expect(state.location).toEqual({
+      id: 'drunken-griffin',
+      player: location.playerStart,
+      doors: { entrance: 'closed', 'storage-door': 'locked' },
+    })
     expect(state.messages).toHaveLength(introJson.length)
     expect(parseState(state)).toBe(state)
   })
@@ -106,7 +110,10 @@ describe('хранилище игры', () => {
     storage,
     createNewGame: createNew,
     parseState,
-    migration: { characterTemplate: (id: string) => (id === sheet.character.id ? sheet.character : undefined) },
+    migration: {
+      characterTemplate: (id: string) => (id === sheet.character.id ? sheet.character : undefined),
+      location: (id: string) => locations[id],
+    },
   })
   /** Хранилище с уже начатой игрой. */
   const started = (storage: ReturnType<typeof memoryStorage> | null = memoryStorage()) => {
@@ -157,7 +164,10 @@ describe('хранилище игры', () => {
   it.each([
     ['не JSON', '{oops'],
     ['другая версия', JSON.stringify({ version: SAVE_VERSION + 1, state: {} })],
-    ['неизвестная локация', JSON.stringify({ version: SAVE_VERSION, state: { ...createNew(), location: { id: 'nowhere', player: { x: 1, y: 1 } } } })],
+    ['неизвестная локация', JSON.stringify({ version: SAVE_VERSION, state: { ...createNew(), location: { id: 'nowhere', player: { x: 1, y: 1 }, doors: {} } } })],
+    ['неизвестная дверь', JSON.stringify({ version: SAVE_VERSION, state: { ...createNew(), location: { ...createNew().location, doors: { entrance: 'open', 'storage-door': 'locked', gate: 'open' } } } })],
+    ['неверное состояние двери', JSON.stringify({ version: SAVE_VERSION, state: { ...createNew(), location: { ...createNew().location, doors: { entrance: 'ajar', 'storage-door': 'locked' } } } })],
+    ['сохранение v5 в неизвестной локации', JSON.stringify({ version: 5, state: { ...createNew(), location: { id: 'nowhere', player: { x: 1, y: 1 } } } })],
   ])('при повреждённом сохранении (%s) игры нет', (_, saved) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const store = createGameStore(options(memoryStorage({ [SAVE_KEY]: saved })))
@@ -171,6 +181,8 @@ describe('хранилище игры', () => {
     const state = structuredClone(gameReducer(createNew(), messageAdded('player', 'Старый ход'))) as unknown as Record<string, unknown> & {
       character: Record<string, unknown>
     }
+    // До v6 стены занимали клетки, дверей в состоянии не было; (9, 12) — старая стартовая клетка таверны.
+    if (version < 6) state.location = { id: 'drunken-griffin', player: { x: 9, y: 12 } }
     strip(state)
     return memoryStorage({ [SAVE_KEY]: JSON.stringify({ version, state }) })
   }
@@ -220,6 +232,25 @@ describe('хранилище игры', () => {
     expect(state.character.proficiencies.tools).toEqual(['dice-set'])
     expect(state.character.feats).toEqual(['savage-attacker', 'alert', 'great-weapon-fighting'])
     expect(state.messages.at(-1)?.text).toBe('Старый ход')
+  })
+
+  it('переносит сохранение версии 5 на тонкие стены: игрок на стартовой клетке перерисованной карты, двери из локации', () => {
+    const state = createGameStore(options(oldSave(5, () => {}))).getState()!
+    expect(state.location).toEqual({
+      id: 'drunken-griffin',
+      player: location.playerStart,
+      doors: { entrance: 'closed', 'storage-door': 'locked' },
+    })
+    expect(state.messages.at(-1)?.text).toBe('Старый ход')
+    expect(state.character).toEqual(sheet.character)
+  })
+
+  it('открытая дверь сохраняется в состоянии и переживает перезагрузку', () => {
+    const storage = memoryStorage()
+    const store = started(storage)
+    const s = store.getState()!
+    store.dispatch({ type: 'gameReset', state: { ...s, location: { ...s.location, doors: { ...s.location.doors, entrance: 'open' } } } })
+    expect(createGameStore(options(storage)).getState()!.location.doors.entrance).toBe('open')
   })
 
   it('сохранение версии 3 неизвестного персонажа тоже загружается', () => {

@@ -194,12 +194,27 @@ textarea {
 .floor--grass { fill: #2e3a22; }
 .floor--grass.floor--alt { fill: #2b361f; }
 
-.wall {
-  stroke: #0d0b09;
-  stroke-width: 0.04;
+/* Тонкие стены по границам клеток */
+.wall-line {
+  stroke-linecap: square;
+  pointer-events: none;
 }
-.wall--stone { fill: #5b544c; }
-.wall--wood { fill: #2f2014; }
+.wall-line--stone { stroke: #120e0b; stroke-width: 0.17; }
+.wall-line--wood { stroke: #23160b; stroke-width: 0.12; }
+.wall-halo { stroke: #7a6a56; stroke-opacity: 0.55; stroke-linecap: square; pointer-events: none; }
+.wall-halo--stone { stroke-width: 0.25; }
+.wall-halo--wood { stroke-width: 0.18; }
+
+.window-glass { stroke: #8fb3c4; stroke-width: 0.1; opacity: 0.85; }
+.window-frame { stroke: #120e0b; stroke-width: 0.04; }
+
+/* Двери: закрытая — створка вдоль стены, запертая — с замком, открытая — проём и распахнутая створка */
+.door-leaf { fill: #8a5a2b; stroke: #120e0b; stroke-width: 0.05; }
+.door-seam { stroke: #3a2512; stroke-width: 0.04; }
+.door-lock rect { fill: #c9a45c; stroke: #120e0b; stroke-width: 0.03; }
+.door-lock-shackle { fill: none; stroke: #c9a45c; stroke-width: 0.04; }
+.door-leaf-open { stroke: #8a5a2b; stroke-width: 0.1; stroke-linecap: round; }
+.door-swing { fill: none; stroke: rgba(201, 164, 92, 0.55); stroke-width: 0.035; stroke-dasharray: 0.08 0.06; }
 
 .grid-line {
   fill: none;
@@ -243,9 +258,6 @@ textarea {
 .obj-barrel { fill: #7a5230; stroke: #2a1a0d; stroke-width: 0.05; }
 .obj-barrel-ring { fill: none; stroke: #3b3a37; stroke-width: 0.05; }
 .obj-barrel-tap { fill: #2a1a0d; }
-.obj-door { fill: #8a5a2b; stroke: #2a1a0d; stroke-width: 0.05; }
-.obj-door-plank { stroke: #5e3c1b; stroke-width: 0.03; }
-.obj-door-handle { fill: #d4b26a; }
 
 /* НПС */
 .npc-token {

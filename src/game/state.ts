@@ -6,10 +6,10 @@ import type { RollResult } from '../engine/dice'
 import type { Equipment } from '../types/character'
 import type { ChatMessage, GameState, MessageAuthor, RollRecord } from '../types/game'
 import type { ItemCatalog } from '../types/items'
-import type { LocationData } from '../types/location'
+import { DOOR_STATES, type DoorState, type LocationData } from '../types/location'
 import { parseCharacterSheet } from './character'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
-import { tileAt } from './location'
+import { isFloor } from '../engine/movement'
 import { isNonEmptyString, isObject, isOneOf, ValidationError } from './validation'
 
 const MESSAGE_AUTHORS: readonly MessageAuthor[] = ['master', 'player', 'system']
@@ -25,10 +25,15 @@ export function createNewGame({ sheet, location, intro }: NewGameData): GameStat
   return structuredClone({
     character: sheet.character,
     inventory: sheet.inventory,
-    location: { id: location.id, player: location.playerStart },
+    location: { id: location.id, player: location.playerStart, doors: initialDoorStates(location) },
     messages: intro,
     rolls: [],
   })
+}
+
+/** Начальные состояния дверей локации (из её JSON). */
+export function initialDoorStates(location: LocationData): Record<string, DoorState> {
+  return Object.fromEntries(location.doors.map((door) => [door.id, door.state]))
 }
 
 /** Сколько последних бросков хранить в журнале. */
@@ -108,8 +113,19 @@ export function parseGameState(raw: unknown, { catalog, locations }: GameStateCo
     const p = loc.player
     if (!isObject(p) || !Number.isInteger(p.x) || !Number.isInteger(p.y)) {
       problems.push('location.player: ожидаются целые x и y')
-    } else if (tileAt(locations[loc.id], p.x as number, p.y as number) !== '.') {
+    } else if (!isFloor(locations[loc.id], p.x as number, p.y as number)) {
       problems.push('location.player: игрок должен стоять на полу')
+    }
+    const doors = loc.doors
+    const doorIds = new Set(locations[loc.id].doors.map((d) => d.id))
+    if (!isObject(doors)) {
+      problems.push('location.doors: ожидается объект { id двери: состояние }')
+    } else {
+      for (const [id, value] of Object.entries(doors)) {
+        if (!doorIds.has(id)) problems.push(`location.doors: в локации нет двери "${id}"`)
+        else if (!isOneOf(DOOR_STATES, value)) problems.push(`location.doors["${id}"]: состояние должно быть одним из: ${DOOR_STATES.join(', ')}`)
+      }
+      for (const id of doorIds) if (!(id in doors)) problems.push(`location.doors: нет состояния двери "${id}"`)
     }
   }
 

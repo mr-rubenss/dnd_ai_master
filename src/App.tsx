@@ -103,7 +103,7 @@ function GameScreen({ state }: { state: GameState }) {
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={state.location.player} />
+          <MapPanel location={location} player={state.location.player} doors={state.location.doors} />
           <section className="panel story-panel">
             <NarrationLog messages={state.messages} />
             <PlayerInput onSend={handleSend} disabled={waiting} leading={<DiceTray rolls={state.rolls} onRoll={handleRoll} />} />

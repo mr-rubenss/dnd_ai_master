@@ -63,20 +63,5 @@ export function MapObjectIcon({ object }: IconProps) {
           <circle cx={cx} cy={cy} r={0.06} className="obj-barrel-tap" />
         </g>
       )
-    case 'door':
-      return (
-        <g>
-          <rect x={x + 0.06} y={y + 0.06} width={w - 0.12} height={h - 0.12} rx={0.06} className="obj-door" />
-          {Array.from({ length: Math.max(w, h) * 3 - 1 }, (_, i) => {
-            const t = (i + 1) / (Math.max(w, h) * 3)
-            return w >= h ? (
-              <line key={i} x1={x + w * t} y1={y + 0.12} x2={x + w * t} y2={y + h - 0.12} className="obj-door-plank" />
-            ) : (
-              <line key={i} x1={x + 0.12} y1={y + h * t} x2={x + w - 0.12} y2={y + h * t} className="obj-door-plank" />
-            )
-          })}
-          <circle cx={x + w - 0.25} cy={y + h / 2} r={0.07} className="obj-door-handle" />
-        </g>
-      )
   }
 }
