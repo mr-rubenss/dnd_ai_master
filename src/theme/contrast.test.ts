@@ -4,16 +4,10 @@ import { darkFantasy } from './darkFantasy'
 import { themes } from './registry'
 
 /**
- * Пары, которые пока не дотягивают до порога и ждут решения владельца проекта (цвета без его согласия не меняем).
- * Список точный: новая плохая пара — тест падает; исправленная пара — убрать её отсюда.
+ * Пары ниже порога, которые ждут решения владельца проекта (цвета тем без его согласия не меняем).
+ * Сейчас таких нет — тест строгий. Список точный: исправленную пару отсюда нужно убрать.
  */
-const KNOWN_ISSUES: Record<string, string[]> = {
-  'dark-fantasy': [
-    'colors.onPrimary на colors.dangerBright', // 4.41:1 — текст основной кнопки при наведении
-    'map.npcInitial на map.npcFriendly', // 4.19:1 — буква на фишке дружелюбного НПС
-    'map.npcInitial на map.npcNeutral', // 4.07:1 — буква на фишке нейтрального НПС
-  ],
-}
+const KNOWN_ISSUES: Record<string, string[]> = {}
 
 const fmt = (ratio: number) => `${ratio.toFixed(2)}:1`
 
