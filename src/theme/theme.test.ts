@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cssVarName, themeCss, themeCssVars, token } from './css'
 import { darkFantasy } from './darkFantasy'
-import { defaultTheme } from './index'
+import { defaultTheme } from './registry'
 import { findRawColors } from './rawColors'
 import { parseTheme } from './schema'
 

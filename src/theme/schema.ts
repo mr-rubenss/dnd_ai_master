@@ -27,6 +27,15 @@ const safeCss = z
   .min(1, 'пустое значение')
   .regex(/^[^;{}<>]*$/, 'недопустимые символы ; { } < >')
 
+/** Пропущенный токен и лишний ключ — по-русски (остальные сообщения схемы заданы ниже). */
+const messages: z.core.$ZodErrorMap = (issue) => {
+  if (issue.code === 'invalid_type' && issue.input === undefined) return 'нет значения'
+  if (issue.code === 'unrecognized_keys') return `лишние ключи: ${issue.keys.join(', ')}`
+  if (issue.code === 'invalid_type') return `ожидается ${issue.expected === 'object' ? 'объект' : issue.expected === 'string' ? 'строка' : issue.expected}`
+  if (issue.code === 'invalid_value') return `допустимо: ${issue.values.map(String).join(', ')}`
+  return undefined
+}
+
 /** Объект ровно с этими ключами (лишние — ошибка). */
 function tokens<const K extends readonly string[], S extends z.ZodType>(keys: K, value: S) {
   const shape = Object.fromEntries(keys.map((k) => [k, value])) as { [P in K[number]]: S }
@@ -55,7 +64,7 @@ void sameShape
 
 /** Проверяет тему; при ошибке — исключение с понятным списком проблем. */
 export function parseTheme(data: unknown): Theme {
-  const result = themeSchema.safeParse(data)
+  const result = themeSchema.safeParse(data, { error: messages })
   if (!result.success) {
     const problems = result.error.issues.map((i) => `${i.path.join('.') || 'тема'}: ${i.message}`)
     throw new Error(`Тема оформления некорректна:\n${problems.join('\n')}`)

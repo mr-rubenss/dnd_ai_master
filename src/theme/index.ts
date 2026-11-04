@@ -1,11 +1,5 @@
-// Тема оформления: один объект → CSS-переменные. Сейчас тема одна — «Тёмное фэнтези».
-import { darkFantasy } from './darkFantasy'
-import { parseTheme } from './schema'
-
+// Тема оформления: один объект → CSS-переменные. Реестр тем — registry.ts.
 export { applyTheme } from './apply'
 export { cssVarName, themeCss, themeCssVars, token } from './css'
-export { parseTheme, themeSchema } from './schema'
+export { DEFAULT_THEME_ID, defaultTheme, themeById, themeFromSearch, themes } from './registry'
 export type { Theme } from './types'
-
-/** Тема по умолчанию (проверена схемой при загрузке). */
-export const defaultTheme = parseTheme(darkFantasy)
