@@ -140,6 +140,7 @@ export const darkFantasy: Theme = {
     display: "'Cormorant Garamond', Georgia, serif",
     serif: "'Literata', Georgia, 'Times New Roman', serif",
     ui: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    master: "'Literata', Georgia, 'Times New Roman', serif",
   },
   fontSizes: {
     '66': '0.66rem',

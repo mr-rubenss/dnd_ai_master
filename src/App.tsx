@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AppearanceButton, AppearancePanel } from './components/AppearancePanel'
 import { CharacterCreation } from './components/creation/CharacterCreation'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { DiceTray } from './components/DiceTray'
@@ -34,6 +35,9 @@ function App() {
   const [afterCreation, setAfterCreation] = useState<'heroes' | 'new-story'>('heroes')
   /** Окно итога завершённой истории. */
   const [epilogueOpen, setEpilogueOpen] = useState(false)
+  /** Панель оформления (кисть в шапке). */
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const closeAppearance = useCallback(() => setAppearanceOpen(false), [])
   const current: Screen = screen === 'game' && !app.active ? 'menu' : screen
   const readOnly = app.active?.status === 'completed'
   const latest = app.stories.find((s) => s.status === 'active') ?? null
@@ -95,26 +99,30 @@ function App() {
     <div className={`app${current === 'game' ? '' : ' app--page'}`}>
       <header className="app-header">
         <h1>ИИ-Мастер</h1>
-        {current !== 'menu' && (
-          <div className="header-actions">
-            {current === 'game' && !readOnly && (
-              <button type="button" className="header-button" onClick={finishStory} data-testid="finish-story">
-                Завершить историю
+        <div className="header-actions">
+          <AppearanceButton onClick={() => setAppearanceOpen(true)} />
+          {current !== 'menu' && (
+            <>
+              {current === 'game' && !readOnly && (
+                <button type="button" className="header-button" onClick={finishStory} data-testid="finish-story">
+                  Завершить историю
+                </button>
+              )}
+              <button
+                type="button"
+                className="header-button"
+                onClick={() => {
+                  setEpilogueOpen(false)
+                  setScreen('menu')
+                }}
+              >
+                В меню
               </button>
-            )}
-            <button
-              type="button"
-              className="header-button"
-              onClick={() => {
-                setEpilogueOpen(false)
-                setScreen('menu')
-              }}
-            >
-              В меню
-            </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </header>
+      {appearanceOpen && <AppearancePanel onClose={closeAppearance} />}
       {current === 'menu' && (
         <StartMenu
           latest={latest}

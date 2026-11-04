@@ -4,14 +4,14 @@ import '@fontsource/literata/400.css'
 import '@fontsource/literata/400-italic.css'
 import '@fontsource/cormorant-garamond/600.css'
 import '@fontsource/cormorant-garamond/700.css'
+// Шрифты текста ведущего на выбор (src/theme/appearance.ts, MASTER_FONTS); файлы грузятся, только когда шрифт выбран.
+import '@fontsource/pt-serif/400.css'
+import '@fontsource/lora/400.css'
+import '@fontsource/pt-sans/400.css'
 import './index.css'
 import App from './App.tsx'
-import { applyTheme } from './theme/apply'
-import { themeFromSearch } from './theme/registry'
-
-// ?theme=<id> временно включает тему из реестра (посмотреть тему дизайнера на телефоне); нигде не сохраняется.
-const previewTheme = themeFromSearch(window.location.search)
-if (previewTheme) applyTheme(previewTheme)
+// Настройки оформления (и ?theme=<id>) уже применил скрипт в index.html; хранилище подхватывает их для панели.
+import './theme/appearanceStore'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

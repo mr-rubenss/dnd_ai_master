@@ -33,7 +33,8 @@ export function DiceRollOverlay({ roll, onDone }: Props) {
   const { result } = roll
   const sides = result.groups[0]?.sides ?? 20
   const finalFace = result.natural ?? result.total
-  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  // Анимации выключены в панели оформления или системой (data-motion ставит src/theme/boot.ts).
+  const reducedMotion = typeof document !== 'undefined' && document.documentElement.dataset.motion === 'reduce'
   const [settled, setSettled] = useState(reducedMotion)
   const [face, setFace] = useState(finalFace)
 

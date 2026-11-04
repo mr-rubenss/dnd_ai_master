@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { appearanceBootData } from './src/theme/appearance.ts'
+import { bootAppearance } from './src/theme/boot.ts'
 import { themeCss } from './src/theme/css.ts'
 import { darkFantasy } from './src/theme/darkFantasy.ts'
 import { DESIGN_THEMES_DIR, loadDesignThemes } from './src/theme/designThemes.ts'
@@ -26,6 +28,16 @@ function readDesignThemes() {
 const VIRTUAL_THEMES = 'virtual:design-themes'
 
 /**
+ * Скрипт в <head>: применяет сохранённые настройки оформления (тема, акцент, шрифт, размер, плотность…)
+ * до первой отрисовки — без вспышки темы по умолчанию. Тот же код (`bootAppearance`) работает и в приложении.
+ */
+function bootScript() {
+  const data = JSON.stringify(appearanceBootData([darkFantasy, ...readDesignThemes().themes])).replace(/</g, '\\u003c')
+  const env = `{ root: document.documentElement, storage: (function () { try { return localStorage } catch (e) { return null } })(), search: location.search, reducedMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) }`
+  return `try { (${bootAppearance.toString()})(${data}, ${env}) } catch (e) {}`
+}
+
+/**
  * Темы оформления.
  * - Тема по умолчанию встраивается в index.html как `<style>` с CSS-переменными: стили получают токены
  *   до загрузки скриптов, без мигания.
@@ -47,7 +59,10 @@ function themePlugin(): Plugin {
       if (existsSync(dir)) for (const name of readdirSync(dir)) this.addWatchFile(join(dir, name))
       return `export default ${JSON.stringify(themes)}`
     },
-    transformIndexHtml: () => [{ tag: 'style', attrs: { id: 'theme' }, children: themeCss(parseTheme(darkFantasy)), injectTo: 'head-prepend' }],
+    transformIndexHtml: () => [
+      { tag: 'style', attrs: { id: 'theme' }, children: themeCss(parseTheme(darkFantasy)), injectTo: 'head-prepend' },
+      { tag: 'script', attrs: { id: 'appearance-boot' }, children: bootScript(), injectTo: 'head-prepend' },
+    ],
   }
 }
 

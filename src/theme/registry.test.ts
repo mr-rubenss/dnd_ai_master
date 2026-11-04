@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { darkFantasy } from './darkFantasy'
 import { loadDesignThemes } from './designThemes'
-import { DEFAULT_THEME_ID, defaultTheme, themeById, themeFromSearch, themes } from './registry'
+import { DEFAULT_THEME_ID, defaultTheme, themeById, themes } from './registry'
 import { parseTheme } from './schema'
 import type { Theme } from './types'
 
@@ -20,17 +20,6 @@ describe('реестр тем', () => {
   it('каждая тема реестра проходит схему, id не повторяются', () => {
     for (const theme of themes) expect(parseTheme(theme)).toEqual(theme)
     expect(new Set(themes.map((t) => t.id)).size).toBe(themes.length)
-  })
-
-  it('?theme=<id> временно выбирает тему из реестра', () => {
-    const list = [darkFantasy, variant('high-contrast')]
-    expect(themeFromSearch('?theme=high-contrast', list)?.id).toBe('high-contrast')
-    expect(themeFromSearch('?debug=1&theme=high-contrast', list)?.id).toBe('high-contrast')
-    // Тема по умолчанию уже встроена в страницу; неизвестная тема и пустой параметр — ничего не меняют.
-    expect(themeFromSearch('?theme=dark-fantasy', list)).toBeNull()
-    expect(themeFromSearch('?theme=sepia', list)).toBeNull()
-    expect(themeFromSearch('?theme=', list)).toBeNull()
-    expect(themeFromSearch('', list)).toBeNull()
   })
 })
 
@@ -58,7 +47,9 @@ describe('темы дизайнера из design/themes/', () => {
   })
 
   it('имя файла — по id темы', () => {
-    expect(() => loadDesignThemes([file(variant('sepia'), 'Сепия.json')])).toThrow('design/themes/Сепия.json: файл темы должен называться по её id — «sepia.json»')
+    expect(() => loadDesignThemes([file(variant('sepia'), 'Сепия.json')])).toThrow(
+      'design/themes/Сепия.json: файл темы должен называться по её id — «sepia.json»',
+    )
   })
 
   it('id не повторяются и не занимают id встроенной темы', () => {

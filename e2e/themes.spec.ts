@@ -24,8 +24,7 @@ test.describe('темы на телефоне', () => {
       const errors = collectPageErrors(page)
       await page.goto(`./?theme=${id}`)
       await expect(page.getByTestId('menu-create')).toBeVisible()
-      // Тема по умолчанию встроена в страницу; другие включаются параметром адреса.
-      expect(await page.evaluate(() => document.documentElement.dataset.theme ?? 'dark-fantasy')).toBe(id)
+      expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(id)
       await expectNoHorizontalScroll(page)
       await testInfo.attach(`${id}: главный экран`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
@@ -41,7 +40,7 @@ test('неизвестная тема в адресе не ломает стра
   const errors = collectPageErrors(page)
   await page.goto('./?theme=no-such-theme')
   await expect(page.getByTestId('menu-create')).toBeVisible()
-  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined()
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark-fantasy')
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(15, 12, 10)')
   expect(errors).toEqual([])
 })

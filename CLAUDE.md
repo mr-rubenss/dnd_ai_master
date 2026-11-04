@@ -44,7 +44,8 @@
   Новое изменение состояния = новый тип события в `StoryEvent` + ветка в `applyEvent` + проверка в `checkAction` + тест.
 - **Хранение — IndexedDB через Dexie** (`src/game/repository.ts`, база `ai-master`): `stories` (сведения для списка),
   `actions` (журнал, ключ `[storyId+seq]`), `snapshots` (кэш последнего состояния; если он отстал — журнал воспроизводится),
-  `heroes`, `hall`. localStorage только для мелочей интерфейса (выбранная вкладка) и отладочного флага.
+  `heroes`, `hall`. localStorage только для мелочей интерфейса (выбранная вкладка), настроек оформления устройства
+  (`ai-master:appearance`) и отладочного флага.
   Хранилище приложения — `src/game/appStore.ts` (экземпляр `src/game/appInstance.ts`, в React — `useAppState()`):
   открытая история, команды (`createStory`, `dispatch`, `dispatchTo`, `renameStory`, `deleteStory`, `completeActive`,
   герои), запись в базу строго по очереди (`flush` — дождаться записи).
@@ -134,13 +135,26 @@
   (`--radius-*`), тени (`--shadow-*`). Формат — тип `Theme` и списки ключей (`src/theme/types.ts`), схема zod
   (`src/theme/schema.ts`, `parseTheme`). Текущая тема — «Тёмное фэнтези» (`src/theme/darkFantasy.ts`).
 - Тема по умолчанию встраивается в `index.html` как `<style id="theme">` с CSS-переменными (плагин в `vite.config.ts`,
-  `themeCss`); смена темы на лету — `applyTheme`. Темы проверяются схемой при сборке; zod в сборку для браузера не попадает.
+  `themeCss`). Темы проверяются схемой при сборке; zod в сборку для браузера не попадает.
 - **Несколько тем — реестр** `src/theme/registry.ts` (`themes`, `themeById`, `DEFAULT_THEME_ID` = `dark-fantasy`).
   Темы дизайнера — JSON-файлы `design/themes/<id>.json` (см. `design/themes/README.md`): плагин Vite читает папку,
   проверяет каждый файл `parseTheme` (`loadDesignThemes` в `src/theme/designThemes.ts`: JSON, схема, имя файла = id,
   id не повторяются) и отдаёт реестру через виртуальный модуль `virtual:design-themes`. Некорректный файл ломает сборку
   с ошибкой «файл: поле: что не так». Темы дизайнера не придумывать — их присылает дизайнер.
-- Параметр адреса `?theme=<id>` временно включает тему из реестра (`themeFromSearch` в `main.tsx`), ничего не сохраняет.
+- **Панель оформления** (кисть в шапке на всех экранах; `src/components/AppearancePanel.tsx`; десктоп — боковая панель,
+  телефон — шторка): карточки всех тем реестра с мини-превью, акцентный цвет (`ACCENTS`; показываются только читаемые
+  с `onAccent` темы), шрифт текста ведущего (`MASTER_FONTS` — 4 шрифта с кириллицей из @fontsource, токен `fonts.master`),
+  размер текста (4 шага — масштаб корневого шрифта), плотность (компактная — отступы темы × 0.7), сетка карты и её
+  прозрачность, подписи НПС, анимации (по умолчанию — как системное «уменьшить движение»), сброс.
+  Это **настройка устройства, а не истории**: `AppearanceSettings` (`src/theme/appearance.ts`) в localStorage
+  `ai-master:appearance`. Применяет их `bootAppearance` (`src/theme/boot.ts`) — **самодостаточная функция**: плагин
+  встраивает её текст в `<head>` (`<script id="appearance-boot">`), поэтому оформление применяется до первой отрисовки,
+  без вспышки; та же функция применяет изменения из панели (`appearanceStore`/`useAppearance` в `appearanceStore.ts`).
+  В ней нельзя ссылаться на импорты и внешние переменные (это проверяет тест). Результат — переменные на `<html>` и
+  атрибуты `data-theme`, `data-density`, `data-map-grid`, `data-npc-labels`, `data-motion` (стили анимаций — через
+  `:root[data-motion='reduce']`, а не через `@media (prefers-reduced-motion)`); прозрачность сетки — `--pref-grid-opacity`.
+- Параметр адреса `?theme=<id>` временно включает тему из реестра поверх сохранённой (до выбора темы в панели),
+  ничего не сохраняет. В e2e тему можно добавить на время страницы: `window.__aiMasterAppearance.addDebugTheme(тема)`.
 - Контраст по WCAG — `src/theme/contrast.ts` (`CONTRAST_PAIRS` — пары «текст на фоне», `themeContrast`): для каждой темы
   реестра каждая пара ≥ 4.5:1 (AA), у темы `high-contrast` — 7:1; полупрозрачные цвета — по итоговому цвету на фоне.
   Тест `contrast.test.ts`; пары, которые пока ниже порога и ждут решения владельца, перечислены в нём (`KNOWN_ISSUES`) —

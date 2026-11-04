@@ -24,7 +24,9 @@ test('без сохранения: стартовый экран без «Про
   await expect(continueButton(page)).toHaveCount(0)
   await expect(createButton(page)).toBeVisible()
   await expect(quickStart(page)).toContainText('Быстрый старт (Ратибор)')
-  await expect(page.locator('.header-button')).toHaveCount(0)
+  // В шапке меню — только кисть оформления.
+  await expect(page.locator('.header-button')).toHaveCount(1)
+  await expect(page.getByTestId('appearance-open')).toBeVisible()
   await expectNoHorizontalScroll(page)
   await testInfo.attach('стартовый экран', { body: await page.screenshot(), contentType: 'image/png' })
 

@@ -7,8 +7,8 @@ import { parseTheme } from './schema'
 
 const styles = import.meta.glob(['../**/*.{css,ts,tsx}', '!./**', '!../**/*.test.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
-/** Переменные, которые задаёт не тема, а сам компонент (размер карты в клетках). */
-const LOCAL_VARS = new Set(['--board-w', '--board-h'])
+/** Переменные, которые задаёт не тема: размер карты в клетках (компонент) и прозрачность сетки (панель оформления). */
+const LOCAL_VARS = new Set(['--board-w', '--board-h', '--pref-grid-opacity'])
 
 /** Все переменные, на которые ссылаются стили и компоненты. */
 function usedVars(): Set<string> {

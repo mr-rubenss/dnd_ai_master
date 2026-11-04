@@ -177,7 +177,7 @@ export function LocationMap({ location, player, doors = {} }: Props) {
             <path d={floorOutline} />
           </clipPath>
           <g>{cells}</g>
-          <rect width={width} height={height} fill="url(#cell-grid)" clipPath="url(#floor-clip)" pointerEvents="none" />
+          <rect width={width} height={height} fill="url(#cell-grid)" clipPath="url(#floor-clip)" pointerEvents="none" className="map-grid" />
 
           <g>
             {location.objects.map((obj) => (

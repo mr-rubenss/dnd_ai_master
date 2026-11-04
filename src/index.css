@@ -185,6 +185,11 @@ textarea {
 .door-leaf-open { stroke: var(--map-door); stroke-width: 0.1; stroke-linecap: round; }
 .door-swing { fill: none; stroke: var(--map-door-swing); stroke-width: 0.035; stroke-dasharray: 0.08 0.06; }
 
+/* Сетка: прозрачность и выключение — из панели оформления. */
+.map-grid { opacity: var(--pref-grid-opacity, 1); }
+:root[data-map-grid='off'] .map-grid { display: none; }
+:root[data-npc-labels='off'] .npc-label { display: none; }
+
 .grid-line {
   fill: none;
   stroke: var(--map-grid);
@@ -380,7 +385,7 @@ textarea {
 }
 
 .message--master .message-text {
-  font-family: var(--font-serif);
+  font-family: var(--font-master);
   font-size: var(--text-105);
   line-height: 1.65;
 }
@@ -2437,14 +2442,19 @@ textarea {
   from { transform: translateY(100%); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dice-tray-dialog,
-  .dice-tray-backdrop,
-  .dice-overlay,
-  .dice-overlay-die,
-  .roll-entry.is-new {
-    animation: none !important;
-  }
+/* Анимации выключены в панели оформления или системой «уменьшить движение» (data-motion ставит src/theme/boot.ts). */
+:root[data-motion='reduce'] .dice-tray-dialog,
+:root[data-motion='reduce'] .dice-tray-backdrop,
+:root[data-motion='reduce'] .dice-overlay,
+:root[data-motion='reduce'] .dice-overlay-die,
+:root[data-motion='reduce'] .roll-entry.is-new,
+:root[data-motion='reduce'] .appearance-panel,
+:root[data-motion='reduce'] .appearance-backdrop {
+  animation: none !important;
+}
+
+:root[data-motion='reduce'] * {
+  transition: none !important;
 }
 
 /* ---------- Узкий экран ---------- */
@@ -3082,4 +3092,327 @@ textarea {
 
 .hero-chronicle .chronicle {
   margin-top: var(--space-8);
+}
+
+/* ---------- Панель оформления ---------- */
+
+.appearance-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4) var(--space-8);
+}
+
+.appearance-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.appearance-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--color-backdrop);
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Десктоп: боковая панель справа. */
+.appearance-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  width: min(380px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel);
+  border-left: 1px solid var(--color-border-bright);
+  box-shadow: var(--shadow-dialog);
+  outline: none;
+  animation: panel-in 0.2s ease-out;
+}
+
+@keyframes panel-in {
+  from { transform: translateX(100%); }
+}
+
+.appearance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-12) var(--space-16);
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, var(--color-panel-raised), var(--color-panel));
+}
+
+.appearance-header h2 {
+  font-size: var(--text-150);
+  color: var(--color-accent-bright);
+}
+
+.appearance-close {
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.appearance-close:hover {
+  color: var(--color-accent-bright);
+  border-color: var(--color-accent);
+}
+
+.appearance-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-16) var(--space-16);
+}
+
+.appearance-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12) 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.appearance-section:last-child {
+  border-bottom: none;
+}
+
+.appearance-section h3 {
+  font-size: var(--text-120);
+  color: var(--color-accent);
+}
+
+.appearance-label {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-82);
+  color: var(--color-muted);
+}
+
+.appearance-hint {
+  margin: 0;
+  font-size: var(--text-78);
+  color: var(--color-muted);
+}
+
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-8);
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-card.is-selected {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-selected-inset);
+  background: var(--color-accent-tint-selected);
+}
+
+.theme-card:focus-visible,
+.accent-swatch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.theme-card-name {
+  font-size: var(--text-85);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.theme-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid;
+  border-radius: var(--radius-md);
+}
+
+.theme-preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+}
+
+.theme-preview-title {
+  font-size: var(--text-110);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.theme-preview-line {
+  height: 4px;
+  border-radius: var(--radius-xs);
+}
+
+.theme-preview-line--short {
+  width: 60%;
+}
+
+.theme-preview-dots {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.theme-preview-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-round);
+}
+
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.accent-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 34px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font-size: var(--text-82);
+  cursor: pointer;
+}
+
+.accent-swatch--theme {
+  padding-right: var(--space-10);
+}
+
+.accent-swatch span {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-round);
+}
+
+.accent-swatch.is-selected {
+  border-color: var(--color-accent-bright);
+  box-shadow: var(--shadow-expertise-ring);
+  color: var(--color-fg);
+}
+
+.appearance-select {
+  max-width: 100%;
+  padding: var(--space-6) var(--space-8);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+}
+
+.appearance-sample {
+  margin: 0;
+  padding: var(--space-8) var(--space-10);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-master-bg);
+  font-family: var(--font-master);
+  font-size: var(--text-100);
+  line-height: 1.6;
+}
+
+.appearance-segmented {
+  display: grid;
+  width: 100%;
+}
+
+.appearance-segmented button {
+  padding: var(--space-6) var(--space-4);
+}
+
+.size-glyph {
+  font-weight: 600;
+  line-height: 1;
+}
+
+.size-glyph--0 { font-size: var(--text-80); }
+.size-glyph--1 { font-size: var(--text-95); }
+.size-glyph--2 { font-size: var(--text-115); }
+.size-glyph--3 { font-size: var(--text-135); }
+
+.appearance-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--text-92);
+  cursor: pointer;
+}
+
+.appearance-toggle input,
+.appearance-range {
+  accent-color: var(--color-accent);
+}
+
+.appearance-range {
+  width: 100%;
+}
+
+.appearance-footer {
+  padding: var(--space-12) var(--space-16);
+  padding-bottom: calc(var(--space-12) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+}
+
+.appearance-footer .secondary-button {
+  width: 100%;
+}
+
+/* Телефон: шторка снизу во всю ширину. */
+@media (max-width: 768px) {
+  .appearance-panel {
+    top: auto;
+    left: 0;
+    width: auto;
+    max-height: 85dvh;
+    border-left: none;
+    border-top: 1px solid var(--color-border-bright);
+    border-radius: var(--radius-3xl) var(--radius-3xl) 0 0;
+    animation: sheet-up 0.22s ease-out;
+  }
+
+  .appearance-header {
+    border-radius: var(--radius-3xl) var(--radius-3xl) 0 0;
+  }
+
+  .theme-cards {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+.header-button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

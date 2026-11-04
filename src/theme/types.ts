@@ -141,8 +141,8 @@ export const DICE_TOKENS = [
   'nat1DieGlow',
 ] as const
 
-/** Семейства шрифтов → `--font-<ключ>`. */
-export const FONT_TOKENS = ['display', 'serif', 'ui'] as const
+/** Семейства шрифтов → `--font-<ключ>`; `master` — текст ведущего (игрок может сменить в панели оформления). */
+export const FONT_TOKENS = ['display', 'serif', 'ui', 'master'] as const
 
 /**
  * Размеры текста → `--text-<ключ>`. Числовой ключ — ступень шкалы (в базовой теме это сотые доли rem:
