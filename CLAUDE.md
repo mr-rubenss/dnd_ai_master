@@ -45,7 +45,7 @@
 - **Хранение — IndexedDB через Dexie** (`src/game/repository.ts`, база `ai-master`): `stories` (сведения для списка),
   `actions` (журнал, ключ `[storyId+seq]`), `snapshots` (кэш последнего состояния; если он отстал — журнал воспроизводится),
   `heroes`, `hall`. localStorage только для мелочей интерфейса (выбранная вкладка), настроек оформления устройства
-  (`ai-master:appearance`) и отладочного флага.
+  (`ai-master:appearance`, свои темы — `ai-master:custom-themes`) и отладочного флага.
   Хранилище приложения — `src/game/appStore.ts` (экземпляр `src/game/appInstance.ts`, в React — `useAppState()`):
   открытая история, команды (`createStory`, `dispatch`, `dispatchTo`, `renameStory`, `deleteStory`, `completeActive`,
   герои), запись в базу строго по очереди (`flush` — дождаться записи).
@@ -153,6 +153,14 @@
   В ней нельзя ссылаться на импорты и внешние переменные (это проверяет тест). Результат — переменные на `<html>` и
   атрибуты `data-theme`, `data-density`, `data-map-grid`, `data-npc-labels`, `data-motion` (стили анимаций — через
   `:root[data-motion='reduce']`, а не через `@media (prefers-reduced-motion)`); прозрачность сетки — `--pref-grid-opacity`.
+- **Свои темы игрока** (`src/theme/customThemes.ts`, UI — `src/components/CustomThemes.tsx`): «Сохранить как свою тему»
+  из текущего оформления (акцент, шрифт ведущего и плотность запекаются в токены, `themeFromSettings`), несколько тем
+  (до 20, id `custom-…`), переименование, удаление; редактор основных цветов (`EDITABLE_COLORS`: фон, текст, акцент,
+  панели, карта; `withColor`) — изменения сразу применяются ко всей странице; предупреждение, если пары контраста ниже
+  WCAG AA (`readabilityWarnings`). Экспорт — JSON в формате тем дизайнера; импорт проверяется `parseTheme` (zod грузится
+  отдельным чанком только при импорте) и получает новый id. Хранение — localStorage `ai-master:custom-themes`
+  (`CustomThemeRecord`: исходная тема + готовые переменные `compiled`, чтобы `bootAppearance` применил свою тему
+  до первой отрисовки). Своя тема — настройка устройства, к историям не относится.
 - Параметр адреса `?theme=<id>` временно включает тему из реестра поверх сохранённой (до выбора темы в панели),
   ничего не сохраняет. В e2e тему можно добавить на время страницы: `window.__aiMasterAppearance.addDebugTheme(тема)`.
 - Контраст по WCAG — `src/theme/contrast.ts` (`CONTRAST_PAIRS` — пары «текст на фоне», `themeContrast`): для каждой темы

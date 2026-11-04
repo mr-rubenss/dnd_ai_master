@@ -1,9 +1,22 @@
-// Настройки оформления в приложении: текущее состояние, сохранение в localStorage и применение к документу.
+// Настройки оформления в приложении: текущее состояние, свои темы, сохранение в localStorage и применение к документу.
 // При загрузке страницы те же настройки уже применил скрипт в index.html (boot.ts) — здесь они только читаются.
 import { useSyncExternalStore } from 'react'
-import { APPEARANCE_KEY, appearanceBootData, DEFAULT_APPEARANCE, type AppearanceSettings } from './appearance.ts'
+import { APPEARANCE_KEY, appearanceBootData, CUSTOM_THEMES_KEY, DEFAULT_APPEARANCE, type AppearanceSettings } from './appearance.ts'
 import { bootAppearance } from './boot.ts'
-import { themes as registryThemes } from './registry.ts'
+import type { ColorRef } from './contrast.ts'
+import {
+  customRecord,
+  exportThemeFile,
+  importThemeFile,
+  isCustomThemeId,
+  MAX_CUSTOM_THEMES,
+  newCustomId,
+  readCustomThemes,
+  themeFromSettings,
+  themeNameProblem,
+  withColor,
+} from './customThemes.ts'
+import { defaultTheme, themes as registryThemes } from './registry.ts'
 import type { Theme } from './types.ts'
 
 export interface AppearanceState {
@@ -12,11 +25,12 @@ export interface AppearanceState {
   themeId: string
   /** Тема включена параметром адреса (до первого выбора в панели). */
   preview: boolean
-  /** Все темы реестра. */
+  /** Все темы: реестр, затем свои темы игрока. */
   themes: readonly Theme[]
 }
 
 const MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+const STORAGE_FULL = 'Не удалось сохранить: хранилище браузера переполнено или недоступно.'
 
 function storage(): Storage | null {
   try {
@@ -28,10 +42,17 @@ function storage(): Storage | null {
 
 const systemReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.(MOTION_QUERY).matches
 
-let themeList: readonly Theme[] = registryThemes
-let data = appearanceBootData(themeList)
+let debugThemes: Theme[] = []
+let customThemes: Theme[] = readCustomThemes(storage()?.getItem(CUSTOM_THEMES_KEY) ?? null, defaultTheme)
+let themeList: readonly Theme[] = []
+let data = appearanceBootData(registryThemes)
 let state: AppearanceState
 const listeners = new Set<() => void>()
+
+function rebuild() {
+  themeList = [...registryThemes, ...debugThemes, ...customThemes]
+  data = appearanceBootData(themeList)
+}
 
 function apply(settings: Partial<AppearanceSettings> | null, search = '') {
   const result = bootAppearance(data, {
@@ -45,16 +66,34 @@ function apply(settings: Partial<AppearanceSettings> | null, search = '') {
   listeners.forEach((l) => l())
 }
 
-function save(settings: AppearanceSettings) {
+/** Записать в хранилище; false — не получилось (переполнено, приватный режим). */
+function write(key: string, value: string | null): boolean {
   try {
-    storage()?.setItem(APPEARANCE_KEY, JSON.stringify(settings))
+    const s = storage()
+    if (!s) return false
+    if (value === null) s.removeItem(key)
+    else s.setItem(key, value)
+    return true
   } catch {
-    // Хранилище недоступно (приватный режим) — настройка действует до перезагрузки.
+    return false
   }
 }
 
+const currentSearch = () => (state.preview ? window.location.search : '')
+
+/** Сохранить свои темы и применить оформление заново. */
+function commitCustom(next: Theme[], settings: AppearanceSettings = state.settings): string | null {
+  if (!write(CUSTOM_THEMES_KEY, JSON.stringify(next.map(customRecord)))) return STORAGE_FULL
+  customThemes = next
+  rebuild()
+  write(APPEARANCE_KEY, JSON.stringify(settings))
+  apply(settings, settings.themeId !== state.settings.themeId ? '' : currentSearch())
+  return null
+}
+
+rebuild()
 apply(null, typeof window === 'undefined' ? '' : window.location.search)
-window.matchMedia?.(MOTION_QUERY).addEventListener?.('change', () => apply(state.settings, state.preview ? window.location.search : ''))
+window.matchMedia?.(MOTION_QUERY).addEventListener?.('change', () => apply(state.settings, currentSearch()))
 
 export const appearanceStore = {
   get: () => state,
@@ -65,23 +104,66 @@ export const appearanceStore = {
   /** Изменить настройки: применяются сразу и сохраняются на устройстве. Выбор темы отменяет `?theme=`. */
   update(patch: Partial<AppearanceSettings>) {
     const settings = { ...state.settings, ...patch }
-    save(settings)
-    apply(settings, state.preview && !('themeId' in patch) ? window.location.search : '')
+    write(APPEARANCE_KEY, JSON.stringify(settings))
+    apply(settings, 'themeId' in patch ? '' : currentSearch())
   },
-  /** Сбросить к теме по умолчанию и стандартным настройкам. */
+  /** Сбросить к теме по умолчанию и стандартным настройкам (свои темы остаются). */
   reset() {
-    try {
-      storage()?.removeItem(APPEARANCE_KEY)
-    } catch {
-      // см. save
-    }
+    write(APPEARANCE_KEY, null)
     apply({ ...DEFAULT_APPEARANCE })
   },
+
+  /** Сохранить текущее оформление как свою тему и выбрать её. Возвращает причину отказа или null. */
+  saveCustom(name: string): string | null {
+    const problem = themeNameProblem(name)
+    if (problem) return problem
+    if (customThemes.length >= MAX_CUSTOM_THEMES) return `Своих тем может быть не больше ${MAX_CUSTOM_THEMES}.`
+    const base = themeList.find((t) => t.id === state.themeId) ?? defaultTheme
+    const theme = themeFromSettings(base, state.settings, newCustomId(), name)
+    // Акцент, шрифт и плотность теперь внутри темы — сами настройки возвращаются к значениям темы.
+    return commitCustom([...customThemes, theme], { ...state.settings, themeId: theme.id, accent: null, masterFont: null, density: 'normal' })
+  },
+  renameCustom(id: string, name: string): string | null {
+    const problem = themeNameProblem(name)
+    if (problem) return problem
+    return commitCustom(customThemes.map((t) => (t.id === id ? { ...t, name: name.trim() } : t)))
+  },
+  /** Удалить свою тему; если она выбрана — вернуться к теме по умолчанию. */
+  deleteCustom(id: string): string | null {
+    const settings = state.settings.themeId === id ? { ...state.settings, themeId: null } : state.settings
+    return commitCustom(
+      customThemes.filter((t) => t.id !== id),
+      settings,
+    )
+  },
+  /** Изменить цвет токена своей темы — сразу виден на странице. */
+  setCustomColor(id: string, ref: ColorRef, value: string): string | null {
+    return commitCustom(customThemes.map((t) => (t.id === id ? withColor(t, ref, value) : t)))
+  },
+  /** Импорт темы из файла (проверка по схеме темы); тема добавляется в свои и выбирается. */
+  async importTheme(text: string): Promise<string | null> {
+    if (customThemes.length >= MAX_CUSTOM_THEMES) return `Своих тем может быть не больше ${MAX_CUSTOM_THEMES}.`
+    let theme: Theme
+    try {
+      // Схема (zod) нужна только здесь — грузится отдельным файлом по требованию.
+      const { parseTheme } = await import('./schema.ts')
+      theme = importThemeFile(text, parseTheme, newCustomId())
+    } catch (error) {
+      return (error as Error).message
+    }
+    return commitCustom([...customThemes, theme], { ...state.settings, themeId: theme.id })
+  },
+  exportTheme(id: string) {
+    const theme = themeList.find((t) => t.id === id)
+    return theme ? exportThemeFile(theme) : null
+  },
+  isCustom: (id: string) => isCustomThemeId(id) && customThemes.some((t) => t.id === id),
+
   /** Только для отладки (e2e): добавить тему в реестр на время работы страницы. */
   addDebugTheme(theme: Theme) {
-    themeList = [...themeList.filter((t) => t.id !== theme.id), theme]
-    data = appearanceBootData(themeList)
-    apply(state.settings, state.preview ? window.location.search : '')
+    debugThemes = [...debugThemes.filter((t) => t.id !== theme.id), theme]
+    rebuild()
+    apply(state.settings, currentSearch())
   },
 }
 

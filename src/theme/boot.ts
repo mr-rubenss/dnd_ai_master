@@ -38,13 +38,30 @@ export function bootAppearance(data: BootData, env: BootEnv): BootResult {
       raw = null
     }
   }
+  // Свои темы игрока (уже скомпилированные) — из того же хранилища; в приложении они приходят в `data`.
+  const themes = { ...data.themes }
+  if (env.storage) {
+    try {
+      const list: unknown = JSON.parse(env.storage.getItem(data.customKey) ?? '[]')
+      for (const rec of Array.isArray(list) ? list : []) {
+        const id = rec?.theme?.id
+        const c = rec?.compiled
+        if (typeof id !== 'string' || themes[id] || !c || typeof c.vars !== 'object' || typeof c.compact !== 'object' || !Array.isArray(c.accents)) continue
+        const only = (vars: Record<string, unknown>) =>
+          Object.fromEntries(Object.entries(vars).filter(([k, v]) => k.startsWith('--') && typeof v === 'string')) as Record<string, string>
+        themes[id] = { colorScheme: c.colorScheme === 'light' ? 'light' : 'dark', vars: only(c.vars), compact: only(c.compact), accents: c.accents }
+      }
+    } catch {
+      // Испорченный список своих тем — работаем без них.
+    }
+  }
   const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const d = data.defaults
   const pick = <T>(value: unknown, allowed: readonly unknown[], fallback: T): T => (allowed.includes(value) ? (value as T) : fallback)
   const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback)
   const opacity = typeof src.gridOpacity === 'number' && src.gridOpacity >= 0.1 && src.gridOpacity <= 1 ? src.gridOpacity : d.gridOpacity
   const settings: AppearanceSettings = {
-    themeId: typeof src.themeId === 'string' && data.themes[src.themeId] ? src.themeId : null,
+    themeId: typeof src.themeId === 'string' && themes[src.themeId] ? src.themeId : null,
     accent: pick(src.accent, Object.keys(data.accents), null),
     masterFont: pick(src.masterFont, Object.keys(data.fonts), null),
     textSize: pick(src.textSize, Object.keys(data.textSizes), d.textSize),
@@ -56,9 +73,9 @@ export function bootAppearance(data: BootData, env: BootEnv): BootResult {
   }
 
   const previewId = env.search ? new URLSearchParams(env.search).get('theme') : null
-  const preview = !!previewId && !!data.themes[previewId]
+  const preview = !!previewId && !!themes[previewId]
   const themeId = preview ? (previewId as string) : (settings.themeId ?? data.defaultThemeId)
-  const theme = data.themes[themeId]
+  const theme = themes[themeId]
   const accent = settings.accent && theme.accents.includes(settings.accent) ? data.accents[settings.accent] : {}
   const vars: Record<string, string> = {
     ...theme.vars,

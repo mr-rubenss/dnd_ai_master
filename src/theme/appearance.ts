@@ -6,6 +6,8 @@ import { cssVarName, themeCssVars } from './css.ts'
 import type { Theme } from './types.ts'
 
 export const APPEARANCE_KEY = 'ai-master:appearance'
+/** Свои темы игрока (тоже настройка устройства). */
+export const CUSTOM_THEMES_KEY = 'ai-master:custom-themes'
 
 /** Акцентные цвета на выбор (вместо акцента темы). */
 export const ACCENTS = {
@@ -72,11 +74,20 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
 }
 
 /** Данные для загрузочного скрипта: всё уже посчитано, скрипт только выбирает и применяет. */
+export interface CompiledTheme {
+  colorScheme: 'dark' | 'light'
+  vars: Record<string, string>
+  compact: Record<string, string>
+  accents: string[]
+}
+
 export interface BootData {
   key: string
+  /** Ключ localStorage со своими темами игрока (`CustomThemeRecord[]`, у каждой — готовый `compiled`). */
+  customKey: string
   defaultThemeId: string
   defaults: AppearanceSettings
-  themes: Record<string, { colorScheme: 'dark' | 'light'; vars: Record<string, string>; compact: Record<string, string>; accents: string[] }>
+  themes: Record<string, CompiledTheme>
   accents: Record<string, Record<string, string>>
   fonts: Record<string, Record<string, string>>
   textSizes: Record<string, string>
@@ -85,20 +96,31 @@ export interface BootData {
 
 const hex = (n: number) => Math.round(n).toString(16).padStart(2, '0')
 
-/** Переменные акцента: сам цвет, светлый вариант и полупрозрачные подложки с теми же долями, что в «Тёмном фэнтези». */
-export function accentVars(color: string): Record<string, string> {
+/** Цвет как #rrggbb (прозрачность отбрасывается) — для полей выбора цвета. */
+export function toHex6(color: string): string {
+  const c = parseColor(color)
+  return `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`
+}
+
+/** Токены акцента: сам цвет, светлый вариант и полупрозрачные подложки с теми же долями, что в «Тёмном фэнтези». */
+export function accentPalette(color: string): Partial<Theme['colors']> {
   const c = parseColor(color)
   const bright = over({ r: 255, g: 255, b: 255, a: 0.3 }, c)
-  const rgba = (a: number) => `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`
+  const rgba = (a: number) => `rgba(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)}, ${a})`
   return {
-    [cssVarName('colors', 'accent')]: color,
-    [cssVarName('colors', 'accentBright')]: `#${hex(bright.r)}${hex(bright.g)}${hex(bright.b)}`,
-    [cssVarName('colors', 'accentTint')]: rgba(0.1),
-    [cssVarName('colors', 'accentTintSelected')]: rgba(0.12),
-    [cssVarName('colors', 'accentTintPrimary')]: rgba(0.16),
-    [cssVarName('colors', 'accentTintBadge')]: rgba(0.2),
-    [cssVarName('colors', 'focusRing')]: rgba(0.2),
+    accent: color,
+    accentBright: `#${hex(bright.r)}${hex(bright.g)}${hex(bright.b)}`,
+    accentTint: rgba(0.1),
+    accentTintSelected: rgba(0.12),
+    accentTintPrimary: rgba(0.16),
+    accentTintBadge: rgba(0.2),
+    focusRing: rgba(0.2),
   }
+}
+
+/** Переменные акцента (см. `accentPalette`). */
+export function accentVars(color: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(accentPalette(color)).map(([key, value]) => [cssVarName('colors', key), value as string]))
 }
 
 /** Акценты, с которыми текст на акценте (`onAccent`) этой темы читается по WCAG AA (4.5:1). */
@@ -109,16 +131,26 @@ export function accentOptions(theme: Theme): AccentId[] {
   )
 }
 
-/** Отступы темы в компактной плотности. */
-export function compactSpace(theme: Theme): Record<string, string> {
+/** Отступы темы в компактной плотности: ключ шкалы → значение. */
+export function compactSpaceValues(theme: Theme): Theme['space'] {
   return Object.fromEntries(
     Object.entries(theme.space).map(([key, value]) => {
       const px = parseFloat(value)
       const unit = value.replace(/^[\d.]+/, '')
       const scaled = unit === 'px' ? `${Math.max(1, Math.round(px * COMPACT_SCALE))}px` : `${+(px * COMPACT_SCALE).toFixed(3)}${unit}`
-      return [cssVarName('space', key), scaled]
+      return [key, scaled]
     }),
-  )
+  ) as Theme['space']
+}
+
+/** Отступы темы в компактной плотности — CSS-переменные. */
+export function compactSpace(theme: Theme): Record<string, string> {
+  return Object.fromEntries(Object.entries(compactSpaceValues(theme)).map(([key, value]) => [cssVarName('space', key), value]))
+}
+
+/** Тема в готовом для применения виде (так её читает загрузочный скрипт). */
+export function compileTheme(theme: Theme): CompiledTheme {
+  return { colorScheme: theme.colorScheme, vars: themeCssVars(theme), compact: compactSpace(theme), accents: accentOptions(theme) }
 }
 
 export function appearanceBootData(themes: readonly Theme[]): BootData {
@@ -126,9 +158,8 @@ export function appearanceBootData(themes: readonly Theme[]): BootData {
     key: APPEARANCE_KEY,
     defaultThemeId: themes[0].id,
     defaults: DEFAULT_APPEARANCE,
-    themes: Object.fromEntries(
-      themes.map((t) => [t.id, { colorScheme: t.colorScheme, vars: themeCssVars(t), compact: compactSpace(t), accents: accentOptions(t) }]),
-    ),
+    customKey: CUSTOM_THEMES_KEY,
+    themes: Object.fromEntries(themes.map((t) => [t.id, compileTheme(t)])),
     accents: Object.fromEntries(Object.entries(ACCENTS).map(([id, a]) => [id, accentVars(a.color)])),
     fonts: Object.fromEntries(Object.entries(MASTER_FONTS).map(([id, f]) => [id, { [cssVarName('fonts', 'master')]: f.stack }])),
     textSizes: Object.fromEntries(Object.entries(TEXT_SIZES).map(([id, s]) => [id, s.scale])),

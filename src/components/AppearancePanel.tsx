@@ -11,7 +11,8 @@ import {
   type DensityId,
 } from '../theme/appearance'
 import { appearanceStore, useAppearance } from '../theme/appearanceStore'
-import type { Theme } from '../theme/types'
+import { CustomThemeEditor, ThemeLibraryActions } from './CustomThemes'
+import { ThemePreview } from './ThemePreview'
 
 /** Кнопка с кистью: открывает панель оформления (в шапке на всех экранах — в игре и в стартовом меню). */
 export function AppearanceButton({ onClick }: { onClick: () => void }) {
@@ -29,27 +30,6 @@ export function AppearanceButton({ onClick }: { onClick: () => void }) {
         <path d="M9.1 12.6l2.4 2.4c.2 1.9-.5 3.5-2 4.6-1.6 1.2-4 1.4-6.4.9 1.2-1 1.5-2.1 1.6-3.4.2-2.6 2.3-4.6 4.4-4.5z" />
       </svg>
     </button>
-  )
-}
-
-/** Мини-превью темы: фон, панель, акцент, текст. Цвета — из самой темы (её токенов). */
-function ThemePreview({ theme }: { theme: Theme }) {
-  const c = theme.colors
-  return (
-    <span className="theme-preview" style={{ background: c.bg, borderColor: c.border }} aria-hidden="true">
-      <span className="theme-preview-panel" style={{ background: c.panel, borderColor: c.borderBright }}>
-        <span className="theme-preview-title" style={{ color: c.accent, fontFamily: theme.fonts.display }}>
-          Аа
-        </span>
-        <span className="theme-preview-line" style={{ background: c.fg }} />
-        <span className="theme-preview-line theme-preview-line--short" style={{ background: c.muted }} />
-      </span>
-      <span className="theme-preview-dots">
-        <span style={{ background: c.accent }} />
-        <span style={{ background: c.danger }} />
-        <span style={{ background: theme.map.floorWood }} />
-      </span>
-    </span>
   )
 }
 
@@ -115,10 +95,14 @@ export function AppearancePanel({ onClose }: Props) {
                 >
                   <ThemePreview theme={t} />
                   <span className="theme-card-name">{t.name}</span>
+                  {appearanceStore.isCustom(t.id) && <span className="theme-card-badge">своя</span>}
                 </button>
               ))}
             </div>
+            <ThemeLibraryActions theme={theme} />
           </section>
+
+          {appearanceStore.isCustom(theme.id) && <CustomThemeEditor key={theme.id} theme={theme} />}
 
           <section className="appearance-section" aria-labelledby={`${titleId}-tune`}>
             <h3 id={`${titleId}-tune`}>Тонкая настройка</h3>
