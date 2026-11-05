@@ -5,11 +5,12 @@
 // можно сохранить, воспроизвести и (в будущем) передавать между игроками по сети.
 
 import { CONDITIONS, MAX_EXHAUSTION } from '../engine/conditions'
+import { formatD20Test } from '../engine/checks'
 import { isFloor } from '../engine/movement'
 import type { CharacterSheet, Equipment } from '../types/character'
 import type { ChatMessage } from '../types/game'
 import type { ItemCatalog } from '../types/items'
-import type { LocationData } from '../types/location'
+import { OBJECT_TYPES, type LocationData } from '../types/location'
 import {
   QUEST_STATUSES,
   type ActionAuthor,
@@ -22,6 +23,7 @@ import {
 } from '../types/story'
 import type { AdventureData } from './adventure'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
+import { placementProblem } from './mapPlacement'
 import { isNonEmptyString } from './validation'
 
 export const TONE_LABELS: Record<StoryTone, string> = {
@@ -115,6 +117,11 @@ const updateMember = (state: StoryState, heroId: string, change: (m: PartyMember
   party: state.party.map((m) => (m.heroId === heroId ? change(m) : m)),
 })
 
+const updateLocation = (state: StoryState, locationId: string, change: (l: LocationData) => LocationData): StoryState => {
+  const location = state.world.locations[locationId]
+  return { ...state, world: { ...state.world, locations: { ...state.world.locations, [locationId]: change(location) } } }
+}
+
 /** Применяет действие к состоянию. Действие должно быть проверено (checkAction) до записи в журнал. */
 export function applyAction(state: StoryState | null, action: StoryAction): StoryState {
   if (action.type === 'storyCreated') return { ...structuredClone(action.seed), updatedAt: action.at }
@@ -161,6 +168,43 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         return { ...m, inventory: { ...m.inventory, items } }
       })
     }
+    case 'itemsRemoved':
+      return updateMember(state, action.heroId, (m) => {
+        let items = [...m.inventory.items]
+        for (const { itemId, quantity } of action.items) {
+          items = items.map((e) => (e.itemId === itemId ? { ...e, quantity: e.quantity - quantity } : e)).filter((e) => e.quantity > 0)
+        }
+        // Предмета не осталось — снимаем его с экипировки.
+        const has = (id: string | null) => !id || items.some((e) => e.itemId === id)
+        const eq = m.inventory.equipped
+        const equipped = { mainHand: has(eq.mainHand) ? eq.mainHand : null, offHand: has(eq.offHand) ? eq.offHand : null, armor: has(eq.armor) ? eq.armor : null }
+        return { ...m, inventory: { ...m.inventory, items, equipped } }
+      })
+    case 'goldChanged':
+      return updateMember(state, action.heroId, (m) => ({ ...m, inventory: { ...m.inventory, gold: Math.round((m.inventory.gold + action.delta) * 100) / 100 } }))
+    case 'hpChanged':
+      return updateMember(state, action.heroId, (m) => {
+        const c = m.character
+        const hp = action.kind === 'damage' ? Math.max(0, c.hp - action.amount) : Math.min(c.maxHp, c.hp + action.amount)
+        return { ...m, character: { ...c, hp } }
+      })
+    case 'checkRolled': {
+      const message: ChatMessage = { id: action.messageId, author: 'system', text: formatD20Test(action.check.result), check: action.check }
+      return { ...state, messages: [...state.messages, message], rolls: action.roll ? [...state.rolls, action.roll].slice(-MAX_ROLL_LOG) : state.rolls }
+    }
+    case 'npcAdded':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, npcs: [...l.npcs, action.npc] }))
+    case 'npcRemoved':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, npcs: l.npcs.filter((n) => n.id !== action.npcId) }))
+    case 'objectAdded':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, objects: [...l.objects, action.object] }))
+    case 'objectRemoved':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, objects: l.objects.filter((o) => o.id !== action.objectId) }))
+    case 'objectUpdated':
+      return updateLocation(state, action.locationId, (l) => ({
+        ...l,
+        objects: l.objects.map((o) => (o.id === action.objectId ? { ...o, ...action.changes, id: o.id } : o)),
+      }))
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]
       const npcs = location.npcs.map((n) => (n.id === action.npcId ? { ...n, x: action.to.x, y: action.to.y } : n))
@@ -250,6 +294,74 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (problem) return problem
       const bad = action.items.find((e) => !catalog[e.itemId] || !Number.isInteger(e.quantity) || e.quantity < 1)
       return bad ? `Нельзя выдать «${bad.itemId}» × ${bad.quantity}.` : null
+    }
+    case 'itemsRemoved': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      const need = new Map<string, number>()
+      for (const e of action.items) {
+        if (!Number.isInteger(e.quantity) || e.quantity < 1) return `Нельзя забрать «${e.itemId}» × ${e.quantity}.`
+        need.set(e.itemId, (need.get(e.itemId) ?? 0) + e.quantity)
+      }
+      for (const [itemId, quantity] of need) {
+        const have = hero.inventory.items.find((e) => e.itemId === itemId)?.quantity ?? 0
+        const name = catalog[itemId]?.name ?? itemId
+        if (have < quantity) return have === 0 ? `У героя нет предмета «${name}».` : `У героя только ${have} шт. «${name}», а забрать нужно ${quantity}.`
+      }
+      return null
+    }
+    case 'goldChanged': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!Number.isFinite(action.delta) || action.delta === 0) return 'Изменение золота — ненулевое число.'
+      if (hero.inventory.gold + action.delta < 0) return `У героя только ${hero.inventory.gold} зм — нельзя забрать ${-action.delta}.`
+      return null
+    }
+    case 'hpChanged': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (hero.fallen) return 'Герой погиб.'
+      if (!Number.isInteger(action.amount) || action.amount < 1) return 'Урон и лечение — целое число не меньше 1.'
+      return null
+    }
+    case 'checkRolled':
+      if (action.author.kind !== 'engine') return 'Кубики бросает только движок.'
+      return needMember(action.check.heroId)
+    case 'npcAdded': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      if (!isNonEmptyString(action.npc.id) || !isNonEmptyString(action.npc.name)) return 'У НПС нужны id и имя.'
+      if (location.npcs.some((n) => n.id === action.npc.id)) return `НПС с id «${action.npc.id}» уже есть.`
+      return isFloor(location, action.npc.x, action.npc.y) ? null : 'НПС может стоять только на полу.'
+    }
+    case 'npcRemoved': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      return location.npcs.some((n) => n.id === action.npcId) ? null : 'В этой локации нет такого НПС.'
+    }
+    case 'objectAdded': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      const o = action.object
+      if (!isNonEmptyString(o.id) || !isNonEmptyString(o.name)) return 'У объекта нужны id и название.'
+      if (!(OBJECT_TYPES as readonly string[]).includes(o.type)) return `Неизвестный вид объекта «${o.type}».`
+      if (location.objects.some((x) => x.id === o.id)) return `Объект с id «${o.id}» уже есть.`
+      return placementProblem(location, [], o, {})
+    }
+    case 'objectRemoved': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      return location.objects.some((o) => o.id === action.objectId) ? null : 'В этой локации нет такого объекта.'
+    }
+    case 'objectUpdated': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      const o = location.objects.find((x) => x.id === action.objectId)
+      if (!o) return 'В этой локации нет такого объекта.'
+      const next = { ...o, ...action.changes }
+      if (!isNonEmptyString(next.name)) return 'У объекта нужно название.'
+      if (!(OBJECT_TYPES as readonly string[]).includes(next.type)) return `Неизвестный вид объекта «${next.type}».`
+      return placementProblem(location, [], next, { objectId: o.id })
     }
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]

@@ -4,8 +4,8 @@
 
 import type { ActiveCondition } from '../engine/conditions'
 import type { Character, Equipment, Inventory } from './character'
-import type { ChatMessage, RollRecord } from './game'
-import type { CellPosition, DoorState, LocationData } from './location'
+import type { ChatMessage, CheckCard, RollRecord } from './game'
+import type { CellPosition, DoorState, LocationData, MapObject, Npc } from './location'
 
 export const STORY_TONES = ['dark-fantasy', 'light-adventure', 'detective', 'horror'] as const
 /** Тон истории — попадёт в системный промт ведущего. */
@@ -126,6 +126,19 @@ export type StoryEvent =
   | { type: 'heroRenamed'; heroId: string; name: string }
   | { type: 'conditionsChanged'; heroId: string; conditions: ActiveCondition[] }
   | { type: 'itemsGranted'; heroId: string; items: { itemId: string; quantity: number }[] }
+  /** Предметы забрали (потрачены, отняты, сломаны). Если предмета не осталось — он снимается с экипировки. */
+  | { type: 'itemsRemoved'; heroId: string; items: { itemId: string; quantity: number }[] }
+  | { type: 'goldChanged'; heroId: string; delta: number }
+  /** Урон (с типом) или лечение; хиты не уходят ниже 0 и выше максимума. */
+  | { type: 'hpChanged'; heroId: string; kind: 'damage' | 'healing'; amount: number; damageType?: string }
+  /** Проверка, которую запросил ведущий: бросок движка и карточка в ленте. */
+  | { type: 'checkRolled'; messageId: string; check: CheckCard; roll?: RollRecord }
+  | { type: 'npcAdded'; locationId: string; npc: Npc }
+  | { type: 'npcRemoved'; locationId: string; npcId: string }
+  | { type: 'objectAdded'; locationId: string; object: MapObject }
+  | { type: 'objectRemoved'; locationId: string; objectId: string }
+  /** Изменение объекта: название, описание, вид, положение, размер. */
+  | { type: 'objectUpdated'; locationId: string; objectId: string; changes: Partial<Omit<MapObject, 'id'>> }
   | { type: 'npcMoved'; locationId: string; npcId: string; to: CellPosition }
   | { type: 'doorChanged'; locationId: string; doorId: string; state: DoorState }
   | { type: 'factRecorded'; fact: WorldFact }

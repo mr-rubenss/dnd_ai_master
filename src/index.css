@@ -232,6 +232,11 @@ textarea {
 .obj-barrel { fill: var(--map-barrel-fill); stroke: var(--map-barrel-stroke); stroke-width: 0.05; }
 .obj-barrel-ring { fill: none; stroke: var(--map-barrel-ring); stroke-width: 0.05; }
 .obj-barrel-tap { fill: var(--map-barrel-tap); }
+.obj-debris { fill: var(--map-chair-fill); stroke: var(--map-chair-stroke); stroke-width: 0.04; }
+.obj-item { fill: var(--map-table-fill); stroke: var(--map-table-stroke); stroke-width: 0.05; }
+.obj-item-band { stroke: var(--map-bar-edge); stroke-width: 0.06; }
+.obj-fire .obj-flame,
+.obj-fire .obj-flame-core { pointer-events: none; }
 
 /* НПС */
 .npc-token {
@@ -3740,4 +3745,90 @@ textarea {
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* ---------- Карточка проверки в ленте ---------- */
+
+.check-card {
+  align-self: center;
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border-bright);
+  border-left-width: 3px;
+  border-radius: var(--radius-lg);
+  background: var(--color-panel-raised);
+  font-size: var(--text-88);
+}
+
+.check-card.is-success { border-left-color: var(--color-accent); }
+.check-card.is-failure { border-left-color: var(--color-danger-bright); }
+.check-card.is-nat20 { border-color: var(--dice-nat20); background: var(--dice-nat20-tint); box-shadow: var(--shadow-nat20-roll); }
+.check-card.is-nat1 { border-color: var(--dice-nat1-border); background: var(--dice-nat1-tint); }
+
+.check-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+
+.check-card-label {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-105);
+  font-weight: 700;
+  color: var(--color-accent-bright);
+  overflow-wrap: anywhere;
+}
+
+.check-card-dc {
+  flex: none;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.check-card-reason,
+.check-card-mode {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.check-card-mode {
+  font-size: var(--text-80);
+}
+
+.check-card-roll {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  font-variant-numeric: tabular-nums;
+}
+
+.check-card-dice {
+  display: inline-flex;
+  gap: var(--space-4);
+}
+
+.check-card-total {
+  font-family: var(--font-display);
+  font-size: var(--text-130);
+  font-weight: 700;
+}
+
+.check-card-outcome {
+  margin-left: auto;
+  padding: var(--space-2) var(--space-10);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+}
+
+.check-card.is-success .check-card-outcome { background: var(--color-accent-tint-badge); color: var(--color-accent-bright); }
+.check-card.is-failure .check-card-outcome { background: var(--color-danger-tint-fallen); color: var(--color-danger-text-soft); }
+
+.check-card-auto {
+  color: var(--color-danger-text);
 }

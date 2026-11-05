@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { ChatMessage } from '../types/game'
+import { CheckCardView } from './CheckCardView'
 
 const AUTHOR_LABELS: Record<ChatMessage['author'], string> = {
   master: 'Ведущий',
@@ -29,12 +30,16 @@ export function NarrationLog({ messages, pending = null }: Props) {
 
   return (
     <section ref={logRef} className="narration-log" aria-label="Повествование" aria-live="polite">
-      {messages.map((message) => (
-        <article key={message.id} className={`message message--${message.author}`}>
-          <span className="message-author">{AUTHOR_LABELS[message.author]}</span>
-          <p className="message-text">{message.text}</p>
-        </article>
-      ))}
+      {messages.map((message) =>
+        message.check ? (
+          <CheckCardView key={message.id} card={message.check} />
+        ) : (
+          <article key={message.id} className={`message message--${message.author}`}>
+            <span className="message-author">{AUTHOR_LABELS[message.author]}</span>
+            <p className="message-text">{message.text}</p>
+          </article>
+        ),
+      )}
       {pending !== null && (
         <article className="message message--master is-streaming" data-testid="master-streaming" aria-busy="true">
           <span className="message-author">{AUTHOR_LABELS.master}</span>

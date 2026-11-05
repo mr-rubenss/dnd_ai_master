@@ -11,8 +11,8 @@ import { parseCharacterSheet } from './character'
 import { parseLocation } from './location'
 import { DM_PROMPT, masterMessages, masterSystemPrompt } from './masterPrompt'
 import { gameStateText } from './masterState'
-import { runMasterTurn } from './masterTurn'
-import { applyAction, ENGINE, makeAction, MASTER, newStorySeed, player } from './storyActions'
+import { MAX_TOOL_ROUNDS, runMasterTurn } from './masterTurn'
+import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, player } from './storyActions'
 
 const context = { catalog: itemCatalog, rules: rulesData }
 const location = parseLocation(drunkenGriffinJson)
@@ -141,7 +141,7 @@ describe('ход ведущего', () => {
       },
     ])
     const result = await runMasterTurn(master, story(), { verbosity: 'detailed', context, onText: (d) => parts.push(d) })
-    expect(result).toEqual({ text: 'Гуннар кивает.', truncated: false })
+    expect(result).toEqual({ text: 'Гуннар кивает.', truncated: false, toolCalls: [] })
     expect(parts).toEqual(['Гуннар ', 'кивает.'])
     expect(requests[0].maxTokens).toBe(1600)
     expect(requests[0].messages[0].content).toContain('## Отряд (лист персонажа и инвентарь)')
@@ -156,5 +156,114 @@ describe('ход ведущего', () => {
   it('рассуждающая модель не успела ответить — объяснение, что делать', async () => {
     const { master } = fakeMaster([() => aiResponse({ reasoning: 'Игрок подходит к стойке, значит…', finishReason: 'length' })])
     await expect(runMasterTurn(master, story(), { verbosity: 'normal', context })).rejects.toThrow('модель «размышляла»')
+  })
+})
+
+describe('цикл с инструментами: ответ модели → инструменты → результаты модели → финальный текст', () => {
+  /** Среда хода: история в памяти, действия проверяются checkAction и применяются по одному. */
+  function runtimeFor(initial: StoryState, rolls: number[] = []) {
+    let state = initial
+    let seq = 100
+    const committed: string[] = []
+    let n = 0
+    const runtime = {
+      getStory: () => state,
+      commit: (event: StoryEvent, author: ActionAuthor) => {
+        const action = makeAction(state.id, seq++, event, author, 5, `x${seq}`)
+        const reason = checkAction(state, action, { catalog: itemCatalog })
+        if (reason) return reason
+        state = applyAction(state, action)
+        committed.push(event.type)
+        return null
+      },
+      tools: { catalog: itemCatalog, rng: () => rolls.shift() ?? 0.5, now: () => 7, newId: () => `t${++n}` },
+    }
+    return { runtime, committed, current: () => state }
+  }
+  const toolCall = (name: string, args: unknown, id = name) => ({ id, name, arguments: args, rawArguments: JSON.stringify(args) })
+
+  it('проверка и недопустимый вызов в одном ответе: бросок движка, отказ с причиной, затем финальный рассказ', async () => {
+    const env = runtimeFor(story(), [(15 - 0.5) / 20])
+    const { master, requests } = fakeMaster([
+      () =>
+        aiResponse({
+          text: 'Ты наваливаешься плечом на дверь кладовой.',
+          toolCalls: [
+            toolCall('request_check', { skill: 'athletics', dc: 15, reason: 'выбить дверь кладовой' }),
+            toolCall('remove_item', { item: 'dagger' }),
+          ],
+          finishReason: 'tool_calls',
+        }),
+      () => aiResponse({ text: 'Замок с треском вылетает — дверь распахивается.' }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+
+    expect(result.text).toBe('Замок с треском вылетает — дверь распахивается.')
+    expect(result.toolCalls.map((t) => [t.call.name, t.outcome.ok])).toEqual([
+      ['request_check', true],
+      ['remove_item', false],
+    ])
+    // Рассказ перед вызовом — в ленту сразу, затем карточка броска; недопустимый вызов ничего не записал.
+    expect(env.committed).toEqual(['masterNarrated', 'checkRolled'])
+    const feed = env.current().messages.slice(-2)
+    expect(feed[0]).toMatchObject({ author: 'master', text: 'Ты наваливаешься плечом на дверь кладовой.' })
+    expect(feed[1]).toMatchObject({ author: 'system', check: { reason: 'выбить дверь кладовой', result: { total: 20, success: true } } })
+
+    // Первый запрос — с инструментами; второй — с историей вызовов и их результатами.
+    expect(requests[0].tools?.map((t) => t.name)).toContain('request_check')
+    expect(requests[0].toolChoice).toBe('auto')
+    const second = requests[1].messages
+    expect(second.at(-3)).toMatchObject({ role: 'assistant', toolCalls: [{ name: 'request_check' }, { name: 'remove_item' }] })
+    expect(JSON.parse((second.at(-2) as { content: string }).content)).toMatchObject({ ok: true, success: true, total: 20 })
+    expect(JSON.parse((second.at(-1) as { content: string }).content)).toEqual({ ok: false, error: 'У героя нет предмета «Кинжал».' })
+  })
+
+  it('несколько изменений игры за ход: предметы, золото, обстановка; состояние в промте обновляется', async () => {
+    const env = runtimeFor(story())
+    const { master, requests } = fakeMaster([
+      () =>
+        aiResponse({
+          toolCalls: [
+            toolCall('change_gold', { amount: -3 }, 'a'),
+            toolCall('give_item', { item: 'Кинжал' }, 'b'),
+            toolCall('update_object', { object: 'table-2', name: 'Опрокинутый стол' }, 'c'),
+          ],
+        }),
+      () => aiResponse({ text: 'Гуннар протягивает кинжал и сгребает монеты.' }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+    expect(result.toolCalls.every((t) => t.outcome.ok)).toBe(true)
+    expect(env.current().party[0].inventory.gold).toBe(15)
+    expect(requests[1].messages[0].content).toContain('золото: 15 зм')
+    expect(requests[1].messages[0].content).toContain('- Опрокинутый стол (9, 7)')
+  })
+
+  it('движок отклонил запись — модель получает причину', async () => {
+    const env = runtimeFor(story())
+    const runtime = { ...env.runtime, commit: () => 'Хранилище недоступно.' }
+    const { master } = fakeMaster([() => aiResponse({ toolCalls: [toolCall('note_fact', { text: 'Факт' })] }), () => aiResponse({ text: 'Дальше.' })])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime })
+    expect(result.toolCalls[0].outcome).toEqual({ ok: false, result: { ok: false, error: 'Хранилище недоступно.' }, events: [] })
+  })
+
+  it('модель не останавливается — после лимита раундов инструменты отключаются и нужен текст', async () => {
+    const env = runtimeFor(story())
+    const steps = Array.from({ length: MAX_TOOL_ROUNDS }, (_, i) => () => aiResponse({ toolCalls: [toolCall('note_fact', { text: `Факт ${i}` })] }))
+    const { master, requests } = fakeMaster([...steps, () => aiResponse({ text: 'Итог.', toolCalls: [toolCall('note_fact', { text: 'лишний' })] })])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+    expect(result.text).toBe('Итог.')
+    expect(requests.at(-1)!.toolChoice).toBe('none')
+    expect(env.current().world.facts.map((f) => f.text)).toEqual(['Факт 0', 'Факт 1', 'Факт 2', 'Факт 3'])
+  })
+
+  it('весь рассказ уже записан по ходу, финал пустой — не ошибка', async () => {
+    const env = runtimeFor(story())
+    const { master } = fakeMaster([
+      () => aiResponse({ text: 'Брам хохочет.', toolCalls: [toolCall('note_fact', { text: 'Брам весел' })] }),
+      () => aiResponse({}),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+    expect(result.text).toBe('')
+    expect(env.committed).toEqual(['masterNarrated', 'factRecorded'])
   })
 })

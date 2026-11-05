@@ -1,3 +1,4 @@
+import type { D20TestResult } from '../engine/checks'
 import type { RollResult } from '../engine/dice'
 import type { Character, Inventory } from './character'
 import type { CellPosition, DoorState } from './location'
@@ -10,6 +11,17 @@ export interface ChatMessage {
   text: string
   /** Чья реплика (для сообщений игрока в отряде из нескольких героев). */
   heroId?: string
+  /** Проверка, которую запросил ведущий и бросил движок, — в ленте показывается карточкой. */
+  check?: CheckCard
+}
+
+/** Карточка проверки в ленте: кто, что, зачем, бросок и итог. */
+export interface CheckCard {
+  heroId: string
+  heroName: string
+  /** Зачем проверка — со слов ведущего. */
+  reason: string
+  result: D20TestResult
 }
 
 /** Запись в журнале бросков. */

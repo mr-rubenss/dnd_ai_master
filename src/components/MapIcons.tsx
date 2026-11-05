@@ -63,5 +63,58 @@ export function MapObjectIcon({ object }: IconProps) {
           <circle cx={cx} cy={cy} r={0.06} className="obj-barrel-tap" />
         </g>
       )
+    case 'fire':
+      // Огонь на полу: свечение и языки пламени в каждой клетке.
+      return (
+        <g className="obj-fire">
+          <circle cx={cx} cy={cy} r={Math.max(w, h) * 0.75} className="obj-fire-glow" />
+          {Array.from({ length: w * h }, (_, i) => {
+            const fx = x + (i % w) + 0.5
+            const fy = y + Math.floor(i / w) + 0.55
+            return (
+              <g key={i}>
+                <path
+                  d={`M ${fx} ${fy - 0.4} C ${fx + 0.3} ${fy - 0.05}, ${fx + 0.2} ${fy + 0.32}, ${fx} ${fy + 0.32} C ${fx - 0.2} ${fy + 0.32}, ${fx - 0.3} ${fy - 0.05}, ${fx} ${fy - 0.4} Z`}
+                  className="obj-flame"
+                />
+                <path
+                  d={`M ${fx} ${fy - 0.1} C ${fx + 0.12} ${fy + 0.05}, ${fx + 0.08} ${fy + 0.26}, ${fx} ${fy + 0.26} C ${fx - 0.08} ${fy + 0.26}, ${fx - 0.12} ${fy + 0.05}, ${fx} ${fy - 0.1} Z`}
+                  className="obj-flame-core"
+                />
+              </g>
+            )
+          })}
+        </g>
+      )
+    case 'debris':
+      // Обломки: несколько неровных кусков.
+      return (
+        <g>
+          {objectPieces(w, h).map(([px, py, s], i) => (
+            <path
+              key={i}
+              d={`M ${x + px} ${y + py - s} L ${x + px + s} ${y + py - s * 0.2} L ${x + px + s * 0.5} ${y + py + s} L ${x + px - s * 0.8} ${y + py + s * 0.6} L ${x + px - s} ${y + py - s * 0.4} Z`}
+              className="obj-debris"
+            />
+          ))}
+        </g>
+      )
+    case 'item':
+      return (
+        <g>
+          <rect x={x + 0.2} y={y + 0.2} width={w - 0.4} height={h - 0.4} rx={0.08} className="obj-item" />
+          <path d={`M ${x + 0.2} ${cy} H ${x + w - 0.2}`} className="obj-item-band" />
+        </g>
+      )
   }
+}
+
+/** Куски обломков: по три на клетку, с небольшим разбросом (детерминированно — без случайных чисел). */
+function objectPieces(w: number, h: number): [number, number, number][] {
+  const pieces: [number, number, number][] = []
+  for (let dy = 0; dy < h; dy++)
+    for (let dx = 0; dx < w; dx++) {
+      pieces.push([dx + 0.3, dy + 0.35, 0.16], [dx + 0.68, dy + 0.45, 0.2], [dx + 0.45, dy + 0.72, 0.13])
+    }
+  return pieces
 }

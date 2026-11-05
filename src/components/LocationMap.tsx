@@ -12,6 +12,9 @@ const OBJECT_TYPE_LABELS: Record<MapObjectType, string> = {
   bar: 'Стойка',
   fireplace: 'Камин',
   barrel: 'Бочка',
+  fire: 'Огонь',
+  debris: 'Обломки',
+  item: 'Предмет',
 }
 
 
@@ -181,7 +184,7 @@ export function LocationMap({ location, player, doors = {} }: Props) {
 
           <g>
             {location.objects.map((obj) => (
-              <g key={obj.id} {...interactiveProps(`obj:${obj.id}`)}>
+              <g key={obj.id} {...interactiveProps(`obj:${obj.id}`)} data-testid={`object-${obj.id}`} data-type={obj.type}>
                 <rect x={obj.x} y={obj.y} width={obj.w ?? 1} height={obj.h ?? 1} className="hit-area" />
                 <MapObjectIcon object={obj} />
               </g>

@@ -5,7 +5,8 @@
 
 export const FLOOR_TYPES = ['wood', 'stone', 'dirt', 'grass'] as const
 export const WALL_MATERIALS = ['stone', 'wood'] as const
-export const OBJECT_TYPES = ['table', 'chair', 'bar', 'fireplace', 'barrel'] as const
+/** Объекты обстановки; fire — огонь, debris — обломки и завал, item — прочий предмет (люстра, ящик, сундук). */
+export const OBJECT_TYPES = ['table', 'chair', 'bar', 'fireplace', 'barrel', 'fire', 'debris', 'item'] as const
 export const NPC_ATTITUDES = ['friendly', 'neutral', 'hostile'] as const
 export const DOOR_STATES = ['open', 'closed', 'locked'] as const
 

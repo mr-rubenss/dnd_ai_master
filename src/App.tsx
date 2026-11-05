@@ -252,6 +252,13 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       const { text } = await runMasterTurn(master, current, {
         verbosity: ai.settings.verbosity,
         context: { catalog: itemCatalog, rules: rulesData },
+        // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
+        runtime: {
+          getStory: () => (appStore.getState().active?.id === story.id ? appStore.getState().active! : current),
+          commit: (event, author) => appStore.dispatchTo(story.id, event, author),
+          tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
+          onRound: () => setStreamText(''),
+        },
         signal: controller.signal,
         onText: (delta) => {
           setAiNotice(null)
@@ -259,7 +266,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         },
         onRetry: ({ delayMs }) => setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`),
       })
-      await appStore.dispatchTo(story.id, { type: 'masterNarrated', messageId: crypto.randomUUID(), text }, MASTER)
+      if (text) await appStore.dispatchTo(story.id, { type: 'masterNarrated', messageId: crypto.randomUUID(), text }, MASTER)
     } catch (error) {
       if (controller.signal.aborted) return
       setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
