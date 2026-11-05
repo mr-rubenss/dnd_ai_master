@@ -6,14 +6,14 @@ import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './h
 const rootVar = (page: Page, name: string) => page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name)
 
 async function openPanel(page: Page) {
-  await page.getByTestId('appearance-open').click()
-  const panel = page.getByTestId('appearance-panel')
+  await page.getByTestId('settings-open').click()
+  const panel = page.getByTestId('settings-panel')
   await expect(panel).toBeVisible()
   return panel
 }
 
 async function saveCustom(page: Page, name: string) {
-  const panel = page.getByTestId('appearance-panel')
+  const panel = page.getByTestId('settings-panel')
   await panel.getByTestId('custom-theme-new').click()
   await panel.getByTestId('custom-theme-name').fill(name)
   await panel.getByTestId('custom-theme-save').click()

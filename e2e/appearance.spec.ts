@@ -7,8 +7,8 @@ const rootVar = (page: Page, name: string) => page.evaluate((n) => getComputedSt
 const rootData = (page: Page) => page.evaluate(() => ({ ...document.documentElement.dataset }))
 
 async function openPanel(page: Page) {
-  await page.getByTestId('appearance-open').click()
-  const panel = page.getByTestId('appearance-panel')
+  await page.getByTestId('settings-open').click()
+  const panel = page.getByTestId('settings-panel')
   await expect(panel).toBeVisible()
   await page.waitForTimeout(300) // анимация выезда
   return panel
@@ -27,7 +27,7 @@ test('смена темы: карточки всех тем реестра, те
   await expect(panel.locator('.theme-card')).toHaveCount(1)
   await page.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)
-  await expect(page.getByTestId('appearance-open')).toBeFocused()
+  await expect(page.getByTestId('settings-open')).toBeFocused()
 
   // Новая тема реестра сама появляется в панели.
   await page.evaluate(

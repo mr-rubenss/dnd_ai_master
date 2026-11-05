@@ -9,10 +9,12 @@ const AUTHOR_LABELS: Record<ChatMessage['author'], string> = {
 
 interface Props {
   messages: ChatMessage[]
+  /** Ответ ведущего, который ещё приходит потоком ('' — ведущий думает); null — нет. */
+  pending?: string | null
 }
 
 /** Лента сообщений ведущего и игрока. Новые сообщения появляются снизу. */
-export function NarrationLog({ messages }: Props) {
+export function NarrationLog({ messages, pending = null }: Props) {
   const logRef = useRef<HTMLElement>(null)
   const isFirstRender = useRef(true)
 
@@ -23,7 +25,7 @@ export function NarrationLog({ messages }: Props) {
     // При первой отрисовке — сразу вниз, дальше — плавно.
     log.scrollTo({ top: log.scrollHeight, behavior: isFirstRender.current ? 'instant' : 'smooth' })
     isFirstRender.current = false
-  }, [messages])
+  }, [messages, pending])
 
   return (
     <section ref={logRef} className="narration-log" aria-label="Повествование" aria-live="polite">
@@ -33,6 +35,12 @@ export function NarrationLog({ messages }: Props) {
           <p className="message-text">{message.text}</p>
         </article>
       ))}
+      {pending !== null && (
+        <article className="message message--master is-streaming" data-testid="master-streaming" aria-busy="true">
+          <span className="message-author">{AUTHOR_LABELS.master}</span>
+          <p className="message-text">{pending || <span className="master-thinking">Ведущий думает…</span>}</p>
+        </article>
+      )}
     </section>
   )
 }

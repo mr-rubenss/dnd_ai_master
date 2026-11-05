@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AppearanceButton, AppearancePanel } from './components/AppearancePanel'
+import { SettingsButton, SettingsPanel, type SettingsTab } from './components/SettingsPanel'
 import { CharacterCreation } from './components/creation/CharacterCreation'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { DiceTray } from './components/DiceTray'
@@ -12,15 +12,20 @@ import { NewStoryScreen } from './components/NewStoryScreen'
 import { PlayerInput } from './components/PlayerInput'
 import { StartMenu } from './components/StartMenu'
 import { StoriesScreen } from './components/StoriesScreen'
+import { AiError, createMaster } from './ai'
+import { aiConnection, settingsProblems } from './ai/settings'
+import { useAiSettings } from './ai/settingsStore'
 import { adventures, defaultAdventure, itemCatalog, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { draftEpilogue } from './game/epilogue'
+import { runMasterTurn } from './game/masterTurn'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryState } from './types/story'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
-const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий пока не подключён — это заглушка.)'
+/** Ответ, пока ведущий не настроен (нет ключа API и т. п.). */
+const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий не подключён: укажите ключ API в «Настройки» → «Ведущий».)'
 
 type Screen = 'menu' | 'stories' | 'new-story' | 'creation' | 'heroes' | 'game'
 
@@ -35,9 +40,9 @@ function App() {
   const [afterCreation, setAfterCreation] = useState<'heroes' | 'new-story'>('heroes')
   /** Окно итога завершённой истории. */
   const [epilogueOpen, setEpilogueOpen] = useState(false)
-  /** Панель оформления (кисть в шапке). */
-  const [appearanceOpen, setAppearanceOpen] = useState(false)
-  const closeAppearance = useCallback(() => setAppearanceOpen(false), [])
+  /** Экран настроек (шестерёнка в шапке): открытая вкладка или null. */
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
+  const closeSettings = useCallback(() => setSettingsTab(null), [])
   const current: Screen = screen === 'game' && !app.active ? 'menu' : screen
   const readOnly = app.active?.status === 'completed'
   const latest = app.stories.find((s) => s.status === 'active') ?? null
@@ -100,7 +105,7 @@ function App() {
       <header className="app-header">
         <h1>ИИ-Мастер</h1>
         <div className="header-actions">
-          <AppearanceButton onClick={() => setAppearanceOpen(true)} />
+          <SettingsButton onClick={() => setSettingsTab('appearance')} />
           {current !== 'menu' && (
             <>
               {current === 'game' && !readOnly && (
@@ -122,7 +127,7 @@ function App() {
           )}
         </div>
       </header>
-      {appearanceOpen && <AppearancePanel onClose={closeAppearance} />}
+      {settingsTab && <SettingsPanel initialTab={settingsTab} onClose={closeSettings} />}
       {current === 'menu' && (
         <StartMenu
           latest={latest}
@@ -212,15 +217,63 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   const animatedRoll = animatedRollId ? story.rolls.find((r) => r.id === animatedRollId) : undefined
   const hideRoll = useCallback(() => setAnimatedRollId(null), [])
 
-  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+  const ai = useAiSettings()
+  /** Текст ведущего, пока он приходит потоком ('' — ведущий думает), или null. */
+  const [streamText, setStreamText] = useState<string | null>(null)
+  const [aiNotice, setAiNotice] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(timerRef.current)
+      abortRef.current?.abort()
+    },
+    [],
+  )
+
+  /** Ход ведущего через общий интерфейс src/ai/: поставщик модели выбран в настройках. */
+  const askMaster = async () => {
+    setAiError(null)
+    setWaiting(true)
+    if (settingsProblems(ai.settings, ai.apiKey).length > 0) {
+      timerRef.current = window.setTimeout(() => {
+        appStore.dispatch({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY }, MASTER)
+        setWaiting(false)
+      }, 600)
+      return
+    }
+    const controller = new AbortController()
+    abortRef.current = controller
+    setStreamText('')
+    try {
+      const current = appStore.getState().active ?? story
+      const master = createMaster(aiConnection(ai.settings, ai.apiKey))
+      const { text } = await runMasterTurn(master, current, {
+        verbosity: ai.settings.verbosity,
+        signal: controller.signal,
+        onText: (delta) => {
+          setAiNotice(null)
+          setStreamText((t) => (t ?? '') + delta)
+        },
+        onRetry: ({ delayMs }) => setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`),
+      })
+      await appStore.dispatchTo(story.id, { type: 'masterNarrated', messageId: crypto.randomUUID(), text }, MASTER)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
+    } finally {
+      if (!controller.signal.aborted) {
+        setWaiting(false)
+        setStreamText(null)
+        setAiNotice(null)
+      }
+    }
+  }
 
   const handleSend = (text: string) => {
     appStore.dispatch({ type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text }, player(lead.heroId))
-    setWaiting(true)
-    timerRef.current = window.setTimeout(() => {
-      appStore.dispatch({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY }, MASTER)
-      setWaiting(false)
-    }, 600)
+    void askMaster()
   }
 
   const handleRoll = (notation: string, mode: RollMode): string | null => {
@@ -248,7 +301,20 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         <main className="main-column">
           <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} />
           <section className="panel story-panel">
-            <NarrationLog messages={story.messages} />
+            <NarrationLog messages={story.messages} pending={streamText} />
+            {aiNotice && (
+              <p className="master-notice" role="status" data-testid="master-notice">
+                {aiNotice}
+              </p>
+            )}
+            {aiError && (
+              <div className="master-error" role="alert" data-testid="master-error">
+                <p>{aiError}</p>
+                <button type="button" className="item-action is-primary" onClick={() => void askMaster()} disabled={waiting}>
+                  Повторить
+                </button>
+              </div>
+            )}
             {readOnly ? (
               <div className="story-ended" data-testid="story-read-only">
                 <p>История завершена — только чтение.</p>

@@ -3530,3 +3530,177 @@ textarea {
   background: var(--color-bg);
   cursor: pointer;
 }
+
+/* ---------- Настройки: вкладки и «Ведущий» ---------- */
+
+.settings-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-tabs button {
+  min-width: 0;
+  padding: var(--space-10) var(--space-8);
+  border: none;
+  background: none;
+  color: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-110);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-tabs button.is-active {
+  color: var(--color-accent-bright);
+  box-shadow: var(--shadow-active-tab);
+}
+
+.settings-tabs button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.master-settings {
+  display: flex;
+  flex-direction: column;
+}
+
+.master-preset {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4) var(--space-12);
+  margin: 0;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-size: var(--text-85);
+}
+
+.master-preset dt {
+  color: var(--color-muted);
+}
+
+.master-preset dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.api-key-row {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.api-key-row .text-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.api-key-row .secondary-button,
+.master-settings .primary-button {
+  padding: var(--space-6) var(--space-12);
+  font-size: var(--text-85);
+}
+
+.master-problems {
+  margin: 0;
+  padding-left: var(--space-18);
+  font-size: var(--text-82);
+  color: var(--color-warning);
+}
+
+.check-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-result {
+  display: flex;
+  gap: var(--space-10);
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-size: var(--text-85);
+}
+
+.check-result.is-ok { border-left-color: var(--color-accent); }
+.check-result.is-warn { border-left-color: var(--color-warning); }
+.check-result.is-fail { border-left-color: var(--color-danger-bright); background: var(--color-danger-tint); }
+
+.check-status {
+  flex: none;
+  min-width: 64px;
+  font-weight: 700;
+}
+
+.check-result.is-ok .check-status { color: var(--color-accent-bright); }
+.check-result.is-warn .check-status { color: var(--color-warning); }
+.check-result.is-fail .check-status { color: var(--color-danger-text); }
+.check-result.is-skipped .check-status,
+.check-result.is-pending .check-status { color: var(--color-muted); }
+
+.check-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.check-text span {
+  color: var(--color-muted);
+}
+
+/* Ответ ведущего, который ещё приходит потоком. */
+.message.is-streaming .message-text::after {
+  content: '▍';
+  margin-left: var(--space-2);
+  color: var(--color-accent);
+  animation: caret-blink 1s steps(2) infinite;
+}
+
+@keyframes caret-blink {
+  50% { opacity: 0; }
+}
+
+:root[data-motion='reduce'] .message.is-streaming .message-text::after {
+  animation: none;
+}
+
+.master-thinking {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.master-notice {
+  margin: 0;
+  padding: var(--space-6) var(--space-12);
+  font-size: var(--text-85);
+  color: var(--color-system-fg);
+}
+
+.master-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-12);
+  margin: 0 var(--space-12) var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-danger-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-tint);
+  font-size: var(--text-88);
+}
+
+.master-error p {
+  flex: 1 1 220px;
+  margin: 0;
+  color: var(--color-danger-text);
+}
