@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AiMaster, AiRequest } from '../ai/types'
+import { aiResponse, fakeMaster } from '../ai/testing'
+import type { AiRequest } from '../ai/types'
 import adventureJson from '../data/adventures/drunken-griffin.json'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import itemsJson from '../data/items.json'
@@ -55,15 +56,14 @@ describe('ход ведущего', () => {
   it('через общий интерфейс: поток текста, лимит по длине ответа, итоговый текст', async () => {
     const requests: AiRequest[] = []
     const parts: string[] = []
-    const master: AiMaster = {
-      format: 'openai-chat',
-      async complete(req) {
+    const { master } = fakeMaster([
+      (req) => {
         requests.push(req)
         req.onText?.('Гуннар ')
         req.onText?.('кивает.')
-        return { text: ' Гуннар кивает. ', toolCalls: [], usage: null, finishReason: 'stop', streamed: true }
+        return aiResponse({ text: ' Гуннар кивает. ', streamed: true })
       },
-    }
+    ])
     const result = await runMasterTurn(master, story(), { verbosity: 'detailed', onText: (d) => parts.push(d) })
     expect(result).toEqual({ text: 'Гуннар кивает.', truncated: false })
     expect(parts).toEqual(['Гуннар ', 'кивает.'])
@@ -72,10 +72,12 @@ describe('ход ведущего', () => {
   })
 
   it('пустой ответ — понятная ошибка', async () => {
-    const master: AiMaster = {
-      format: 'openai-chat',
-      complete: async () => ({ text: '  ', toolCalls: [], usage: null, finishReason: 'stop', streamed: false }),
-    }
+    const { master } = fakeMaster([() => aiResponse({ text: '  ' })])
     await expect(runMasterTurn(master, story(), { verbosity: 'normal' })).rejects.toThrow('Ведущий прислал пустой ответ')
+  })
+
+  it('рассуждающая модель не успела ответить — объяснение, что делать', async () => {
+    const { master } = fakeMaster([() => aiResponse({ reasoning: 'Игрок подходит к стойке, значит…', finishReason: 'length' })])
+    await expect(runMasterTurn(master, story(), { verbosity: 'normal' })).rejects.toThrow('модель «размышляла»')
   })
 })

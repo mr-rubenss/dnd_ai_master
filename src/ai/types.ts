@@ -58,6 +58,25 @@ export interface AiResponse {
   finishReason: 'stop' | 'length' | 'tool_calls' | 'other'
   /** Ответ действительно пришёл потоком (несколько частей). */
   streamed: boolean
+  /** «Размышления» рассуждающих моделей (reasoning / reasoning_content) — игроку не показываются. */
+  reasoning: string
+  /** Как пришёл ответ: событий потока, пропущенных непонятных строк, тип содержимого — для объяснения ошибок. */
+  stats: { events: number; skipped: number; contentType: string; format: 'stream' | 'json' }
+}
+
+/** Сырой ответ сервера для «Диагностики» — без ключа и заголовка Authorization. */
+export interface AiDiagnostics {
+  url: string
+  /** Что отправили (без ключа): модель, стриминг, лимит. */
+  request: string
+  status: number | null
+  statusText: string
+  /** Заголовки ответа, которые браузер показывает странице (CORS скрывает остальные). */
+  headers: [string, string][]
+  /** Первые строки тела ответа как есть (ключ, если встретится, скрыт). */
+  lines: string[]
+  /** Ошибка до получения ответа (нет сети и т. п.). */
+  error?: string
 }
 
 /** Ведущий: отправить сообщения и инструменты — получить текст, вызовы инструментов и расход токенов. */
@@ -65,6 +84,8 @@ export interface AiMaster {
   /** Формат API адаптера, например `openai-chat`. */
   readonly format: AiFormat
   complete(request: AiRequest): Promise<AiResponse>
+  /** Тестовый запрос со стримингом: статус, заголовки и первые `maxLines` строк сырого ответа. */
+  diagnose(options?: { maxLines?: number; signal?: AbortSignal }): Promise<AiDiagnostics>
 }
 
 /** Форматы API, для которых есть адаптеры. */

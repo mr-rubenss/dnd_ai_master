@@ -3704,3 +3704,40 @@ textarea {
   margin: 0;
   color: var(--color-danger-text);
 }
+
+.master-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.master-actions > * {
+  flex: 1 1 auto;
+}
+
+.master-settings .master-actions .secondary-button {
+  padding: var(--space-6) var(--space-12);
+  font-size: var(--text-85);
+}
+
+.diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.diagnostics-text {
+  max-height: 320px;
+  margin: 0;
+  padding: var(--space-8) var(--space-10);
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: var(--text-75);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

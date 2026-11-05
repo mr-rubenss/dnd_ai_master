@@ -1,31 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { runConnectionCheck } from './check'
 import { AiError } from './errors'
-import type { AiMaster, AiRequest, AiResponse } from './types'
+import { aiResponse, fakeMaster } from './testing'
+import type { AiRequest } from './types'
 
-const reply = (r: Partial<AiResponse>): AiResponse => ({ text: '', toolCalls: [], usage: null, finishReason: 'stop', streamed: false, ...r })
-const call = (name: string, args: unknown = {}, error?: string) => ({
-  id: name,
-  name,
-  arguments: args,
-  rawArguments: JSON.stringify(args),
-  ...(error ? { argumentsError: error } : {}),
-})
-
-/** Ведущий-заглушка: на каждый запрос — следующий ответ из очереди (функция может звать onText). */
-function fakeMaster(steps: ((req: AiRequest) => AiResponse | Promise<AiResponse>)[]) {
-  const requests: AiRequest[] = []
-  const master: AiMaster = {
-    format: 'openai-chat',
-    async complete(req) {
-      requests.push(req)
-      const step = steps.shift()
-      if (!step) throw new Error('лишний запрос')
-      return step(req)
-    },
-  }
-  return { master, requests }
-}
+const reply = aiResponse
+const call = (name: string, args: unknown = {}, error?: string) => ({ id: name, name, arguments: args, rawArguments: JSON.stringify(args), ...(error ? { argumentsError: error } : {}) })
 
 const streamed = (req: AiRequest) => {
   for (const p of ['Один, ', 'два, ', 'три.']) req.onText?.(p)
@@ -61,7 +41,7 @@ describe('проверка подключения', () => {
     ])
     const results = await runConnectionCheck(master)
     expect(results.map((r) => r.status)).toEqual(['fail', 'skipped', 'skipped'])
-    expect(results[0].detail).toBe('Ключ API не принят. Проверьте ключ в «Настройки» → «Ведущий». Без принятого ключа ведущий не сможет отвечать.')
+    expect(results[0].detail).toBe('Ключ API не принят. Проверьте ключ в «Настройки» → «Ведущий». Без принятого ключа ведущий не сможет отвечать. Где споткнулась: ответ сервера HTTP 401.')
     expect(requests).toHaveLength(1)
   })
 

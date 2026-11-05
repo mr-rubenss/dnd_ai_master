@@ -23,6 +23,11 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     signal: options.signal,
   })
   const text = response.text.trim()
+  if (!text && response.reasoning)
+    throw new AiError('bad-response', {
+      message:
+        'Ведущий не успел ответить: модель «размышляла», и ответ не поместился в лимит длины. Выберите «Подробно» в «Настройки» → «Ведущий» или нерассуждающую модель.',
+    })
   if (!text) throw new AiError('bad-response', { message: 'Ведущий прислал пустой ответ. Попробуйте ещё раз.' })
   return { text, truncated: response.finishReason === 'length' }
 }

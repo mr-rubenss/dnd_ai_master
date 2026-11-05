@@ -35,14 +35,17 @@ export class AiError extends Error {
   readonly retryAfterMs?: number
   /** Подробность от поставщика — уже без ключа (для «Модель не приняла запрос»). */
   readonly detail?: string
+  /** На чём споткнулось: «HTTP 400 от сервера», «разбор потока: …» — для проверки подключения и диагностики. */
+  readonly stage?: string
 
-  constructor(kind: AiErrorKind, options: { status?: number; retryAfterMs?: number; detail?: string; message?: string } = {}) {
+  constructor(kind: AiErrorKind, options: { status?: number; retryAfterMs?: number; detail?: string; message?: string; stage?: string } = {}) {
     super(options.message ?? (options.detail ? `${MESSAGES[kind]} ${options.detail}` : MESSAGES[kind]))
     this.name = 'AiError'
     this.kind = kind
     this.status = options.status
     this.retryAfterMs = options.retryAfterMs
     this.detail = options.detail
+    this.stage = options.stage ?? (options.status ? `ответ сервера HTTP ${options.status}` : undefined)
   }
 
   /** Повторять ли запрос автоматически. */

@@ -233,6 +233,52 @@ test('нет сети — понятное сообщение', async ({ page })
   await expect(page.getByTestId('master-error')).toContainText('Не удалось связаться с адресом API: нет сети')
 })
 
+test('«Диагностика»: статус, заголовки и первые 20 строк сырого ответа — без ключа', async ({ page, context }) => {
+  await withKey(page)
+  const lines = [': OPENROUTER PROCESSING', '', ...Array.from({ length: 30 }, (_, i) => `data: {"choices":[{"delta":{"content":"${i}"}}]}`)].join('\n')
+  const api = await mockApi(page, DEEPSEEK, (_, route) =>
+    route.fulfill({
+      status: 200,
+      headers: { ...CORS, 'access-control-expose-headers': 'x-trace-id', 'content-type': 'text/event-stream', 'x-trace-id': 'trace-42' },
+      body: lines,
+    }),
+  )
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {})
+  await page.goto('./')
+  const panel = await openMasterTab(page)
+  await panel.getByTestId('diagnose').click()
+  const text = panel.getByTestId('diagnostics-text')
+  await expect(text).toContainText('HTTP 200')
+  await expect(text).toContainText('content-type: text/event-stream')
+  await expect(text).toContainText('x-trace-id: trace-42')
+  await expect(text).toContainText('Первые строки ответа (20):')
+  await expect(text).toContainText(': OPENROUTER PROCESSING')
+  await expect(text).toContainText('"content":"17"')
+  await expect(text).not.toContainText('"content":"18"')
+  const shown = await text.innerText()
+  expect(shown).not.toContain(KEY)
+  expect(shown.toLowerCase()).not.toMatch(/^authorization:/m)
+  expect(shown).not.toContain('Bearer')
+  expect(api.bodies[0]).toMatchObject({ stream: true, model: 'deepseek-chat' })
+  await panel.getByTestId('diagnostics-copy').click()
+  await expect(panel.getByTestId('diagnostics-copy')).toHaveText('Скопировано')
+  await expectNoHorizontalScroll(page)
+})
+
+test('проверка рассуждающей модели: стриминг частично, с объяснением, что пришло', async ({ page }) => {
+  await withKey(page)
+  await mockApi(page, DEEPSEEK, (body, route) => {
+    if (body.stream === false || body.tools) return healthy(body, route)
+    return fulfillSse(route, sse([delta({ reasoning: 'Считаю: один, два…' }), delta({}, 'length'), '[DONE]']))
+  })
+  await page.goto('./')
+  const panel = await openMasterTab(page)
+  await panel.getByTestId('check-connection').click()
+  await expect(panel.getByTestId('check-stream')).toHaveAttribute('data-status', 'warn')
+  await expect(panel.getByTestId('check-stream')).toContainText('Модель рассуждающая')
+  await expect(panel.getByTestId('check-stream')).toContainText('причина окончания — length')
+})
+
 test.describe('телефон', () => {
   test.skip(({ isMobile }) => !isMobile, 'только для телефона')
 

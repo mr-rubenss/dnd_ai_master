@@ -3,7 +3,7 @@ import { AI_FORMATS, createMaster } from '../ai'
 import { CHECK_TITLES, runConnectionCheck, type CheckId, type CheckResult } from '../ai/check'
 import { AI_PRESETS, aiConnection, settingsProblems, VERBOSITY, type AiPresetId, type AiProvider, type Verbosity } from '../ai/settings'
 import { aiSettingsStore, useAiSettings } from '../ai/settingsStore'
-import type { AiFormat } from '../ai/types'
+import type { AiDiagnostics, AiFormat } from '../ai/types'
 
 const STATUS_LABELS: Record<CheckResult['status'], string> = { ok: 'Да', warn: 'Частично', fail: 'Нет', skipped: '—' }
 const PROVIDERS: { id: AiProvider; name: string }[] = [
@@ -17,6 +17,8 @@ export function MasterSettings() {
   const [showKey, setShowKey] = useState(false)
   const [checking, setChecking] = useState(false)
   const [results, setResults] = useState<CheckResult[] | null>(null)
+  const [diagnostics, setDiagnostics] = useState<AiDiagnostics | null>(null)
+  const [copied, setCopied] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const id = useId()
   const update = aiSettingsStore.update
@@ -36,6 +38,30 @@ export function MasterSettings() {
       await runConnectionCheck(master, setResults, controller.signal)
     } finally {
       if (!controller.signal.aborted) setChecking(false)
+    }
+  }
+
+  const diagnose = async () => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setChecking(true)
+    setDiagnostics(null)
+    setCopied(false)
+    try {
+      setDiagnostics(await createMaster(aiConnection(settings, apiKey)).diagnose({ maxLines: 20, signal: controller.signal }))
+    } finally {
+      if (!controller.signal.aborted) setChecking(false)
+    }
+  }
+
+  const copyDiagnostics = async () => {
+    if (!diagnostics) return
+    try {
+      await navigator.clipboard.writeText(diagnosticsText(diagnostics))
+      setCopied(true)
+    } catch {
+      setCopied(false)
     }
   }
 
@@ -175,15 +201,26 @@ export function MasterSettings() {
             ))}
           </ul>
         )}
-        <button
-          type="button"
-          className="primary-button"
-          onClick={() => void check()}
-          disabled={checking || problems.length > 0}
-          data-testid="check-connection"
-        >
-          {checking ? 'Проверяю…' : 'Проверить подключение'}
-        </button>
+        <div className="master-actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => void check()}
+            disabled={checking || problems.length > 0}
+            data-testid="check-connection"
+          >
+            {checking ? 'Проверяю…' : 'Проверить подключение'}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void diagnose()}
+            disabled={checking || problems.length > 0}
+            data-testid="diagnose"
+          >
+            Диагностика
+          </button>
+        </div>
         {results && (
           <ul className="check-results" aria-live="polite" data-testid="check-results">
             {(Object.keys(CHECK_TITLES) as CheckId[]).map((checkId) => {
@@ -201,7 +238,36 @@ export function MasterSettings() {
             })}
           </ul>
         )}
+        {diagnostics && (
+          <div className="diagnostics" data-testid="diagnostics">
+            <p className="appearance-hint">
+              Тестовый запрос со стримингом и сырой ответ сервера — без ключа и без заголовка Authorization. Скопируйте и пришлите, если
+              проверка не проходит. Браузер показывает только те заголовки, которые сервер разрешил (CORS).
+            </p>
+            <pre className="diagnostics-text" data-testid="diagnostics-text">
+              {diagnosticsText(diagnostics)}
+            </pre>
+            <button type="button" className="secondary-button" onClick={() => void copyDiagnostics()} data-testid="diagnostics-copy">
+              {copied ? 'Скопировано' : 'Скопировать'}
+            </button>
+          </div>
+        )}
       </section>
     </div>
   )
+}
+
+/** Диагностика одним текстом: запрос, статус, заголовки, первые строки ответа. */
+function diagnosticsText(d: AiDiagnostics): string {
+  return [
+    `Запрос: ${d.request}`,
+    d.status === null ? `Ответа нет: ${d.error ?? 'неизвестная ошибка'}` : `HTTP ${d.status} ${d.statusText}`.trim(),
+    '',
+    'Заголовки ответа:',
+    ...(d.headers.length ? d.headers.map(([n, v]) => `${n}: ${v}`) : ['(нет доступных)']),
+    '',
+    `Первые строки ответа (${d.lines.length}):`,
+    ...(d.lines.length ? d.lines : ['(пусто)']),
+    ...(d.error && d.status !== null ? ['', d.error] : []),
+  ].join('\n')
 }

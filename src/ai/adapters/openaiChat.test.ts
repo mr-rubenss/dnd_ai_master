@@ -91,6 +91,8 @@ describe('ответ', () => {
       usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17 },
       finishReason: 'stop',
       streamed: false,
+      reasoning: '',
+      stats: { events: 1, skipped: 0, contentType: 'application/json', format: 'json' },
     })
   })
 
@@ -115,6 +117,8 @@ describe('ответ', () => {
       usage: { inputTokens: 40, outputTokens: 3, totalTokens: 43 },
       finishReason: 'stop',
       streamed: true,
+      reasoning: '',
+      stats: { events: 5, skipped: 0, contentType: 'text/event-stream; charset=utf-8', format: 'stream' },
     })
   })
 

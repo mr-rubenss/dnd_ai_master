@@ -1,5 +1,5 @@
 // Помощники для тестов: подменённые ответы API (обычный JSON и поток SSE, разрезанный на произвольные куски).
-import type { AiTransport } from './types.ts'
+import type { AiMaster, AiRequest, AiResponse, AiTransport } from './types.ts'
 
 export function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
@@ -42,4 +42,32 @@ export function fakeTransport(responses: (Response | Error | (() => Response))[]
     },
   }
   return { transport, calls, sleeps }
+}
+
+/** Ответ ведущего с разумными значениями по умолчанию. */
+export const aiResponse = (r: Partial<AiResponse> = {}): AiResponse => ({
+  text: '',
+  toolCalls: [],
+  usage: null,
+  finishReason: 'stop',
+  streamed: false,
+  reasoning: '',
+  stats: { events: 1, skipped: 0, contentType: 'text/event-stream', format: 'stream' },
+  ...r,
+})
+
+/** Ведущий-заглушка: на каждый запрос — следующий шаг из очереди (шаг может звать onText). */
+export function fakeMaster(steps: ((req: AiRequest) => AiResponse | Promise<AiResponse>)[]) {
+  const requests: AiRequest[] = []
+  const master: AiMaster = {
+    format: 'openai-chat',
+    async complete(req) {
+      requests.push(req)
+      const step = steps.shift()
+      if (!step) throw new Error('лишний запрос')
+      return step(req)
+    },
+    diagnose: async () => ({ url: '', request: '', status: null, statusText: '', headers: [], lines: [] }),
+  }
+  return { master, requests }
 }

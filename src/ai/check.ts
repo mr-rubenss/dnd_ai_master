@@ -1,7 +1,7 @@
 // «Проверить подключение»: три проверки по очереди — ключ принят; модель отвечает со стримингом;
 // модель вызывает инструменты, в том числе несколько в одном ответе. Для каждой — что это значит для игры.
 import { AiError } from './errors.ts'
-import type { AiMaster, AiTool } from './types.ts'
+import type { AiMaster, AiResponse, AiTool } from './types.ts'
 
 export type CheckId = 'key' | 'stream' | 'tools'
 export type CheckStatus = 'ok' | 'warn' | 'fail' | 'skipped'
@@ -52,8 +52,15 @@ function explain(error: unknown): string {
     'model-not-found': 'Ведущий не сможет отвечать, пока не указана существующая модель.',
     'not-found': 'Ведущий не сможет отвечать, пока адрес не исправлен.',
   }
-  return `${error.message} ${consequence[error.kind] ?? 'Ведущий не сможет отвечать.'}`
+  const where = error.stage ? ` Где споткнулась: ${error.stage}.` : ''
+  return `${error.message} ${consequence[error.kind] ?? 'Ведущий не сможет отвечать.'}${where}`
 }
+
+/** Как пришёл ответ — для объяснения, если что-то не так. */
+const how = (r: AiResponse) =>
+  `Получено: ${r.stats.format === 'stream' ? `поток, событий ${r.stats.events}` : 'обычный JSON (не поток)'}` +
+  `${r.stats.skipped ? `, пропущено непонятных строк ${r.stats.skipped}` : ''}, тип содержимого «${r.stats.contentType || 'не указан'}»,` +
+  ` текста ${r.text.length} симв., «размышлений» ${r.reasoning.length} симв., причина окончания — ${r.finishReason}.`
 
 export async function runConnectionCheck(
   master: AiMaster,
@@ -77,30 +84,46 @@ export async function runConnectionCheck(
     return results
   }
 
-  // 2. Стриминг: текст приходит частями.
+  // 2. Стриминг: текст приходит частями. Лимит с запасом — рассуждающие модели сначала «думают».
   try {
     let parts = 0
     const response = await master.complete({
       messages: [{ role: 'user', content: 'Посчитай по-русски словами от одного до десяти через запятую.' }],
-      maxTokens: 60,
+      maxTokens: 1000,
       onText: () => void parts++,
       signal,
     })
-    if (parts > 1 && response.text.trim())
+    const text = response.text.trim()
+    if (parts > 1 && text)
       push({
         id: 'stream',
         title: CHECK_TITLES.stream,
         status: 'ok',
         detail: `Ответ пришёл частями (${parts}) — текст ведущего будет появляться по ходу.`,
       })
-    else if (response.text.trim())
+    else if (text)
       push({
         id: 'stream',
         title: CHECK_TITLES.stream,
         status: 'warn',
-        detail: 'Модель отвечает, но без стриминга: текст ведущего будет появляться целиком, после паузы.',
+        detail: `Модель отвечает, но не потоком: текст ведущего будет появляться целиком, после паузы. ${how(response)}`,
       })
-    else push({ id: 'stream', title: CHECK_TITLES.stream, status: 'fail', detail: 'Модель прислала пустой ответ — ведущий будет молчать.' })
+    else if (response.reasoning)
+      push({
+        id: 'stream',
+        title: CHECK_TITLES.stream,
+        status: 'warn',
+        detail:
+          `Модель рассуждающая: прислала только «размышления», а ответ не успел начаться${response.finishReason === 'length' ? ' — кончился лимит длины' : ''}. ` +
+          `Ведущий будет отвечать медленнее и дороже; для игры лучше нерассуждающая модель. ${how(response)}`,
+      })
+    else
+      push({
+        id: 'stream',
+        title: CHECK_TITLES.stream,
+        status: 'fail',
+        detail: `Модель прислала пустой ответ — ведущий будет молчать. Нажмите «Диагностика» и пришлите результат. ${how(response)}`,
+      })
   } catch (error) {
     push({ id: 'stream', title: CHECK_TITLES.stream, status: 'fail', detail: explain(error) })
   }
@@ -116,7 +139,7 @@ export async function runConnectionCheck(
       ],
       tools: CHECK_TOOLS,
       toolChoice: 'required',
-      maxTokens: 200,
+      maxTokens: 1000,
       signal,
     })
     const names = new Set(response.toolCalls.map((c) => c.name))
@@ -142,7 +165,7 @@ export async function runConnectionCheck(
         id: 'tools',
         title: CHECK_TITLES.tools,
         status: 'fail',
-        detail: 'Модель не вызывает инструменты — ведущий не сможет запрашивать проверки, броски и изменения в игре. Выберите другую модель.',
+        detail: `Модель не вызывает инструменты — ведущий не сможет запрашивать проверки, броски и изменения в игре. Выберите другую модель. ${how(response)}`,
       })
   } catch (error) {
     push({ id: 'tools', title: CHECK_TITLES.tools, status: 'fail', detail: explain(error) })
