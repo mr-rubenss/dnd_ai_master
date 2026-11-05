@@ -14,9 +14,9 @@ export type AiProvider = AiPresetId | 'custom'
 
 /** Длина ответов ведущего: лимит токенов и указание в системном промте. */
 export const VERBOSITY = {
-  short: { name: 'Коротко', maxTokens: 350, instruction: 'Отвечай коротко: 1–2 небольших абзаца, только самое важное.' },
-  normal: { name: 'Обычно', maxTokens: 800, instruction: 'Отвечай в обычном объёме: 2–3 абзаца.' },
-  detailed: { name: 'Подробно', maxTokens: 1600, instruction: 'Отвечай подробно: 3–5 абзацев с атмосферными деталями.' },
+  short: { name: 'Коротко', maxTokens: 350, instruction: 'Отвечай коротко: 2–3 предложения, только самое важное.' },
+  normal: { name: 'Обычно', maxTokens: 800, instruction: 'Отвечай в обычном объёме: 3–6 предложений.' },
+  detailed: { name: 'Подробно', maxTokens: 1600, instruction: 'Отвечай подробно: 6–10 предложений, с атмосферными деталями, но без воды.' },
 } as const
 export type Verbosity = keyof typeof VERBOSITY
 

@@ -15,7 +15,7 @@ import { StoriesScreen } from './components/StoriesScreen'
 import { AiError, createMaster } from './ai'
 import { aiConnection, settingsProblems } from './ai/settings'
 import { useAiSettings } from './ai/settingsStore'
-import { adventures, defaultAdventure, itemCatalog, startingSheet } from './data'
+import { adventures, defaultAdventure, itemCatalog, rulesData, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { draftEpilogue } from './game/epilogue'
 import { runMasterTurn } from './game/masterTurn'
@@ -251,6 +251,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       const master = createMaster(aiConnection(ai.settings, ai.apiKey))
       const { text } = await runMasterTurn(master, current, {
         verbosity: ai.settings.verbosity,
+        context: { catalog: itemCatalog, rules: rulesData },
         signal: controller.signal,
         onText: (delta) => {
           setAiNotice(null)

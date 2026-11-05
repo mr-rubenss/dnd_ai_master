@@ -5,9 +5,12 @@ import { VERBOSITY, type Verbosity } from '../ai/settings'
 import type { AiMaster, AiRequest } from '../ai/types'
 import type { StoryState } from '../types/story'
 import { masterMessages } from './masterPrompt'
+import type { MasterStateContext } from './masterState'
 
 export interface MasterTurnOptions {
   verbosity: Verbosity
+  /** Справочник предметов и правила — для листа персонажа и инвентаря в запросе. */
+  context: MasterStateContext
   onText?: AiRequest['onText']
   onRetry?: AiRequest['onRetry']
   signal?: AbortSignal
@@ -15,7 +18,7 @@ export interface MasterTurnOptions {
 
 export async function runMasterTurn(master: AiMaster, story: StoryState, options: MasterTurnOptions): Promise<{ text: string; truncated: boolean }> {
   const response = await master.complete({
-    messages: masterMessages(story, options.verbosity),
+    messages: masterMessages(story, options.verbosity, options.context),
     maxTokens: VERBOSITY[options.verbosity].maxTokens,
     temperature: 0.9,
     onText: options.onText,

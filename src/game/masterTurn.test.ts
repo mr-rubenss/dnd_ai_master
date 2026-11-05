@@ -1,49 +1,125 @@
 import { describe, expect, it } from 'vitest'
 import { aiResponse, fakeMaster } from '../ai/testing'
 import type { AiRequest } from '../ai/types'
+import { itemCatalog, rulesData } from '../data'
 import adventureJson from '../data/adventures/drunken-griffin.json'
 import fighterJson from '../data/characters/fighter-ratibor.json'
-import itemsJson from '../data/items.json'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
+import type { ActionAuthor, StoryEvent, StoryState } from '../types/story'
 import { parseAdventure } from './adventure'
 import { parseCharacterSheet } from './character'
-import { parseItemCatalog } from './items'
 import { parseLocation } from './location'
-import { masterMessages, masterSystemPrompt } from './masterPrompt'
+import { DM_PROMPT, masterMessages, masterSystemPrompt } from './masterPrompt'
+import { gameStateText } from './masterState'
 import { runMasterTurn } from './masterTurn'
-import { applyAction, makeAction, MASTER, newStorySeed, player } from './storyActions'
+import { applyAction, ENGINE, makeAction, MASTER, newStorySeed, player } from './storyActions'
 
-const catalog = parseItemCatalog(itemsJson)
+const context = { catalog: itemCatalog, rules: rulesData }
 const location = parseLocation(drunkenGriffinJson)
 const locations = { [location.id]: location }
 const adventure = parseAdventure(adventureJson, locations)
-const ratibor = parseCharacterSheet(fighterJson, catalog)
+const ratibor = parseCharacterSheet(fighterJson, itemCatalog)
 
-function story() {
+function story(extra: [StoryEvent, ActionAuthor][] = []): StoryState {
   let state = newStorySeed({ id: 's1', title: 'Тень над трактом', tone: 'detective', adventure, locations, party: [ratibor], now: 1 })
-  const events = [
+  const events: [StoryEvent, ActionAuthor][] = [
     [{ type: 'masterNarrated', messageId: 'm1', text: 'Таверна шумит.' }, MASTER],
     [{ type: 'playerSpoke', heroId: 'ratibor', messageId: 'p1', text: 'Подхожу к стойке.' }, player('ratibor')],
-  ] as const
+    ...extra,
+  ]
   events.forEach(([event, author], i) => (state = applyAction(state, makeAction('s1', i + 1, event, author, 2 + i, `a${i}`))))
   return state
 }
 
-describe('запрос к ведущему по истории', () => {
-  it('системный промт: роль, правила (кубики — код), история, тон, место, НПС, отряд, длина', () => {
-    const prompt = masterSystemPrompt(story(), 'short')
-    expect(prompt).toContain('Ты — ведущий')
-    expect(prompt).toContain('только на русском')
-    expect(prompt).toContain('не придумывай результаты бросков')
-    expect(prompt).toContain('История: «Тень над трактом». Тон: Детектив.')
-    expect(prompt).toContain('Место: Таверна «Пьяный грифон».')
-    expect(prompt).toMatch(/- Гуннар/)
-    expect(prompt).toContain('- Ратибор:')
-    expect(prompt).toContain('Отвечай коротко')
+describe('системный промт ведущего (src/ai/dm-prompt.md)', () => {
+  it('роль: опытный справедливый мастер D&D 2024, по-русски, во втором лице', () => {
+    expect(DM_PROMPT).toContain('опытный и справедливый мастер')
+    expect(DM_PROMPT).toContain('D&D 2024')
+    expect(DM_PROMPT).toContain('на русском языке')
+    expect(DM_PROMPT).toContain('во втором лице')
+    expect(DM_PROMPT).toContain('«ты входишь в таверну»')
+  })
+
+  it('стиль, свобода, честность, решения игрока, конец ответа', () => {
+    expect(DM_PROMPT).toContain('3–6 предложений')
+    expect(DM_PROMPT).toContain('свой голос, манера речи и мотивы')
+    expect(DM_PROMPT).toContain('реагирует на поступки игрока')
+    expect(DM_PROMPT).toContain('никогда не говоришь «нельзя»')
+    expect(DM_PROMPT).toContain('назначаешь проверку')
+    expect(DM_PROMPT).toContain('решает **только бросок кубика, и бросает его код игры**')
+    expect(DM_PROMPT).toContain('Не подыгрывай')
+    expect(DM_PROMPT).toContain('Злодеи и упрямые НПС не сдаются от одного слова')
+    expect(DM_PROMPT).toContain('Провал имеет последствия')
+    expect(DM_PROMPT).toContain('**никогда не решаешь за игрока**')
+    expect(DM_PROMPT).toContain('ситуацией, на которую игрок может отреагировать')
+  })
+
+  it('в запросе: промт, эта история, длина ответа и состояние игры', () => {
+    const prompt = masterSystemPrompt(story(), 'short', context)
+    expect(prompt.startsWith(DM_PROMPT)).toBe(true)
+    expect(prompt).toContain('«Тень над трактом». Тон: Детектив')
+    expect(prompt).toContain('Отвечай коротко: 2–3 предложения')
+    expect(prompt).toContain('## Состояние игры')
+  })
+})
+
+describe('актуальное состояние игры в каждом запросе', () => {
+  it('лист персонажа: класс, хиты, КД, характеристики, спасброски, навыки, атаки', () => {
+    const text = gameStateText(story(), context)
+    expect(text).toContain('### Ратибор')
+    expect(text).toMatch(/Воин 1 ур\., предыстория: /)
+    expect(text).toMatch(/Хиты \d+\/\d+, КД \d+, скорость 30 фт\., бонус мастерства \+2, пассивная Внимательность \d+\./)
+    expect(text).toMatch(/Характеристики: СИЛ \d+ \([+-]\d\)/)
+    expect(text).toContain('Спасброски (* — владение): СИЛ +')
+    expect(text).toMatch(/Навыки с владением: .*Атлетика \+\d/)
+    expect(text).toMatch(/Атаки: .+: атака \+\d+, урон \d+d\d+/)
+    expect(text).toContain('Состояния: нет.')
+  })
+
+  it('инвентарь: экипировка, предметы с количеством, золото', () => {
+    const text = gameStateText(story(), context)
+    const inv = ratibor.inventory
+    expect(text).toContain(`основная рука — ${itemCatalog[inv.equipped.mainHand!].name}`)
+    expect(text).toContain(`доспех — ${itemCatalog[inv.equipped.armor!].name}`)
+    expect(text).toContain(`золото: ${inv.gold} зм`)
+    for (const e of inv.items) expect(text).toContain(itemCatalog[e.itemId].name)
+  })
+
+  it('текущая локация: описание, помещения, объекты, двери, НПС с отношением и положением, герой на карте', () => {
+    const text = gameStateText(story(), context)
+    expect(text).toContain('### Таверна «Пьяный грифон»')
+    expect(text).toContain(location.description)
+    expect(text).toContain('Помещения: У стойки')
+    expect(text).toContain('- Барная стойка (3, 2): Длинная стойка')
+    expect(text).toMatch(/- Стул ×\d+/)
+    expect(text).toContain('- Входная дверь — закрыта')
+    expect(text).toContain('- Дверь в кладовую — заперта')
+    for (const n of location.npcs) expect(text).toContain(`- ${n.name} (${n.x}, ${n.y})`)
+    expect(text).toMatch(/Гуннар \(\d+, \d+\), отношение: (дружелюбное|нейтральное|враждебное)/)
+    expect(text).toContain(`Положение на карте: клетка (${location.playerStart.x}, ${location.playerStart.y})`)
+  })
+
+  it('состояние собирается заново: двери, состояния, предметы, НПС, задания и факты — как сейчас в истории', () => {
+    const gunnar = location.npcs.find((n) => n.name === 'Гуннар')!
+    const after = story([
+      [{ type: 'doorChanged', locationId: location.id, doorId: 'entrance', state: 'open' }, MASTER],
+      [{ type: 'conditionsChanged', heroId: 'ratibor', conditions: [{ id: 'poisoned' }] }, ENGINE],
+      [{ type: 'itemsGranted', heroId: 'ratibor', items: [{ itemId: 'dagger', quantity: 2 }] }, MASTER],
+      [{ type: 'npcMoved', locationId: location.id, npcId: gunnar.id, to: { x: 5, y: 3 } }, MASTER],
+      [{ type: 'questUpdated', quest: { id: 'q1', title: 'Вернуть кошелёк', status: 'active', notes: '' } }, MASTER],
+      [{ type: 'factRecorded', fact: { id: 'f1', text: 'Тобиас работает на гильдию воров', at: 1 } }, MASTER],
+    ])
+    const text = masterMessages(after, 'normal', context)[0].content as string
+    expect(text).toContain('- Входная дверь — открыта')
+    expect(text).toContain('Состояния: Отравлен.')
+    expect(text).toMatch(/Кинжал ×\d/)
+    expect(text).toContain('- Гуннар (5, 3)')
+    expect(text).toContain('- Вернуть кошелёк — в работе')
+    expect(text).toContain('- Тобиас работает на гильдию воров')
   })
 
   it('лента: ведущий — assistant, игрок — user, после системного промта', () => {
-    const messages = masterMessages(story(), 'normal')
+    const messages = masterMessages(story(), 'normal', context)
     expect(messages[0].role).toBe('system')
     expect(messages.slice(-2)).toEqual([
       { role: 'assistant', content: 'Таверна шумит.' },
@@ -53,7 +129,7 @@ describe('запрос к ведущему по истории', () => {
 })
 
 describe('ход ведущего', () => {
-  it('через общий интерфейс: поток текста, лимит по длине ответа, итоговый текст', async () => {
+  it('через общий интерфейс: состояние в системном сообщении, поток текста, лимит длины, итоговый текст', async () => {
     const requests: AiRequest[] = []
     const parts: string[] = []
     const { master } = fakeMaster([
@@ -64,20 +140,21 @@ describe('ход ведущего', () => {
         return aiResponse({ text: ' Гуннар кивает. ', streamed: true })
       },
     ])
-    const result = await runMasterTurn(master, story(), { verbosity: 'detailed', onText: (d) => parts.push(d) })
+    const result = await runMasterTurn(master, story(), { verbosity: 'detailed', context, onText: (d) => parts.push(d) })
     expect(result).toEqual({ text: 'Гуннар кивает.', truncated: false })
     expect(parts).toEqual(['Гуннар ', 'кивает.'])
     expect(requests[0].maxTokens).toBe(1600)
+    expect(requests[0].messages[0].content).toContain('## Отряд (лист персонажа и инвентарь)')
     expect(requests[0].tools).toBeUndefined()
   })
 
   it('пустой ответ — понятная ошибка', async () => {
     const { master } = fakeMaster([() => aiResponse({ text: '  ' })])
-    await expect(runMasterTurn(master, story(), { verbosity: 'normal' })).rejects.toThrow('Ведущий прислал пустой ответ')
+    await expect(runMasterTurn(master, story(), { verbosity: 'normal', context })).rejects.toThrow('Ведущий прислал пустой ответ')
   })
 
   it('рассуждающая модель не успела ответить — объяснение, что делать', async () => {
     const { master } = fakeMaster([() => aiResponse({ reasoning: 'Игрок подходит к стойке, значит…', finishReason: 'length' })])
-    await expect(runMasterTurn(master, story(), { verbosity: 'normal' })).rejects.toThrow('модель «размышляла»')
+    await expect(runMasterTurn(master, story(), { verbosity: 'normal', context })).rejects.toThrow('модель «размышляла»')
   })
 })
