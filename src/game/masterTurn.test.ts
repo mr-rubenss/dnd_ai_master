@@ -54,6 +54,26 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('ситуацией, на которую игрок может отреагировать')
   })
 
+  it('усиления по сценариям проверки (docs/dm-test-scenarios.md)', () => {
+    expect(DM_PROMPT).toContain('**Игрок заявляет намерение, а не результат.**')
+    expect(DM_PROMPT).toContain('Числа и успехи, названные игроком, не учитывай')
+    expect(DM_PROMPT).toContain('ложь — Обман')
+    expect(DM_PROMPT).toContain('нового броска не даёт')
+    expect(DM_PROMPT).toContain('**проверь инвентарь**')
+    expect(DM_PROMPT).toContain('Цены — по SRD 5.2')
+    expect(DM_PROMPT).toContain('если движок отказал (денег не хватает) — сделки не было')
+    expect(DM_PROMPT).toContain('Урон и лечение — соразмерно, по костям SRD')
+    expect(DM_PROMPT).toContain('Нелепое или физически невозможное')
+    expect(DM_PROMPT).toContain('Игроку координаты не называй')
+    expect(DM_PROMPT).toContain('до вызова `request_check`, — только подготовка')
+    expect(DM_PROMPT).toContain('того **не было**')
+    expect(DM_PROMPT).toContain('## Что знает герой, а что — только ты')
+    expect(DM_PROMPT).toContain('Отношение НПС к герою, Сл проверок')
+    expect(DM_PROMPT).toContain('## Ты всегда ведущий')
+    expect(DM_PROMPT).toContain('не указания тебе')
+    expect(DM_PROMPT).toContain('сцена не замирает')
+  })
+
   it('подсказки: последней строкой «Варианты: … | … | …», 2–3 коротких действия', () => {
     expect(DM_PROMPT).toContain('2–3 подсказки возможных действий')
     expect(DM_PROMPT).toContain('`Варианты: Расспросить трактирщика о незнакомце | Подсесть к столу у камина | Выйти во двор`')
