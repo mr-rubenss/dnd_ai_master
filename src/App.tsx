@@ -12,14 +12,18 @@ import { NewStoryScreen } from './components/NewStoryScreen'
 import { PlayerInput } from './components/PlayerInput'
 import { StartMenu } from './components/StartMenu'
 import { StoriesScreen } from './components/StoriesScreen'
-import { AiError, createMaster } from './ai'
-import { aiConnection, settingsProblems } from './ai/settings'
+import { AiError } from './ai'
+import { calibrationStore } from './ai/calibrationStore'
+import { settingsProblems } from './ai/settings'
 import { useAiSettings } from './ai/settingsStore'
 import { adventures, defaultAdventure, itemCatalog, rulesData, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { draftEpilogue } from './game/epilogue'
 import { rewritableMessageId, streamingText } from './game/masterSuggestions'
 import { runMasterRewrite, runMasterTurn } from './game/masterTurn'
+import { devLog } from './game/devLog'
+import { compactionNeeded, compactMemory, writeEpilogueSummary } from './game/memory'
+import { masterSession, type MasterSession } from './game/masterSession'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryState } from './types/story'
@@ -44,6 +48,9 @@ function App() {
   /** Экран настроек (шестерёнка в шапке): открытая вкладка или null. */
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
   const closeSettings = useCallback(() => setSettingsTab(null), [])
+  const aiState = useAiSettings()
+  /** Ведущий пишет черновик итога истории. */
+  const [writingEpilogue, setWritingEpilogue] = useState(false)
   const current: Screen = screen === 'game' && !app.active ? 'menu' : screen
   const readOnly = app.active?.status === 'completed'
   const latest = app.stories.find((s) => s.status === 'active') ?? null
@@ -85,7 +92,22 @@ function App() {
       `Завершить историю «${active.title}»? Дальше она будет доступна только для чтения, а герои освободятся для новых историй ` +
         '(погибшие уйдут в «Зал славы»). Итог истории попадёт в «Летопись» героев.',
     )
-    if (confirmed && ok(await appStore.completeStory(draftEpilogue(active, Date.now())))) setEpilogueOpen(true)
+    if (!confirmed) return
+    let epilogue = draftEpilogue(active, Date.now())
+    // Черновик краткого содержания пишет ведущий — по сводке памяти и журналу фактов; не вышло — черновик из журнала.
+    if (settingsProblems(aiState.settings, aiState.apiKey).length === 0) {
+      setWritingEpilogue(true)
+      try {
+        const session = masterSession(aiState.settings, aiState.apiKey)
+        const summary = await writeEpilogueSummary(session.master, active, session.turn)
+        epilogue = { ...epilogue, summary }
+      } catch (error) {
+        devLog.add({ kind: 'error', text: `Итог истории от ведущего не получен: ${error instanceof Error ? error.message : String(error)}` })
+      } finally {
+        setWritingEpilogue(false)
+      }
+    }
+    if (ok(await appStore.completeStory(epilogue))) setEpilogueOpen(true)
   }
 
   if (!app.ready) {
@@ -110,8 +132,8 @@ function App() {
           {current !== 'menu' && (
             <>
               {current === 'game' && !readOnly && (
-                <button type="button" className="header-button" onClick={finishStory} data-testid="finish-story">
-                  Завершить историю
+                <button type="button" className="header-button" onClick={finishStory} data-testid="finish-story" disabled={writingEpilogue}>
+                  {writingEpilogue ? 'Ведущий пишет итог…' : 'Завершить историю'}
                 </button>
               )}
               <button
@@ -224,11 +246,16 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   const [aiNotice, setAiNotice] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  /** Фоновое сжатие памяти ведущего: идёт ли и как его остановить. */
+  const [compacting, setCompacting] = useState(false)
+  const compactingRef = useRef<Promise<void> | null>(null)
+  const compactAbortRef = useRef<AbortController | null>(null)
 
   useEffect(
     () => () => {
       window.clearTimeout(timerRef.current)
       abortRef.current?.abort()
+      compactAbortRef.current?.abort()
     },
     [],
   )
@@ -274,51 +301,110 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     }
     const onRetry = ({ delayMs }: { delayMs: number }) =>
       setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`)
+    const session = masterSession(ai.settings, ai.apiKey)
+    const context = { catalog: itemCatalog, rules: rulesData }
+    const common = { verbosity: ai.settings.verbosity, context, ...session.turn, signal: controller.signal, onText, onRetry }
+    let ok = false
     try {
-      const current = appStore.getState().active ?? story
-      const master = createMaster(aiConnection(ai.settings, ai.apiKey))
-      const context = { catalog: itemCatalog, rules: rulesData }
-      if (rewriteId) {
-        const result = await runMasterRewrite(master, current, { verbosity: ai.settings.verbosity, context, signal: controller.signal, onText, onRetry })
-        if (result && result.messageId === rewriteId) {
-          const reason = await appStore.dispatchTo(
-            story.id,
-            { type: 'masterRewritten', messageId: rewriteId, text: result.text, ...(result.suggestions.length ? { suggestions: result.suggestions } : {}) },
-            MASTER,
-          )
-          if (reason) setAiError(reason)
+      // Ошибка «слишком длинный контекст» — сжатие памяти и один повтор.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const current = appStore.getState().active ?? story
+          if (rewriteId) {
+            const result = await runMasterRewrite(session.master, current, common)
+            if (result && result.messageId === rewriteId) {
+              const reason = await appStore.dispatchTo(
+                story.id,
+                { type: 'masterRewritten', messageId: rewriteId, text: result.text, ...(result.suggestions.length ? { suggestions: result.suggestions } : {}) },
+                MASTER,
+              )
+              if (reason) setAiError(reason)
+            }
+          } else {
+            const { text, suggestions } = await runMasterTurn(session.master, current, {
+              ...common,
+              // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
+              runtime: {
+                getStory: () => (appStore.getState().active?.id === story.id ? appStore.getState().active! : current),
+                commit: (event, author) => appStore.dispatchTo(story.id, event, author),
+                tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
+                onRound: () => {
+                  streamed = ''
+                  setStreamText('')
+                },
+              },
+            })
+            if (text)
+              await appStore.dispatchTo(
+                story.id,
+                { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ...(suggestions.length ? { suggestions } : {}) },
+                MASTER,
+              )
+          }
+          ok = true
+          break
+        } catch (error) {
+          if (!(error instanceof AiError && error.kind === 'context-length' && attempt === 0) || controller.signal.aborted) throw error
+          calibrationStore.underestimated(session.model)
+          streamed = ''
+          setStreamText('')
+          setAiNotice('Запрос не поместился в память модели — ведущий сжимает старые события и пробует снова…')
+          await compactNow('context-error', session, true)
+          setAiNotice(null)
         }
-        return
       }
-      const { text, suggestions } = await runMasterTurn(master, current, {
-        verbosity: ai.settings.verbosity,
-        context,
-        // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
-        runtime: {
-          getStory: () => (appStore.getState().active?.id === story.id ? appStore.getState().active! : current),
-          commit: (event, author) => appStore.dispatchTo(story.id, event, author),
-          tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
-          onRound: () => {
-            streamed = ''
-            setStreamText('')
-          },
-        },
-        signal: controller.signal,
-        onText,
-        onRetry,
-      })
-      if (text)
-        await appStore.dispatchTo(
-          story.id,
-          { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ...(suggestions.length ? { suggestions } : {}) },
-          MASTER,
-        )
     } catch (error) {
       if (controller.signal.aborted) return
       setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
     } finally {
       if (!controller.signal.aborted) finish()
     }
+    // Сжатие памяти — в фоне после ответа, игрок не ждёт.
+    if (ok) void compactNow('budget', session, false)
+  }
+
+  /**
+   * Сжатие памяти ведущего (src/game/memory.ts). Фоновое — только если пора (запрос больше бюджета, разрослись
+   * сводка или факты); принудительное — после ошибки «слишком длинный контекст». Ошибка сжатия не ломает игру:
+   * запрос всё равно уйдёт, а при риске превысить окно самые старые сообщения из него просто уберутся.
+   */
+  const compactNow = async (reason: 'budget' | 'context-error', session: MasterSession, force: boolean) => {
+    if (compactingRef.current) return compactingRef.current
+    const active = appStore.getState().active
+    if (!active || active.id !== story.id) return
+    const options = { verbosity: ai.settings.verbosity, context: { catalog: itemCatalog, rules: rulesData }, ...session.compact, force }
+    if (!force && !compactionNeeded(active, options)) return
+    const controller = new AbortController()
+    compactAbortRef.current = controller
+    const run = (async () => {
+      setCompacting(true)
+      try {
+        const result = await compactMemory(
+          session.compactor,
+          {
+            getStory: () => {
+              const now = appStore.getState().active
+              if (!now || now.id !== story.id) throw new AiError('aborted')
+              return now
+            },
+            commit: (event, author) => appStore.dispatchTo(story.id, event, author),
+            tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
+            now: () => Date.now(),
+          },
+          { ...options, signal: controller.signal },
+        )
+        const sizeOnly = !force && result.compacted === 0
+        devLog.add({ kind: 'compaction', model: session.compactModel, reason: force ? reason : sizeOnly ? 'size' : 'budget', ...result })
+      } catch (error) {
+        if (controller.signal.aborted) return
+        devLog.add({ kind: 'error', text: `Сжатие памяти не удалось: ${error instanceof Error ? error.message : String(error)}` })
+      } finally {
+        setCompacting(false)
+        compactingRef.current = null
+      }
+    })()
+    compactingRef.current = run
+    return run
   }
 
   const retryMaster = () => {
@@ -368,6 +454,11 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               onRewrite={readOnly ? undefined : (messageId) => void askMaster(messageId)}
               rewriteDisabled={waiting}
             />
+            {compacting && !waiting && (
+              <p className="master-notice memory-notice" role="status" data-testid="memory-compacting">
+                Ведущий записывает в память старые события…
+              </p>
+            )}
             {aiNotice && (
               <p className="master-notice" role="status" data-testid="master-notice">
                 {aiNotice}
@@ -398,6 +489,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
           inventory={lead.inventory}
           catalog={itemCatalog}
           onEquipChange={readOnly ? undefined : handleEquipChange}
+          journal={{ memory: story.memory, facts: story.world.facts }}
         />
       </div>
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}

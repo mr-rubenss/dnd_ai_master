@@ -67,10 +67,26 @@ function parseArguments(id: string, name: string, raw: string): AiToolCall {
 }
 
 const toUsage = (u: unknown): AiUsage | null => {
-  const usage = u as { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null | undefined
+  const usage = u as
+    | {
+        prompt_tokens?: number
+        completion_tokens?: number
+        total_tokens?: number
+        // Кэш: OpenAI и большинство совместимых — prompt_tokens_details.cached_tokens, DeepSeek — prompt_cache_hit_tokens.
+        prompt_tokens_details?: { cached_tokens?: number } | null
+        prompt_cache_hit_tokens?: number
+      }
+    | null
+    | undefined
   if (!usage || typeof usage.prompt_tokens !== 'number') return null
   const out = usage.completion_tokens ?? 0
-  return { inputTokens: usage.prompt_tokens, outputTokens: out, totalTokens: usage.total_tokens ?? usage.prompt_tokens + out }
+  const cached = usage.prompt_cache_hit_tokens ?? usage.prompt_tokens_details?.cached_tokens
+  return {
+    inputTokens: usage.prompt_tokens,
+    outputTokens: out,
+    totalTokens: usage.total_tokens ?? usage.prompt_tokens + out,
+    cachedInputTokens: typeof cached === 'number' ? cached : null,
+  }
 }
 
 const toFinish = (reason: unknown): AiResponse['finishReason'] =>

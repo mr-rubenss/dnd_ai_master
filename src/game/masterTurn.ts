@@ -2,10 +2,10 @@
 // финальный текст. ИИ меняет игру только инструментами (masterTools.ts): каждый вызов проверяет движок, недопустимый —
 // отклоняется, и модель получает причину. Принятые действия записываются в историю через `commit` по одному.
 import { AiError } from '../ai/errors'
-import { VERBOSITY, type Verbosity } from '../ai/settings'
-import type { AiMaster, AiMessage, AiRequest, AiResponse, AiToolCall } from '../ai/types'
+import { VERBOSITY, type ContextBudget, type Verbosity } from '../ai/settings'
+import type { AiMaster, AiMessage, AiRequest, AiResponse, AiToolCall, AiUsage } from '../ai/types'
 import type { ActionAuthor, StoryEvent, StoryState } from '../types/story'
-import { masterMessages } from './masterPrompt'
+import { buildMasterRequest, type PromptPart } from './masterPrompt'
 import { rewritableMessageId, splitSuggestions } from './masterSuggestions'
 import type { MasterStateContext } from './masterState'
 import { executeTool, MASTER_TOOLS, type ToolContext, type ToolOutcome } from './masterTools'
@@ -27,8 +27,26 @@ export interface MasterToolRuntime {
   onRound?: () => void
 }
 
+/** Отчёт о запросе к модели — для журнала разработчика и уточнения подсчёта токенов. */
+export interface RequestReport {
+  purpose: 'turn' | 'rewrite' | 'compact' | 'resummarize' | 'merge-facts' | 'epilogue'
+  parts: { label: string; tokens: number }[]
+  rawTokens: number
+  estimatedTokens: number
+  dropped: number
+  usage: AiUsage | null
+}
+
+export const partsReport = (parts: PromptPart[]) => parts.map((p) => ({ label: p.id, tokens: p.tokens }))
+
 export interface MasterTurnOptions {
   verbosity: Verbosity
+  /** Бюджет контекста; без него — запрос без обрезки. */
+  budget?: ContextBudget
+  /** Поправочный коэффициент подсчёта токенов (читается перед каждым запросом — он уточняется по ходу). */
+  factor?: () => number
+  /** После каждого запроса к модели. */
+  onRequest?: (report: RequestReport) => void
   /** Справочник предметов и правила — для листа персонажа и инвентаря в запросе. */
   context: MasterStateContext
   /** Инструменты ведущего; без них — только текст. */
@@ -60,16 +78,26 @@ function emptyAnswer(response: AiResponse): never {
 export async function runMasterTurn(master: AiMaster, story: StoryState, options: MasterTurnOptions): Promise<MasterTurnResult> {
   const { runtime } = options
   const current = () => runtime?.getStory() ?? story
-  const messages: AiMessage[] = masterMessages(current(), options.verbosity, options.context)
+  const historyEnd = story.messages.length
+  const turn: AiMessage[] = []
   const toolCalls: MasterTurnResult['toolCalls'] = []
   let narrated = false
 
   for (let round = 0; ; round++) {
     const toolsAllowed = !!runtime && round < MAX_TOOL_ROUNDS
-    // Состояние в системном промте — свежее на каждый раунд (после уже выполненных инструментов).
-    messages[0] = masterMessages(current(), options.verbosity, options.context)[0]
+    // Запрос собирается заново на каждый раунд: состояние и факты — свежие (после уже выполненных инструментов),
+    // лента — на начало хода, дальше — сообщения этого хода.
+    const plan = buildMasterRequest(current(), {
+      verbosity: options.verbosity,
+      context: options.context,
+      tools: runtime ? MASTER_TOOLS : undefined,
+      budget: options.budget,
+      factor: options.factor?.(),
+      historyEnd,
+      turn,
+    })
     const response = await master.complete({
-      messages,
+      messages: plan.messages,
       ...(runtime ? { tools: MASTER_TOOLS, toolChoice: toolsAllowed ? ('auto' as const) : ('none' as const) } : {}),
       maxTokens: VERBOSITY[options.verbosity].maxTokens,
       temperature: 0.9,
@@ -77,6 +105,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       onRetry: options.onRetry,
       signal: options.signal,
     })
+    options.onRequest?.({ purpose: 'turn', parts: partsReport(plan.parts), rawTokens: plan.rawTokens, estimatedTokens: plan.estimatedTokens, dropped: plan.dropped, usage: response.usage })
     const { text, suggestions } = splitSuggestions(response.text)
     const calls = toolsAllowed ? response.toolCalls : []
 
@@ -90,7 +119,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       const reason = await runtime!.commit({ type: 'masterNarrated', messageId: runtime!.tools.newId(), text }, MASTER)
       if (!reason) narrated = true
     }
-    messages.push({ role: 'assistant', content: response.text || null, toolCalls: calls })
+    turn.push({ role: 'assistant', content: response.text || null, toolCalls: calls })
     runtime!.onRound?.()
     for (const call of calls) {
       let outcome = executeTool(current(), call, runtime!.tools)
@@ -103,7 +132,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       }
       toolCalls.push({ call, outcome })
       runtime!.onTool?.(call, outcome)
-      messages.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
+      turn.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
     }
   }
 }
@@ -132,15 +161,22 @@ export async function runMasterRewrite(
 ): Promise<MasterRewriteResult | null> {
   const messageId = rewritableMessageId(story.messages)
   if (!messageId) return null
-  const messages: AiMessage[] = [...masterMessages(story, options.verbosity, options.context), { role: 'user', content: REWRITE_REQUEST }]
+  const plan = buildMasterRequest(story, {
+    verbosity: options.verbosity,
+    context: options.context,
+    budget: options.budget,
+    factor: options.factor?.(),
+    trailing: [{ role: 'user', content: REWRITE_REQUEST }],
+  })
   const response = await master.complete({
-    messages,
+    messages: plan.messages,
     maxTokens: VERBOSITY[options.verbosity].maxTokens,
     temperature: 1,
     onText: options.onText,
     onRetry: options.onRetry,
     signal: options.signal,
   })
+  options.onRequest?.({ purpose: 'rewrite', parts: partsReport(plan.parts), rawTokens: plan.rawTokens, estimatedTokens: plan.estimatedTokens, dropped: plan.dropped, usage: response.usage })
   const { text, suggestions } = splitSuggestions(response.text)
   if (!text) emptyAnswer(response)
   return { messageId, text, suggestions, truncated: response.finishReason === 'length' }

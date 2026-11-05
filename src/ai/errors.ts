@@ -8,6 +8,7 @@ export type AiErrorKind =
   | 'model-not-found'
   | 'not-found' // неверный адрес API
   | 'bad-request'
+  | 'context-length' // запрос не поместился в окно контекста модели
   | 'server'
   | 'bad-response'
   | 'aborted'
@@ -22,6 +23,7 @@ const MESSAGES: Record<AiErrorKind, string> = {
   'model-not-found': 'Модель не найдена. Проверьте название модели в «Настройки» → «Ведущий».',
   'not-found': 'По этому адресу API нет нужного метода. Проверьте адрес (base URL) в «Настройки» → «Ведущий».',
   'bad-request': 'Модель не приняла запрос.',
+  'context-length': 'Запрос не поместился в окно контекста модели. Уменьшите «Окно контекста» или «Размер запроса» в «Настройки» → «Ведущий».',
   server: 'Сервер модели перегружен или недоступен. Попробуйте позже.',
   'bad-response': 'Модель прислала ответ в непонятном формате.',
   aborted: 'Запрос отменён.',
@@ -83,6 +85,9 @@ export function errorFromResponse(status: number, body: unknown, headers: Header
   if (status === 401 || status === 403) return new AiError('auth', { status })
   if (status === 402 || /insufficient[_ ](quota|balance)/i.test(raw)) return new AiError('billing', { status })
   if (status === 429) return new AiError('rate-limit', { status, retryAfterMs: retryAfter })
+  // «Слишком длинный контекст»: формулировки OpenAI, DeepSeek, OpenRouter, vLLM и др.
+  if ((status === 400 || status === 413 || status === 422) && /context[_ ]length|context window|maximum context|too many tokens|prompt is too long|reduce the length|input is too long|exceeds? the (model'?s )?(max|context)/i.test(raw))
+    return new AiError('context-length', { status, detail })
   if (mentionsModel && (status === 400 || status === 404 || status === 422)) return new AiError('model-not-found', { status })
   if (status === 404) return new AiError('not-found', { status })
   if (status >= 500) return new AiError('server', { status, retryAfterMs: retryAfter })

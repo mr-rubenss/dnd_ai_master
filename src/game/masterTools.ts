@@ -11,6 +11,7 @@ import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import type { ItemCatalog } from '../types/items'
 import { DOOR_STATES, NPC_ATTITUDES, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
 import type { ActionAuthor, PartyMember, StoryEvent, StoryState } from '../types/story'
+import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER } from './storyActions'
 
@@ -151,8 +152,12 @@ export const MASTER_TOOLS: AiTool[] = [
   },
   {
     name: 'note_fact',
-    description: 'Записать в журнал важный факт о мире, который нужно помнить дальше: «Тобиас работает на гильдию воров».',
-    parameters: object({ text: str('Факт одним предложением.') }, ['text']),
+    description:
+      'Записать в журнал фактов то, что должно жить дольше ленты: НПС и их отношение к герою, обещания, долги, тайны, важные события. ' +
+      'Стиль — заметка мастера: одна строка до ~20 слов, без прилагательных и вводных слов, имена и названия точно, ' +
+      'без пересказа диалогов и описаний. Пример: «Тобиас — вор бочек; знает, что герой его подозревает; должен гильдии 30 зм». ' +
+      'Если факт уточняет уже записанный (о том же НПС, долге, тайне) — движок обновит старую запись.',
+    parameters: object({ text: str('Факт — одна строка до ~20 слов.') }, ['text']),
   },
   {
     name: 'add_object',
@@ -512,7 +517,16 @@ const HANDLERS: Record<string, Handler> = {
 
   note_fact(state, args, ctx) {
     const factText = text(args, 'text', true)!
-    if (state.world.facts.some((f) => norm(f.text) === norm(factText))) reject('Этот факт уже записан.')
+    const problem = factProblem(factText)
+    if (problem) reject(problem)
+    if (state.world.facts.some((f) => norm(f.text) === norm(factText))) return { events: [], result: { message: 'Этот факт уже записан.' } }
+    // Повтор уже записанного (о том же) — обновляем старую запись, а не плодим похожие.
+    const same = sameFact(state.world.facts, factText)
+    if (same)
+      return {
+        events: [{ event: { type: 'factUpdated', factId: same.id, text: factText, at: ctx.now() }, author: MASTER }],
+        result: { message: `Факт обновлён (было: «${same.text}»).` },
+      }
     return {
       events: [{ event: { type: 'factRecorded', fact: { id: `fact-${ctx.newId()}`, text: factText, at: ctx.now() } }, author: MASTER }],
       result: { message: 'Факт записан в журнал.' },

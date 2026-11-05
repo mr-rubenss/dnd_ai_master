@@ -153,7 +153,23 @@ describe('недопустимые вызовы отклоняются, ниче
     expect(rejected(s, 'note_fact', { text: '  ' })).toBe('«text» — непустая строка.')
     expect(rejected(s, 'note_fact', {})).toBe('Нужен параметр «text».')
     const noted = run(s, 'note_fact', { text: 'Тобиас — вор.' }).state
-    expect(rejected(noted, 'note_fact', { text: 'тобиас — вор.' })).toBe('Этот факт уже записан.')
+    const again = run(noted, 'note_fact', { text: 'тобиас — вор.' })
+    expect(again.outcome).toMatchObject({ ok: true, result: { ok: true, message: 'Этот факт уже записан.' }, events: [] })
+  })
+
+  it('факты: слишком длинный — просьба сократить; повтор — обновление старой записи, а не новая', () => {
+    const long = Array.from({ length: 35 }, (_, i) => `слово${i}`).join(' ')
+    expect(rejected(s, 'note_fact', { text: long })).toMatch(/^Факт слишком длинный \(35 слов\)\. Сократи до ~20 слов в стиле заметки мастера/)
+    expect(rejected(s, 'note_fact', { text: 'Тобиас — вор\nБрам — охранник' })).toBe('Факт — одна строка. Запиши каждый факт отдельным вызовом.')
+
+    const ctx = context()
+    const first = run(s, 'note_fact', { text: 'Тобиас — должен гильдии 30 зм' }, ctx).state
+    const other = run(first, 'note_fact', { text: 'Лиара — ищет брата в Северной башне' }, ctx).state
+    expect(other.world.facts).toHaveLength(2)
+    const updated = run(other, 'note_fact', { text: 'Тобиас — должен гильдии 10 зм' }, ctx)
+    expect(updated.outcome.events.map((e) => e.event.type)).toEqual(['factUpdated'])
+    expect(updated.outcome.result.message).toBe('Факт обновлён (было: «Тобиас — должен гильдии 30 зм»).')
+    expect(updated.state.world.facts.map((f) => f.text)).toEqual(['Тобиас — должен гильдии 10 зм', 'Лиара — ищет брата в Северной башне'])
   })
 
   it('неизвестный инструмент, битые аргументы, завершённая история, погибший герой', () => {

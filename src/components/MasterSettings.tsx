@@ -1,9 +1,17 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AI_FORMATS, createMaster } from '../ai'
 import { CHECK_TITLES, runConnectionCheck, type CheckId, type CheckResult } from '../ai/check'
-import { AI_PRESETS, aiConnection, settingsProblems, VERBOSITY, type AiPresetId, type AiProvider, type Verbosity } from '../ai/settings'
+import {
+  AI_PRESETS,
+  aiConnection,
+  DEFAULT_TARGET_TOKENS,
+  MIN_CONTEXT_WINDOW,
+  MIN_TARGET_TOKENS,
+  settingsProblems,
+  VERBOSITY, type AiPresetId, type AiProvider, type Verbosity } from '../ai/settings'
 import { aiSettingsStore, useAiSettings } from '../ai/settingsStore'
 import type { AiDiagnostics, AiFormat } from '../ai/types'
+import { DevLogView } from './DevLogView'
 
 const STATUS_LABELS: Record<CheckResult['status'], string> = { ok: 'Да', warn: 'Частично', fail: 'Нет', skipped: '—' }
 const PROVIDERS: { id: AiProvider; name: string }[] = [
@@ -192,6 +200,65 @@ export function MasterSettings() {
         </div>
       </section>
 
+      <section className="appearance-section" aria-labelledby={`${id}-memory`}>
+        <h3 id={`${id}-memory`}>Память ведущего</h3>
+        <p className="appearance-hint">
+          Когда запрос к модели становится больше целевого размера, ведущий в фоне сжимает старые события в сводку «Что было раньше»,
+          а важное записывает в журнал фактов. Вся лента остаётся в истории.
+        </p>
+        <label className="appearance-label" htmlFor={`${id}-window`}>
+          Окно контекста модели, токенов
+        </label>
+        {preset ? (
+          <p className="appearance-hint" data-testid="context-window-preset">
+            {preset.name}: {formatTokens(preset.contextWindow)} токенов.
+          </p>
+        ) : (
+          <input
+            id={`${id}-window`}
+            className="text-input"
+            type="number"
+            inputMode="numeric"
+            min={MIN_CONTEXT_WINDOW}
+            step={1000}
+            value={settings.contextWindow || ''}
+            onChange={(e) => update({ contextWindow: Math.round(Number(e.target.value)) || 0 })}
+            data-testid="context-window"
+          />
+        )}
+        <label className="appearance-label" htmlFor={`${id}-target`}>
+          Целевой размер запроса, токенов
+        </label>
+        <input
+          id={`${id}-target`}
+          className="text-input"
+          type="number"
+          inputMode="numeric"
+          min={MIN_TARGET_TOKENS}
+          step={1000}
+          value={settings.targetTokens || ''}
+          onChange={(e) => update({ targetTokens: Math.round(Number(e.target.value)) || 0 })}
+          data-testid="target-tokens"
+        />
+        <p className="appearance-hint">
+          Меньше — дешевле запросы и чаще сжатие; по умолчанию {formatTokens(DEFAULT_TARGET_TOKENS)}. Не больше окна контекста.
+        </p>
+        <label className="appearance-label" htmlFor={`${id}-compact-model`}>
+          Модель для сжатия памяти
+        </label>
+        <input
+          id={`${id}-compact-model`}
+          className="text-input"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={`Та же, что у ведущего (${aiConnection(settings, '').model || 'модель'})`}
+          value={settings.compactModel}
+          onChange={(e) => update({ compactModel: e.target.value })}
+          data-testid="compact-model"
+        />
+        <p className="appearance-hint">Можно указать более дешёвую модель того же поставщика.</p>
+      </section>
+
       <section className="appearance-section" aria-labelledby={`${id}-check`}>
         <h3 id={`${id}-check`}>Подключение</h3>
         {problems.length > 0 && (
@@ -253,9 +320,13 @@ export function MasterSettings() {
           </div>
         )}
       </section>
+
+      <DevLogView />
     </div>
   )
 }
+
+const formatTokens = (n: number) => n.toLocaleString('ru-RU')
 
 /** Диагностика одним текстом: запрос, статус, заголовки, первые строки ответа. */
 function diagnosticsText(d: AiDiagnostics): string {

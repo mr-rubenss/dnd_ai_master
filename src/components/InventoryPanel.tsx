@@ -7,6 +7,8 @@ import { EQUIPMENT_SLOTS, equipActions, SLOT_NAMES, wieldedTwoHanded, type Equip
 import type { EquipmentChange } from '../game/storyActions'
 import type { Character, Inventory } from '../types/character'
 import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types/items'
+import type { StoryMemory, WorldFact } from '../types/story'
+import { AdventureJournal } from './AdventureJournal'
 import { CharacterStats } from './CharacterStats'
 import { CATEGORY_LABELS, formatDice, formatNumber, formatWeight, itemStatLines, itemSummary } from './itemText'
 
@@ -17,13 +19,16 @@ interface Props {
   /** Сменить экипировку; возвращает причину отказа или null. */
   /** Смена экипировки; нет — только чтение (завершённая история). */
   onEquipChange?: (change: EquipmentChange) => string | null
+  /** Журнал приключения: сводка ведущего и журнал фактов истории. */
+  journal?: { memory?: StoryMemory; facts: readonly WorldFact[] }
 }
 
-type Tab = 'stats' | 'equipment'
+type Tab = 'stats' | 'equipment' | 'journal'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'stats', label: 'Характеристики' },
   { id: 'equipment', label: 'Снаряжение' },
+  { id: 'journal', label: 'Журнал' },
 ]
 
 /** Последняя выбранная вкладка — настройка интерфейса этого браузера, не состояние игры. */
@@ -32,7 +37,7 @@ const TAB_STORAGE_KEY = 'ai-master:sheet-tab'
 function loadTab(): Tab {
   try {
     const saved = window.localStorage.getItem(TAB_STORAGE_KEY)
-    return saved === 'equipment' || saved === 'stats' ? saved : 'stats'
+    return saved === 'equipment' || saved === 'stats' || saved === 'journal' ? saved : 'stats'
   } catch {
     return 'stats'
   }
@@ -61,7 +66,7 @@ function formatAttack(attack: WeaponAttack): string {
 }
 
 /** Панель персонажа и инвентаря. На узком экране сворачивается в кнопку. */
-export function InventoryPanel({ character, inventory, catalog, onEquipChange }: Props) {
+export function InventoryPanel({ character, inventory, catalog, onEquipChange, journal }: Props) {
   const [open, setOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [tab, setTabState] = useState<Tab>(loadTab)
@@ -262,6 +267,10 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange }:
               )
             })}
           </section>
+        </div>
+
+        <div id="sheet-panel-journal" role="tabpanel" aria-labelledby="sheet-tab-journal" hidden={tab !== 'journal'}>
+          {tab === 'journal' && <AdventureJournal memory={journal?.memory} facts={journal?.facts ?? []} />}
         </div>
       </div>
     </aside>

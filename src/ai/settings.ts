@@ -7,8 +7,8 @@ export const API_KEY_STORAGE = 'ai-master:api-key'
 
 /** Готовые поставщики. «Свой» — адрес и модель вводятся вручную. */
 export const AI_PRESETS = {
-  deepseek: { name: 'DeepSeek', format: 'openai-chat', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
-} as const satisfies Record<string, { name: string; format: AiFormat; baseUrl: string; model: string }>
+  deepseek: { name: 'DeepSeek', format: 'openai-chat', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', contextWindow: 128_000 },
+} as const satisfies Record<string, { name: string; format: AiFormat; baseUrl: string; model: string; contextWindow: number }>
 export type AiPresetId = keyof typeof AI_PRESETS
 export type AiProvider = AiPresetId | 'custom'
 
@@ -27,9 +27,58 @@ export interface AiSettings {
   baseUrl: string
   model: string
   verbosity: Verbosity
+  /** Окно контекста модели в токенах — для «Своего» поставщика (у пресета — из AI_PRESETS). */
+  contextWindow: number
+  /** Целевой размер запроса в токенах: больше — старая часть ленты сжимается в сводку. */
+  targetTokens: number
+  /** Модель для сжатия памяти (может быть дешевле); пусто — та же, что у ведущего. */
+  compactModel: string
 }
 
-export const DEFAULT_AI_SETTINGS: AiSettings = { provider: 'deepseek', format: 'openai-chat', baseUrl: '', model: '', verbosity: 'normal' }
+/** Окно контекста «Своего» поставщика по умолчанию и пределы настроек бюджета. */
+export const DEFAULT_CONTEXT_WINDOW = 32_000
+export const DEFAULT_TARGET_TOKENS = 20_000
+export const MIN_CONTEXT_WINDOW = 4_000
+export const MAX_CONTEXT_WINDOW = 2_000_000
+export const MIN_TARGET_TOKENS = 3_000
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: 'deepseek',
+  format: 'openai-chat',
+  baseUrl: '',
+  model: '',
+  verbosity: 'normal',
+  contextWindow: DEFAULT_CONTEXT_WINDOW,
+  targetTokens: DEFAULT_TARGET_TOKENS,
+  compactModel: '',
+}
+
+/** Окно контекста модели по настройкам: у пресета — из конфига, у «Своего» — как указал игрок. */
+export const contextWindowOf = (settings: AiSettings) =>
+  settings.provider === 'custom' ? settings.contextWindow : AI_PRESETS[settings.provider].contextWindow
+
+/** Бюджет памяти ведущего: окно контекста, целевой размер запроса (не больше окна) и лимит ответа. */
+export interface ContextBudget {
+  contextWindow: number
+  targetTokens: number
+  maxResponseTokens: number
+}
+
+export function contextBudget(settings: AiSettings): ContextBudget {
+  const contextWindow = contextWindowOf(settings)
+  return {
+    contextWindow,
+    targetTokens: Math.min(settings.targetTokens, contextWindow),
+    maxResponseTokens: VERBOSITY[settings.verbosity].maxTokens,
+  }
+}
+
+/** Подключение для сжатия памяти: та же учётная запись, своя модель (если задана). */
+export function compactConnection(settings: AiSettings, apiKey: string): AiConnection {
+  const conn = aiConnection(settings, apiKey)
+  const model = settings.compactModel.trim()
+  return model ? { ...conn, model } : conn
+}
 
 /** Подключение по настройкам и ключу: у пресета адрес и модель свои. */
 export function aiConnection(settings: AiSettings, apiKey: string): AiConnection {
@@ -67,6 +116,10 @@ export function settingsProblems(settings: AiSettings, apiKey: string): string[]
     if (!settings.model.trim()) problems.push('Укажите название модели.')
   }
   if (!apiKey.trim()) problems.push('Введите ключ API.')
+  const window = contextWindowOf(settings)
+  if (settings.provider === 'custom' && !(window >= MIN_CONTEXT_WINDOW && window <= MAX_CONTEXT_WINDOW))
+    problems.push(`Окно контекста — от ${MIN_CONTEXT_WINDOW} до ${MAX_CONTEXT_WINDOW} токенов.`)
+  if (!(settings.targetTokens >= MIN_TARGET_TOKENS)) problems.push(`Размер запроса — не меньше ${MIN_TARGET_TOKENS} токенов.`)
   return problems
 }
 
@@ -81,6 +134,7 @@ export function parseAiSettings(raw: string | null): AiSettings {
   }
   const d = DEFAULT_AI_SETTINGS
   const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback)
+  const int = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : fallback)
   return {
     provider:
       src.provider === 'custom' || (typeof src.provider === 'string' && src.provider in AI_PRESETS) ? (src.provider as AiProvider) : d.provider,
@@ -88,5 +142,8 @@ export function parseAiSettings(raw: string | null): AiSettings {
     baseUrl: str(src.baseUrl, d.baseUrl),
     model: str(src.model, d.model),
     verbosity: typeof src.verbosity === 'string' && src.verbosity in VERBOSITY ? (src.verbosity as Verbosity) : d.verbosity,
+    contextWindow: int(src.contextWindow, d.contextWindow),
+    targetTokens: int(src.targetTokens, d.targetTokens),
+    compactModel: str(src.compactModel, d.compactModel),
   }
 }

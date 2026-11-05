@@ -87,17 +87,15 @@ export function locationText(story: StoryState): string {
     .join('\n')
 }
 
-/** Раздел «Состояние игры» для системного промта — собирается заново для каждого запроса. */
+/** Раздел «Состояние игры» для системного промта — собирается заново для каждого запроса (факты — отдельной частью). */
 export function gameStateText(story: StoryState, ctx: MasterStateContext): string {
   const heroes = story.party.map((m) => heroSheetText(m, ctx)).join('\n\n')
   const quests = story.world.quests.map((q) => `- ${q.title} — ${q.status === 'active' ? 'в работе' : q.status === 'completed' ? 'выполнено' : 'провалено'}`)
-  const facts = story.world.facts.slice(-15).map((f) => `- ${f.text}`)
   return [
     '## Состояние игры (ведёт код; это главнее твоей памяти)',
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
     quests.length ? `## Задания\n${quests.join('\n')}` : '',
-    facts.length ? `## Известные факты\n${facts.join('\n')}` : '',
   ]
     .filter(Boolean)
     .join('\n\n')

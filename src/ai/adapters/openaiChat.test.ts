@@ -88,7 +88,7 @@ describe('ответ', () => {
     expect(response).toEqual({
       text: 'Таверна шумит.',
       toolCalls: [],
-      usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17 },
+      usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17, cachedInputTokens: null },
       finishReason: 'stop',
       streamed: false,
       reasoning: '',
@@ -114,7 +114,7 @@ describe('ответ', () => {
     expect(response).toEqual({
       text: 'Дверь скрипит.',
       toolCalls: [],
-      usage: { inputTokens: 40, outputTokens: 3, totalTokens: 43 },
+      usage: { inputTokens: 40, outputTokens: 3, totalTokens: 43, cachedInputTokens: null },
       finishReason: 'stop',
       streamed: true,
       reasoning: '',
@@ -238,6 +238,37 @@ describe('ошибки', () => {
     const error = await failure(createMaster(connection, transport).complete(ask))
     expect(error.kind).toBe('bad-request')
     expect(error.message).toBe('Модель не приняла запрос. Bad header Bearer [ключ скрыт]; context too long')
+  })
+
+  it('слишком длинный контекст (OpenAI, DeepSeek, OpenRouter) — свой вид ошибки, без автоповтора', async () => {
+    const texts = [
+      "This model's maximum context length is 65536 tokens. However, you requested 70000 tokens.",
+      'Prompt is too long',
+      'context_length_exceeded',
+    ]
+    for (const text of texts) {
+      const { transport, calls } = fakeTransport([jsonResponse(400, providerError(text))])
+      const error = await failure(createMaster(connection, transport).complete(ask))
+      expect(error.kind).toBe('context-length')
+      expect(error.message).toMatch(/^Запрос не поместился в окно контекста модели\./)
+      expect(calls).toHaveLength(1)
+    }
+  })
+
+  it('кэш: сколько входных токенов пришло из кэша (DeepSeek и OpenAI-формат)', async () => {
+    const deepseek = fakeTransport([
+      jsonResponse(200, completion({ content: 'Ок' }, 'stop', { prompt_tokens: 100, completion_tokens: 5, total_tokens: 105, prompt_cache_hit_tokens: 64, prompt_cache_miss_tokens: 36 } as never)),
+    ])
+    expect((await createMaster(connection, deepseek.transport).complete(ask)).usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 5,
+      totalTokens: 105,
+      cachedInputTokens: 64,
+    })
+    const openai = fakeTransport([
+      jsonResponse(200, completion({ content: 'Ок' }, 'stop', { prompt_tokens: 50, completion_tokens: 2, total_tokens: 52, prompt_tokens_details: { cached_tokens: 32 } } as never)),
+    ])
+    expect((await createMaster(connection, openai.transport).complete(ask)).usage?.cachedInputTokens).toBe(32)
   })
 
   it('ошибка посреди потока — без повтора (текст уже показан)', async () => {

@@ -99,6 +99,21 @@ export interface StoryState {
   finds?: StoryFind[]
   /** Итог — у завершённой истории. */
   epilogue?: StoryEpilogue
+  /** Память ведущего (сводка старой части ленты). Нет поля — сжатий ещё не было. */
+  memory?: StoryMemory
+}
+
+/**
+ * Память ведущего: сводка «Что было раньше» — сжатая старая часть ленты. В запрос к модели идут сводка и сообщения
+ * после `covered`; полная лента остаётся в истории для игрока.
+ */
+export interface StoryMemory {
+  summary: string
+  /** Сколько первых сообщений ленты уже вошло в сводку. */
+  covered: number
+  /** Сколько раз сжимали. */
+  compactions: number
+  updatedAt: number
 }
 
 /** Кто совершил действие. */
@@ -145,6 +160,12 @@ export type StoryEvent =
   | { type: 'npcMoved'; locationId: string; npcId: string; to: CellPosition }
   | { type: 'doorChanged'; locationId: string; doorId: string; state: DoorState }
   | { type: 'factRecorded'; fact: WorldFact }
+  /** Факт повторял уже записанный — старая запись обновлена новым текстом. */
+  | { type: 'factUpdated'; factId: string; text: string; at: number }
+  /** Журнал фактов разросся — ведущий объединил повторы и устаревшее (ни одно имя не потеряно). */
+  | { type: 'factsMerged'; facts: WorldFact[] }
+  /** Сжатие памяти ведущего: первые `covered` сообщений ленты сведены в сводку «Что было раньше» (лента не меняется). */
+  | { type: 'memoryCompacted'; summary: string; covered: number; at: number }
   | { type: 'questUpdated'; quest: Quest }
   | { type: 'journalWritten'; entry: JournalEntry }
 

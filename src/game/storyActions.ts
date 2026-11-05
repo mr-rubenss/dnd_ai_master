@@ -24,6 +24,7 @@ import {
 import type { AdventureData } from './adventure'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
+import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { isNonEmptyString } from './validation'
 
@@ -229,6 +230,17 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     }
     case 'factRecorded':
       return { ...state, world: { ...state.world, facts: [...state.world.facts, action.fact] } }
+    case 'factUpdated': {
+      const facts = state.world.facts.map((f) => (f.id === action.factId ? { ...f, text: action.text, at: action.at } : f))
+      return { ...state, world: { ...state.world, facts } }
+    }
+    case 'factsMerged':
+      return { ...state, world: { ...state.world, facts: action.facts } }
+    case 'memoryCompacted':
+      return {
+        ...state,
+        memory: { summary: action.summary, covered: action.covered, compactions: (state.memory?.compactions ?? 0) + 1, updatedAt: action.at },
+      }
     case 'questUpdated': {
       const exists = state.world.quests.some((q) => q.id === action.quest.id)
       const quests = exists ? state.world.quests.map((q) => (q.id === action.quest.id ? action.quest : q)) : [...state.world.quests, action.quest]
@@ -394,13 +406,41 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       return location.doors.some((d) => d.id === action.doorId) ? null : 'В этой локации нет такой двери.'
     }
     case 'factRecorded':
-      return isNonEmptyString(action.fact.text) ? null : 'Пустой факт.'
+      return factProblem(action.fact.text)
     case 'questUpdated':
       return isNonEmptyString(action.quest.title) && (QUEST_STATUSES as readonly string[]).includes(action.quest.status) ? null : 'Квест: нужно название и статус.'
     case 'journalWritten':
       return isNonEmptyString(action.entry.text) ? null : 'Пустая запись журнала.'
+    case 'factUpdated':
+      if (!state.world.facts.some((f) => f.id === action.factId)) return 'Такого факта нет в журнале.'
+      return factProblem(action.text)
+    case 'factsMerged': {
+      if (action.author.kind !== 'master') return 'Объединяет факты только ведущий.'
+      if (action.facts.length === 0 && state.world.facts.length > 0) return 'Нельзя стереть весь журнал фактов.'
+      if (new Set(action.facts.map((f) => f.id)).size !== action.facts.length) return 'Повторяются id фактов.'
+      for (const f of action.facts) {
+        const problem = factProblem(f.text)
+        if (problem) return problem
+      }
+      const lost = lostNames(
+        state.world.facts.map((f) => f.text),
+        action.facts.map((f) => f.text),
+      )
+      return lost.length ? `При объединении потеряны имена: ${lost.join(', ')}.` : null
+    }
+    case 'memoryCompacted': {
+      if (action.author.kind !== 'master') return 'Сжимает память только ведущий.'
+      const from = state.memory?.covered ?? 0
+      if (!Number.isInteger(action.covered) || action.covered < from || action.covered > state.messages.length)
+        return 'Сводка должна охватывать начало ленты и не больше, чем в ней есть.'
+      if (!isNonEmptyString(action.summary)) return 'Пустая сводка.'
+      return action.summary.length > MAX_SUMMARY_CHARS ? `Сводка — не длиннее ${MAX_SUMMARY_CHARS} символов.` : null
+    }
   }
 }
+
+/** Жёсткий предел длины сводки «Что было раньше» (сжатие держит её заметно короче — см. memory.ts). */
+export const MAX_SUMMARY_CHARS = 8_000
 
 /** Проверка итога истории. */
 export function epilogueProblem(epilogue: { summary: string; outcome: string }): string | null {

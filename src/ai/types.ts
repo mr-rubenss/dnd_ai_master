@@ -47,6 +47,8 @@ export interface AiUsage {
   inputTokens: number
   outputTokens: number
   totalTokens: number
+  /** Сколько входных токенов взято из кэша поставщика (дешевле); null — поставщик не сообщил. */
+  cachedInputTokens: number | null
 }
 
 export interface AiResponse {
