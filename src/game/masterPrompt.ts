@@ -29,7 +29,9 @@ export function masterMessages(story: StoryState, verbosity: Verbosity, ctx: Mas
   const names = new Map(story.party.map((m) => [m.heroId, m.character.name]))
   const multi = story.party.length > 1
   const history: AiMessage[] = story.messages.slice(-HISTORY_LIMIT).map((m) => {
-    if (m.author === 'master') return { role: 'assistant', content: m.text }
+    // Подсказки возвращаем в текст так, как их писала модель, — чтобы она держала формат.
+    if (m.author === 'master')
+      return { role: 'assistant', content: m.suggestions?.length ? `${m.text}\n\nВарианты: ${m.suggestions.join(' | ')}` : m.text }
     if (m.author === 'player') return { role: 'user', content: multi && m.heroId ? `${names.get(m.heroId) ?? 'Игрок'}: ${m.text}` : m.text }
     return { role: 'user', content: `[Код игры] ${m.text}` }
   })

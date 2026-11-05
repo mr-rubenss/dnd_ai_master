@@ -6,6 +6,7 @@ import { VERBOSITY, type Verbosity } from '../ai/settings'
 import type { AiMaster, AiMessage, AiRequest, AiResponse, AiToolCall } from '../ai/types'
 import type { ActionAuthor, StoryEvent, StoryState } from '../types/story'
 import { masterMessages } from './masterPrompt'
+import { rewritableMessageId, splitSuggestions } from './masterSuggestions'
 import type { MasterStateContext } from './masterState'
 import { executeTool, MASTER_TOOLS, type ToolContext, type ToolOutcome } from './masterTools'
 import { MASTER } from './storyActions'
@@ -40,6 +41,8 @@ export interface MasterTurnOptions {
 export interface MasterTurnResult {
   /** Финальный текст (записать действием masterNarrated); пустой — если весь рассказ уже записан по ходу. */
   text: string
+  /** Подсказки действий из конца ответа (строка «Варианты: …» — из текста вырезана). */
+  suggestions: string[]
   truncated: boolean
   /** Все вызовы инструментов за ход и их итог. */
   toolCalls: { call: AiToolCall; outcome: ToolOutcome }[]
@@ -74,12 +77,12 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       onRetry: options.onRetry,
       signal: options.signal,
     })
-    const text = response.text.trim()
+    const { text, suggestions } = splitSuggestions(response.text)
     const calls = toolsAllowed ? response.toolCalls : []
 
     if (calls.length === 0) {
       if (!text && !narrated) emptyAnswer(response)
-      return { text, truncated: response.finishReason === 'length', toolCalls }
+      return { text, suggestions, truncated: response.finishReason === 'length', toolCalls }
     }
 
     // Текст перед вызовами («Ты пытаешься…») — в ленту сразу, перед карточками бросков.
@@ -103,4 +106,42 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       messages.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
     }
   }
+}
+
+/** Просьба переписать ответ — служебное сообщение модели (после её последнего ответа). */
+export const REWRITE_REQUEST =
+  '[Код игры] Игрок попросил переписать твой последний ответ. Напиши его заново, по-другому: другие детали, слова ' +
+  'и реплики НПС. Всё, что уже случилось по правилам (броски и их итоги, предметы, урон, перемещения), остаётся ' +
+  'как есть — не противоречь этому и ничего не меняй. Не упоминай, что ответ переписан.'
+
+export interface MasterRewriteResult {
+  messageId: string
+  text: string
+  suggestions: string[]
+  truncated: boolean
+}
+
+/**
+ * «Переписать ответ»: новый текст последнего ответа ведущего — без инструментов, чтобы переписывание
+ * не меняло игру и не позволяло перебросить кубики. null — переписывать нечего (последнее в ленте — не ответ ведущего).
+ */
+export async function runMasterRewrite(
+  master: AiMaster,
+  story: StoryState,
+  options: Omit<MasterTurnOptions, 'runtime'>,
+): Promise<MasterRewriteResult | null> {
+  const messageId = rewritableMessageId(story.messages)
+  if (!messageId) return null
+  const messages: AiMessage[] = [...masterMessages(story, options.verbosity, options.context), { role: 'user', content: REWRITE_REQUEST }]
+  const response = await master.complete({
+    messages,
+    maxTokens: VERBOSITY[options.verbosity].maxTokens,
+    temperature: 1,
+    onText: options.onText,
+    onRetry: options.onRetry,
+    signal: options.signal,
+  })
+  const { text, suggestions } = splitSuggestions(response.text)
+  if (!text) emptyAnswer(response)
+  return { messageId, text, suggestions, truncated: response.finishReason === 'length' }
 }

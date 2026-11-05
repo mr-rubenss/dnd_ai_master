@@ -24,6 +24,7 @@ import {
 import type { AdventureData } from './adventure'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
+import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { isNonEmptyString } from './validation'
 
 export const TONE_LABELS: Record<StoryTone, string> = {
@@ -146,8 +147,20 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       const message: ChatMessage = { id: action.messageId, author: 'player', text: action.text, heroId: action.heroId }
       return { ...state, messages: [...state.messages, message] }
     }
-    case 'masterNarrated':
-      return { ...state, messages: [...state.messages, { id: action.messageId, author: 'master', text: action.text }] }
+    case 'masterNarrated': {
+      const message: ChatMessage = { id: action.messageId, author: 'master', text: action.text }
+      if (action.suggestions?.length) message.suggestions = action.suggestions
+      return { ...state, messages: [...state.messages, message] }
+    }
+    case 'masterRewritten':
+      return {
+        ...state,
+        messages: state.messages.map((m) => {
+          if (m.id !== action.messageId) return m
+          const { suggestions: _old, ...rest } = m
+          return action.suggestions?.length ? { ...rest, text: action.text, suggestions: action.suggestions } : { ...rest, text: action.text }
+        }),
+      }
     case 'diceRolled':
       return { ...state, rolls: [...state.rolls, action.roll].slice(-MAX_ROLL_LOG) }
     case 'equipmentChanged':
@@ -273,7 +286,13 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (action.author.kind !== 'player' || action.author.heroId !== action.heroId) return 'Говорить за героя может только его игрок.'
       return isNonEmptyString(action.text) ? null : 'Пустая реплика.'
     case 'masterNarrated':
-      return isNonEmptyString(action.text) ? null : 'Пустой текст ведущего.'
+      return isNonEmptyString(action.text) ? suggestionsProblem(action.suggestions) : 'Пустой текст ведущего.'
+    case 'masterRewritten': {
+      if (action.author.kind !== 'master') return 'Переписать ответ ведущего может только ведущий.'
+      if (rewritableMessageId(state.messages) !== action.messageId)
+        return 'Переписать можно только последний ответ ведущего.'
+      return isNonEmptyString(action.text) ? suggestionsProblem(action.suggestions) : 'Пустой текст ведущего.'
+    }
     case 'diceRolled':
       return action.author.kind === 'engine' ? null : 'Кубики бросает только движок.'
     case 'equipmentChanged':

@@ -11,7 +11,7 @@ import { parseCharacterSheet } from './character'
 import { parseLocation } from './location'
 import { DM_PROMPT, masterMessages, masterSystemPrompt } from './masterPrompt'
 import { gameStateText } from './masterState'
-import { MAX_TOOL_ROUNDS, runMasterTurn } from './masterTurn'
+import { MAX_TOOL_ROUNDS, REWRITE_REQUEST, runMasterRewrite, runMasterTurn } from './masterTurn'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, player } from './storyActions'
 
 const context = { catalog: itemCatalog, rules: rulesData }
@@ -52,6 +52,11 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('Провал имеет последствия')
     expect(DM_PROMPT).toContain('**никогда не решаешь за игрока**')
     expect(DM_PROMPT).toContain('ситуацией, на которую игрок может отреагировать')
+  })
+
+  it('подсказки: последней строкой «Варианты: … | … | …», 2–3 коротких действия', () => {
+    expect(DM_PROMPT).toContain('2–3 подсказки возможных действий')
+    expect(DM_PROMPT).toContain('`Варианты: Расспросить трактирщика о незнакомце | Подсесть к столу у камина | Выйти во двор`')
   })
 
   it('в запросе: промт, эта история, длина ответа и состояние игры', () => {
@@ -141,7 +146,7 @@ describe('ход ведущего', () => {
       },
     ])
     const result = await runMasterTurn(master, story(), { verbosity: 'detailed', context, onText: (d) => parts.push(d) })
-    expect(result).toEqual({ text: 'Гуннар кивает.', truncated: false, toolCalls: [] })
+    expect(result).toEqual({ text: 'Гуннар кивает.', suggestions: [], truncated: false, toolCalls: [] })
     expect(parts).toEqual(['Гуннар ', 'кивает.'])
     expect(requests[0].maxTokens).toBe(1600)
     expect(requests[0].messages[0].content).toContain('## Отряд (лист персонажа и инвентарь)')
@@ -156,6 +161,53 @@ describe('ход ведущего', () => {
   it('рассуждающая модель не успела ответить — объяснение, что делать', async () => {
     const { master } = fakeMaster([() => aiResponse({ reasoning: 'Игрок подходит к стойке, значит…', finishReason: 'length' })])
     await expect(runMasterTurn(master, story(), { verbosity: 'normal', context })).rejects.toThrow('модель «размышляла»')
+  })
+})
+
+describe('подсказки и «Переписать ответ»', () => {
+  it('строка «Варианты: …» вырезается из рассказа и возвращается подсказками', async () => {
+    const { master } = fakeMaster([
+      () => aiResponse({ text: 'Гуннар хмурится.\n— Чего тебе?\n\nВарианты: Заказать эль | Спросить о незнакомце | Уйти' }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context })
+    expect(result.text).toBe('Гуннар хмурится.\n— Чего тебе?')
+    expect(result.suggestions).toEqual(['Заказать эль', 'Спросить о незнакомце', 'Уйти'])
+  })
+
+  it('подсказки возвращаются модели в ленте в том же виде', () => {
+    const s = story([[{ type: 'masterNarrated', messageId: 'm2', text: 'Гуннар хмурится.', suggestions: ['Заказать эль', 'Уйти'] }, MASTER]])
+    expect(masterMessages(s, 'normal', context).at(-1)).toEqual({ role: 'assistant', content: 'Гуннар хмурится.\n\nВарианты: Заказать эль | Уйти' })
+  })
+
+  it('переписать: тот же контекст плюс просьба, без инструментов; новый текст и подсказки', async () => {
+    const s = story([[{ type: 'masterNarrated', messageId: 'm2', text: 'Гуннар хмурится.' }, MASTER]])
+    const parts: string[] = []
+    const { master, requests } = fakeMaster([
+      (req) => {
+        req.onText?.('Гуннар ')
+        return aiResponse({ text: 'Гуннар молча протирает кружку.\nВарианты: Положить монету на стойку | Окликнуть его', streamed: true })
+      },
+    ])
+    const result = await runMasterRewrite(master, s, { verbosity: 'normal', context, onText: (d) => parts.push(d) })
+    expect(result).toEqual({ messageId: 'm2', text: 'Гуннар молча протирает кружку.', suggestions: ['Положить монету на стойку', 'Окликнуть его'], truncated: false })
+    expect(parts).toEqual(['Гуннар '])
+    const messages = requests[0].messages
+    expect(messages.at(-2)).toEqual({ role: 'assistant', content: 'Гуннар хмурится.' })
+    expect(messages.at(-1)).toEqual({ role: 'user', content: REWRITE_REQUEST })
+    expect(requests[0].tools).toBeUndefined()
+    expect(requests[0].toolChoice).toBeUndefined()
+  })
+
+  it('переписать нечего — последним в ленте игрок или карточка броска', async () => {
+    const { master, requests } = fakeMaster([])
+    expect(await runMasterRewrite(master, story(), { verbosity: 'normal', context })).toBeNull()
+    expect(requests).toHaveLength(0)
+  })
+
+  it('пустой переписанный ответ — понятная ошибка', async () => {
+    const s = story([[{ type: 'masterNarrated', messageId: 'm2', text: 'Гуннар хмурится.' }, MASTER]])
+    const { master } = fakeMaster([() => aiResponse({ text: 'Варианты: Уйти' })])
+    await expect(runMasterRewrite(master, s, { verbosity: 'normal', context })).rejects.toThrow('Ведущий прислал пустой ответ')
   })
 })
 

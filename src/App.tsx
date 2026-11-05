@@ -18,7 +18,8 @@ import { useAiSettings } from './ai/settingsStore'
 import { adventures, defaultAdventure, itemCatalog, rulesData, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { draftEpilogue } from './game/epilogue'
-import { runMasterTurn } from './game/masterTurn'
+import { rewritableMessageId, streamingText } from './game/masterSuggestions'
+import { runMasterRewrite, runMasterTurn } from './game/masterTurn'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryState } from './types/story'
@@ -232,52 +233,103 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     [],
   )
 
-  /** Ход ведущего через общий интерфейс src/ai/: поставщик модели выбран в настройках. */
-  const askMaster = async () => {
+  /** Что делает ведущий сейчас (и что повторит «Повторить» после ошибки): ход или переписывание ответа. */
+  const [replacingId, setReplacingId] = useState<string | null>(null)
+  const lastRequestRef = useRef<{ kind: 'turn' } | { kind: 'rewrite'; messageId: string }>({ kind: 'turn' })
+
+  /**
+   * Ход ведущего через общий интерфейс src/ai/: поставщик модели выбран в настройках.
+   * rewriteId — «Переписать ответ»: новый текст последнего ответа, без инструментов (игра не меняется).
+   */
+  const askMaster = async (rewriteId: string | null = null) => {
+    lastRequestRef.current = rewriteId ? { kind: 'rewrite', messageId: rewriteId } : { kind: 'turn' }
     setAiError(null)
     setWaiting(true)
+    setReplacingId(rewriteId)
+    setStreamText('')
+    const finish = () => {
+      setWaiting(false)
+      setStreamText(null)
+      setAiNotice(null)
+      setReplacingId(null)
+    }
     if (settingsProblems(ai.settings, ai.apiKey).length > 0) {
       timerRef.current = window.setTimeout(() => {
-        appStore.dispatch({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY }, MASTER)
-        setWaiting(false)
+        const event = rewriteId
+          ? ({ type: 'masterRewritten', messageId: rewriteId, text: STUB_REPLY } as const)
+          : ({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY } as const)
+        appStore.dispatch(event, MASTER)
+        finish()
       }, 600)
       return
     }
     const controller = new AbortController()
     abortRef.current = controller
-    setStreamText('')
+    // Поток копится целиком, а игроку показывается без строки подсказок «Варианты: …».
+    let streamed = ''
+    const onText = (delta: string) => {
+      setAiNotice(null)
+      streamed += delta
+      setStreamText(streamingText(streamed))
+    }
+    const onRetry = ({ delayMs }: { delayMs: number }) =>
+      setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`)
     try {
       const current = appStore.getState().active ?? story
       const master = createMaster(aiConnection(ai.settings, ai.apiKey))
-      const { text } = await runMasterTurn(master, current, {
+      const context = { catalog: itemCatalog, rules: rulesData }
+      if (rewriteId) {
+        const result = await runMasterRewrite(master, current, { verbosity: ai.settings.verbosity, context, signal: controller.signal, onText, onRetry })
+        if (result && result.messageId === rewriteId) {
+          const reason = await appStore.dispatchTo(
+            story.id,
+            { type: 'masterRewritten', messageId: rewriteId, text: result.text, ...(result.suggestions.length ? { suggestions: result.suggestions } : {}) },
+            MASTER,
+          )
+          if (reason) setAiError(reason)
+        }
+        return
+      }
+      const { text, suggestions } = await runMasterTurn(master, current, {
         verbosity: ai.settings.verbosity,
-        context: { catalog: itemCatalog, rules: rulesData },
+        context,
         // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
         runtime: {
           getStory: () => (appStore.getState().active?.id === story.id ? appStore.getState().active! : current),
           commit: (event, author) => appStore.dispatchTo(story.id, event, author),
           tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
-          onRound: () => setStreamText(''),
+          onRound: () => {
+            streamed = ''
+            setStreamText('')
+          },
         },
         signal: controller.signal,
-        onText: (delta) => {
-          setAiNotice(null)
-          setStreamText((t) => (t ?? '') + delta)
-        },
-        onRetry: ({ delayMs }) => setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`),
+        onText,
+        onRetry,
       })
-      if (text) await appStore.dispatchTo(story.id, { type: 'masterNarrated', messageId: crypto.randomUUID(), text }, MASTER)
+      if (text)
+        await appStore.dispatchTo(
+          story.id,
+          { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ...(suggestions.length ? { suggestions } : {}) },
+          MASTER,
+        )
     } catch (error) {
       if (controller.signal.aborted) return
       setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
     } finally {
-      if (!controller.signal.aborted) {
-        setWaiting(false)
-        setStreamText(null)
-        setAiNotice(null)
-      }
+      if (!controller.signal.aborted) finish()
     }
   }
+
+  const retryMaster = () => {
+    const last = lastRequestRef.current
+    // Переписать можно, только если ответ всё ещё последний; иначе — обычный ход.
+    void askMaster(last.kind === 'rewrite' && rewritableMessageId(story.messages) === last.messageId ? last.messageId : null)
+  }
+
+  /** Подсказки последнего ответа ведущего (если он последний в ленте). */
+  const lastMessage = story.messages.at(-1)
+  const suggestions = lastMessage?.author === 'master' && !waiting ? (lastMessage.suggestions ?? []) : []
 
   const handleSend = (text: string) => {
     appStore.dispatch({ type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text }, player(lead.heroId))
@@ -309,7 +361,13 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         <main className="main-column">
           <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} />
           <section className="panel story-panel">
-            <NarrationLog messages={story.messages} pending={streamText} />
+            <NarrationLog
+              messages={story.messages}
+              pending={streamText}
+              replacingId={replacingId}
+              onRewrite={readOnly ? undefined : (messageId) => void askMaster(messageId)}
+              rewriteDisabled={waiting}
+            />
             {aiNotice && (
               <p className="master-notice" role="status" data-testid="master-notice">
                 {aiNotice}
@@ -318,7 +376,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
             {aiError && (
               <div className="master-error" role="alert" data-testid="master-error">
                 <p>{aiError}</p>
-                <button type="button" className="item-action is-primary" onClick={() => void askMaster()} disabled={waiting}>
+                <button type="button" className="item-action is-primary" onClick={retryMaster} disabled={waiting}>
                   Повторить
                 </button>
               </div>
@@ -331,7 +389,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
                 </button>
               </div>
             ) : (
-              <PlayerInput onSend={handleSend} disabled={waiting} leading={<DiceTray rolls={story.rolls} onRoll={handleRoll} />} />
+              <PlayerInput onSend={handleSend} disabled={waiting} suggestions={suggestions} leading={<DiceTray rolls={story.rolls} onRoll={handleRoll} />} />
             )}
           </section>
         </main>

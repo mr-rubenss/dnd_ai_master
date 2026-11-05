@@ -120,7 +120,10 @@ export type StoryEvent =
   /** Герой погиб. */
   | { type: 'heroDied'; heroId: string }
   | { type: 'playerSpoke'; heroId: string; messageId: string; text: string }
-  | { type: 'masterNarrated'; messageId: string; text: string }
+  /** Ответ ведущего; suggestions — 2–3 подсказки действий для игрока (кнопки под полем ввода). */
+  | { type: 'masterNarrated'; messageId: string; text: string; suggestions?: string[] }
+  /** Игрок попросил переписать последний ответ ведущего: новый текст на месте старого (что случилось — не меняется). */
+  | { type: 'masterRewritten'; messageId: string; text: string; suggestions?: string[] }
   | { type: 'diceRolled'; roll: RollRecord }
   | { type: 'equipmentChanged'; heroId: string; equipped: Equipment }
   | { type: 'heroRenamed'; heroId: string; name: string }

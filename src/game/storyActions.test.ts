@@ -159,6 +159,27 @@ describe('проверка действий', () => {
     expect(story.act({ type: 'masterNarrated', messageId: 'y', text: 'После конца' }, MASTER)).toBe('История завершена — в ней больше ничего не происходит.')
   })
 
+  it('ответ ведущего с подсказками; «Переписать ответ» — только последний ответ ведущего и только ведущим', () => {
+    const story = chronicle()
+    expect(story.act({ type: 'masterNarrated', messageId: 'm1', text: 'Тишина.', suggestions: ['а', 'б', 'в', 'г'] }, MASTER)).toBe('Подсказок может быть не больше 3.')
+    expect(story.act({ type: 'masterNarrated', messageId: 'm1', text: 'Тишина.', suggestions: ['Войти', 'Уйти'] }, MASTER)).toBeNull()
+    expect(story.state.messages.at(-1)).toMatchObject({ id: 'm1', text: 'Тишина.', suggestions: ['Войти', 'Уйти'] })
+
+    expect(story.act({ type: 'masterRewritten', messageId: 'm1', text: 'Другое' }, SYSTEM)).toBe('Переписать ответ ведущего может только ведущий.')
+    expect(story.act({ type: 'masterRewritten', messageId: 'nope', text: 'Другое' }, MASTER)).toBe('Переписать можно только последний ответ ведущего.')
+    expect(story.act({ type: 'masterRewritten', messageId: 'm1', text: ' ' }, MASTER)).toBe('Пустой текст ведущего.')
+    const count = story.state.messages.length
+    expect(story.act({ type: 'masterRewritten', messageId: 'm1', text: 'Скрипит половица.', suggestions: ['Замереть'] }, MASTER)).toBeNull()
+    expect(story.state.messages).toHaveLength(count)
+    expect(story.state.messages.at(-1)).toEqual({ id: 'm1', author: 'master', text: 'Скрипит половица.', suggestions: ['Замереть'] })
+    // Без подсказок — старые подсказки убираются.
+    expect(story.act({ type: 'masterRewritten', messageId: 'm1', text: 'Тихо.' }, MASTER)).toBeNull()
+    expect(story.state.messages.at(-1)).toEqual({ id: 'm1', author: 'master', text: 'Тихо.' })
+
+    expect(story.act({ type: 'playerSpoke', heroId: 'ratibor', messageId: 'p9', text: 'Иду дальше.' }, player('ratibor'))).toBeNull()
+    expect(story.act({ type: 'masterRewritten', messageId: 'm1', text: 'Поздно.' }, MASTER)).toBe('Переписать можно только последний ответ ведущего.')
+  })
+
   it('историю нельзя создать дважды, а переименовать — пустым названием', () => {
     const story = chronicle()
     expect(checkAction(story.state, story.actions[0], { catalog })).toBe('История уже создана.')

@@ -2,7 +2,7 @@
 // запросов нет; ключ в тестах — выдуманный.
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, startQuickGame } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, reloadAndContinue, startQuickGame } from './helpers'
 
 const KEY = 'sk-e2e-fake-key-123456'
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions'
@@ -180,14 +180,16 @@ test('ход ведущего: запрос с историей, ответ по
   const masters = await page.locator('.message--master:not(.is-streaming)').count()
   await page.locator('.player-input textarea').fill('Подхожу к стойке')
   await page.locator('.player-input textarea').press('Enter')
-  // Пока ответа нет — «Ведущий думает…», отправить следующий ход нельзя.
-  await expect(page.getByTestId('master-streaming')).toContainText('Ведущий думает…')
-  await page.locator('.player-input textarea').fill('Ещё')
+  // Пока ответа нет — анимация «Мастер думает…», поле ввода заблокировано.
+  await expect(page.getByTestId('master-thinking')).toBeVisible()
+  await expect(page.getByTestId('master-streaming')).toContainText('Мастер думает')
+  await expect(page.locator('.player-input textarea')).toBeDisabled()
   await expect(page.locator('.player-input > button[type="submit"]')).toBeDisabled()
   release()
   await expect(page.locator('.message--master').last()).toHaveText(/Гуннар поднимает взгляд и кивает\./)
   await expect(page.getByTestId('master-streaming')).toHaveCount(0)
   await expect(page.locator('.message--master:not(.is-streaming)')).toHaveCount(masters + 1)
+  await expect(page.locator('.player-input textarea')).toBeEnabled()
   const body = api.bodies[0] as { messages: { role: string; content: string }[]; max_tokens: number; stream: boolean }
   expect(body.stream).toBe(true)
   expect(body.max_tokens).toBe(800)
@@ -195,6 +197,88 @@ test('ход ведущего: запрос с историей, ответ по
   expect(body.messages[0].content).toContain('Вечер в «Пьяном грифоне»')
   expect(body.messages.at(-1)).toEqual({ role: 'user', content: 'Подхожу к стойке' })
   expect(errors).toEqual([])
+})
+
+test('подсказки ведущего под полем ввода и «Переписать ответ»', async ({ page }, testInfo) => {
+  const errors = collectPageErrors(page)
+  await withKey(page)
+  const replies = [
+    'Гуннар хмурится и вытирает руки о фартук.\n— Чего тебе?\n\nВарианты: Заказать эль | Спросить о незнакомце | Отойти к камину',
+    'Гуннар молча ставит перед тобой кружку и ждёт монету.\nВарианты: Положить монету на стойку | Спросить о комнате',
+  ]
+  let release: (() => void) | null = null
+  const api = await mockApi(page, DEEPSEEK, async (_, route) => {
+    const text = replies.shift()!
+    if (replies.length === 0) await new Promise<void>((resolve) => (release = resolve))
+    // Строка подсказок приходит по частям — в ленте её не видно ни в потоке, ни после.
+    await fulfillSse(route, textStream(text.match(/[\s\S]{1,12}/g)!))
+  })
+  await page.goto('./')
+  await startQuickGame(page)
+  const input = page.locator('.player-input textarea')
+  await input.fill('Подхожу к стойке')
+  await input.press('Enter')
+
+  const last = page.locator('.message--master').last()
+  await expect(last).toContainText('— Чего тебе?')
+  await expect(page.locator('.narration-log')).not.toContainText('Варианты')
+  const chips = page.getByTestId('suggestions').getByRole('button')
+  await expect(chips).toHaveText(['Заказать эль', 'Спросить о незнакомце', 'Отойти к камину'])
+
+  // Подсказка вставляет текст в поле, но не отправляет его.
+  const players = await page.locator('.message--player').count()
+  await chips.nth(1).click()
+  await expect(input).toHaveValue('Спросить о незнакомце')
+  await expect(input).toBeFocused()
+  await expect(page.locator('.message--player')).toHaveCount(players)
+  if (testInfo.project.name === 'mobile') await expectNoHorizontalScroll(page)
+  await testInfo.attach('подсказки ведущего', { body: await page.screenshot(), contentType: 'image/png' })
+
+  // «Переписать ответ»: старый ответ заменяется потоком нового, поле и подсказки недоступны.
+  const masters = await page.locator('.message--master').count()
+  await expect(page.getByTestId('master-rewrite')).toHaveCount(1)
+  await last.getByTestId('master-rewrite').click()
+  await expect(page.getByTestId('master-thinking')).toBeVisible()
+  await expect(page.locator('.narration-log')).not.toContainText('Чего тебе?')
+  await expect(input).toBeDisabled()
+  await expect(page.getByTestId('suggestions')).toHaveCount(0)
+  await expect(page.getByTestId('master-rewrite')).toHaveCount(0)
+  await expect.poll(() => release !== null).toBe(true)
+  release!()
+  await expect(last).toContainText('Гуннар молча ставит перед тобой кружку')
+  await expect(page.locator('.message--master')).toHaveCount(masters)
+  await expect(page.locator('.narration-log')).not.toContainText('Чего тебе?')
+  await expect(chips).toHaveText(['Положить монету на стойку', 'Спросить о комнате'])
+  await expect(input).toBeEnabled()
+  // Набранный текст не потерялся.
+  await expect(input).toHaveValue('Спросить о незнакомце')
+
+  // Переписывание — без инструментов и с просьбой в конце; модель видит свой прежний ответ с подсказками.
+  const body = api.bodies[1] as { messages: { role: string; content: string }[]; tools?: unknown }
+  expect(body.tools).toBeUndefined()
+  expect(body.messages.at(-1)!.content).toContain('Игрок попросил переписать твой последний ответ')
+  expect(body.messages.at(-2)!.content).toContain('Варианты: Заказать эль | Спросить о незнакомце | Отойти к камину')
+
+  // После ответа игрока переписывать уже нечего; новый ответ — снова с кнопкой.
+  await reloadAndContinue(page)
+  await expect(page.locator('.message--master').last()).toContainText('Гуннар молча ставит перед тобой кружку')
+  await expect(page.getByTestId('suggestions').getByRole('button')).toHaveText(['Положить монету на стойку', 'Спросить о комнате'])
+  expect(errors).toEqual([])
+})
+
+test('без настроенного ведущего: «Мастер думает…», заглушка; «Переписать ответ» тоже отвечает заглушкой', async ({ page }) => {
+  await page.goto('./')
+  await startQuickGame(page)
+  await page.locator('.player-input textarea').fill('Привет')
+  await page.locator('.player-input textarea').press('Enter')
+  await expect(page.getByTestId('master-thinking')).toBeVisible()
+  await expect(page.locator('.player-input textarea')).toBeDisabled()
+  await expect(page.locator('.message--master').last()).toContainText('Ведущий задумчиво молчит')
+  const masters = await page.locator('.message--master').count()
+  await page.getByTestId('master-rewrite').click()
+  await expect(page.locator('.player-input textarea')).toBeEnabled()
+  await expect(page.locator('.message--master')).toHaveCount(masters)
+  await expect(page.getByTestId('suggestions')).toHaveCount(0)
 })
 
 test('ошибки хода: нет денег на счёте — понятное сообщение и «Повторить»; лимит — автоматический повтор', async ({ page }) => {
