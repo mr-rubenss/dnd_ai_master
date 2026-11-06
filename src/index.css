@@ -4548,3 +4548,35 @@ textarea {
   color: var(--color-muted);
   font-size: var(--text-78);
 }
+
+/* Раздел «Умения», языки, приёмы оружия и воззвания (вкладка «Характеристики»). */
+.resources-heading {
+  margin: var(--space-10) 0 var(--space-4);
+  font-size: var(--text-86);
+}
+
+.slot-row-source {
+  display: block;
+  font-size: var(--text-68);
+  color: var(--color-muted);
+}
+
+.item-badge.is-mastery {
+  color: var(--color-fg);
+}
+
+.origin .fact-list dd {
+  overflow-wrap: anywhere;
+}
+
+.invocation-line {
+  display: block;
+}
+
+.sheet-incomplete {
+  margin: var(--space-6) 0;
+}
+
+.languages {
+  margin-top: var(--space-10);
+}

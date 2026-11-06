@@ -35,6 +35,8 @@ export interface WeaponStats {
   damageType: DamageType
   properties: WeaponProperty[]
   mastery?: WeaponMastery
+  /** Дальнобойное оружие (луки, арбалеты, праща, дротик); без поля — рукопашное. */
+  ranged?: boolean
   /** Урон при хвате двумя руками (свойство «универсальное»). */
   versatileDamage?: string
   /** Дистанция в футах: обычная/максимальная (для метательного и стрелкового оружия). */
@@ -80,6 +82,9 @@ export interface ItemUse {
 }
 
 /** Можно ли применить предмет (use_item): расходники, боеприпасы и предметы с описанием применения. */
+/** Дальнобойное ли оружие: отмечено в справочнике или стреляет боеприпасами. */
+export const isRangedWeapon = (w: WeaponStats) => Boolean(w.ranged) || w.properties.includes('ammunition')
+
 export const isUsable = (item: ItemDefinition) => item.category === 'consumable' || item.category === 'ammunition' || item.use !== undefined
 
 export type ItemCatalog = Record<string, ItemDefinition>

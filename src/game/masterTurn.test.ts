@@ -40,6 +40,11 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('«ты входишь в таверну»')
   })
 
+  it('языки: незнакомую речь и тексты герой не понимает', () => {
+    expect(DM_PROMPT).toContain('Герой понимает только языки из строки «Языки»')
+    expect(DM_PROMPT).toContain('**непонятны**')
+  })
+
   it('стиль, свобода, честность, решения игрока, конец ответа', () => {
     expect(DM_PROMPT).toContain('3–6 предложений')
     expect(DM_PROMPT).toContain('свой голос, манера речи и мотивы')

@@ -3,7 +3,7 @@
 // checkAction на копии состояния и возвращает результат для модели. Недопустимый вызов отклоняется с причиной,
 // ничего не меняя. Чистые функции; запись действий в историю делает вызывающий код (masterTurn.ts).
 import type { AiTool, AiToolCall } from '../ai/types'
-import { ABILITIES, ABILITY_NAMES, type Ability } from '../engine/abilities'
+import { ABILITIES, ABILITY_NAMES, ABILITY_NAMES_GENITIVE, abilityModifier, proficiencyBonus, type Ability } from '../engine/abilities'
 import { abilityCheck, CheckError, MAX_DC, MIN_DC, savingThrow, type D20TestResult } from '../engine/checks'
 import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition, type ConditionId } from '../engine/conditions'
 import { roll, type RollMode, type Rng } from '../engine/dice'
@@ -19,6 +19,7 @@ import { END_TURN_TOOL } from './turnChanges'
 import { checkSubjectOf } from './classOrder'
 import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
 import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
+import { recoveryText } from './features'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER } from './storyActions'
 
@@ -150,8 +151,10 @@ export const MASTER_TOOLS: AiTool[] = [
   {
     name: 'use_feature',
     description:
-      'Герой применил умение класса с ограниченным числом применений («Второе дыхание», «Ярость», «Бардовское вдохновение» — список в листе героя). ' +
-      'Движок спишет применение и, если умение лечит, сам бросит лечение. Применений нет — откажет.',
+      'Герой применил умение с ограниченным числом применений — класса («Второе дыхание», «Ярость», «Бардовское вдохновение»), вида (оружие дыхания, «Прилив адреналина», ' +
+      '«Неутомимая стойкость», «Знание камня», «Великанье происхождение») или воззвания; список с остатком — в разделе «Умения» листа героя. ' +
+      'Движок спишет применение и сам бросит лечение или урон (оружие дыхания: урон и Сл спасброска целей). Применений нет — откажет. ' +
+      'Бесплатные сотворения заклинаний тратятся не здесь, а через cast_spell.',
     parameters: object(
       {
         hero: HERO,
@@ -692,7 +695,7 @@ const HANDLERS: Record<string, Handler> = {
     if (!found)
       reject(`У ${member.character.name} нет умения «${query}» с применениями.${states.length ? ` Есть: ${states.map((r) => `${r.resource.name} (${r.resource.id})`).join(', ')}.` : ''}`)
     const { resource, left, max } = found!
-    if (left <= 0) reject(`«${resource.name}» у ${member.character.name} потрачено (0/${max}) — восстанавливается ${resource.shortRest ? 'коротким или долгим' : 'долгим'} отдыхом.`)
+    if (left <= 0) reject(`«${resource.name}» у ${member.character.name} потрачено (0/${max}) — восстанавливается: ${recoveryText(resource)}.`)
     if (resource.pool) {
       const amount = integer(args, 'amount') ?? reject(`«${resource.name}» — запас: укажи amount (в запасе ${left}).`)
       if (amount! > left) reject(`В запасе «${resource.name}» осталось ${left}, а нужно ${amount}.`)
@@ -714,6 +717,27 @@ const HANDLERS: Record<string, Handler> = {
       const hp = hpEvents(member, 'healing', r.total, undefined, ENGINE)
       events.push(...hp.events)
       healing = ` Лечение ${r.total}, хиты ${hp.hp}/${member.character.maxHp}.`
+    }
+    const c = member.character
+    const pb = proficiencyBonus(c.level)
+    if (resource.effect?.damage) {
+      const count = resource.effect.damage.count[Math.min(20, Math.max(1, c.level)) - 1]
+      const type = rules.species[c.speciesId]?.choice?.options.find((o) => o.id === c.speciesOption)?.damageType
+      const typeName = type ? (DAMAGE_TYPE_NAMES[type as DamageTypeId] ?? type) : ''
+      const r = roll(`${count}d${resource.effect.damage.die}`, { rng: ctx.rng })
+      events.push({ event: { type: 'diceRolled', roll: { id: `roll-${ctx.newId()}`, label: `${resource.name}: урон${typeName ? ` (${typeName})` : ''}`, timestamp: ctx.now(), result: r } }, author: ENGINE })
+      healing += ` Урон ${r.total}${typeName ? ` (${typeName})` : ''} при провале, ${Math.floor(r.total / 2)} при успехе.`
+    }
+    if (resource.effect?.save) {
+      const dc = 8 + abilityModifier(c.abilities[resource.effect.save.dcAbility]) + pb
+      healing += ` Цели делают спасбросок ${ABILITY_NAMES_GENITIVE[resource.effect.save.ability]} Сл ${dc} — бросай их сам по правилам НПС.`
+    }
+    if (resource.effect?.tempHp === 'proficiency') healing += ` Временные хиты: ${pb} (учёт временных хитов появится с боевой системой — опиши в рассказе).`
+    if (resource.id === 'relentless-endurance') {
+      if (c.hp > 0) reject(`«${resource.name}» срабатывает, когда хиты опускаются до 0, а у ${c.name} сейчас ${c.hp}.`)
+      const hp = hpEvents(member, 'healing', 1, undefined, ENGINE)
+      events.push(...hp.events)
+      healing += ` ${c.name} остаётся с 1 хитом.`
     }
     return { events, result: { left: left - 1, max, message: `${member.character.name} применяет «${resource.name}» (осталось ${left - 1}/${max}).${healing}` } }
   },

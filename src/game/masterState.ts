@@ -15,6 +15,11 @@ import { armorClass } from './character'
 import { currentLocation } from './storyActions'
 import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
+import { recoveryText } from './features'
+import { invocationLabel } from './invocations'
+import { languageNames } from './languages'
+import { masteryRule } from './weaponMastery'
+import { MASTERY_LABELS } from '../components/itemText'
 import { classSpellcasting, hasMagic, knownSpells, needsSpellChoice, spellcastingStats, spellSlots } from './magic'
 
 export interface MasterStateContext {
@@ -56,6 +61,7 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
     `Навыки с владением: ${skills || 'нет'}.`,
     feats ? `Черты: ${feats}.` : '',
     classOrderOf(c, ctx.rules) ? `${ctx.rules.classes[c.classId]?.order?.feature}: ${classOrderOf(c, ctx.rules)!.name} — ${classOrderOf(c, ctx.rules)!.description}` : '',
+    ...originText(c, ctx),
     `Состояния: ${conditions || 'нет'}.`,
     `Экипировка: основная рука — ${name(inv.equipped.mainHand)}, вторая рука — ${name(inv.equipped.offHand)}, доспех — ${name(inv.equipped.armor)}.`,
     attacks.length ? `Атаки: ${attacks.join('; ')}.` : '',
@@ -115,15 +121,43 @@ export function magicText(member: PartyMember, ctx: MasterStateContext): string[
   return lines
 }
 
-/** Кости хитов и умения с применениями — для отдыха и use_feature. */
+/** Кости хитов и умения с применениями (класс, вид, воззвания; бесплатные сотворения) — для отдыха и use_feature. */
 export function restText(member: PartyMember, ctx: MasterStateContext): string[] {
   const c = member.character
   const hd = hitDiceOf(c, ctx.rules)
   const features = featureResources(c, ctx.rules)
   return [
     `Кости хитов: ${hd.left}/${hd.total} (к${hd.die}).`,
-    features.length ? `Умения с применениями: ${features.map((f) => `${f.resource.name} (${f.resource.id}) ${f.left}/${f.max}`).join(', ')}.` : '',
+    features.length
+      ? `Умения с применениями (use_feature): ${features.map((f) => `${f.resource.name} (${f.resource.id}; ${f.sourceName}) ${f.left}/${f.max}, восстановление — ${recoveryText(f.resource)}`).join(', ')}.`
+      : '',
   ]
+}
+
+/**
+ * Языки, приёмы оружия и воззвания. Языки — что герой понимает: речь и тексты на остальных ему непонятны.
+ */
+export function originText(c: PartyMember['character'], ctx: MasterStateContext): string[] {
+  const rules = ctx.rules
+  const lines: string[] = []
+  if (rules.languages)
+    lines.push(
+      c.languages?.length
+        ? `Языки (только их герой понимает, на остальных речь и надписи ему непонятны): ${languageNames(c.languages, rules)}.`
+        : 'Языки ещё не выбраны игроком — считай, что герой знает только Общий.',
+    )
+  if (masteryRule(c.classId, rules) && c.weaponMasteries?.length)
+    lines.push(
+      `Приёмы оружия освоены: ${c.weaponMasteries
+        .map((id) => {
+          const m = ctx.catalog[id]?.weapon?.mastery
+          return `${ctx.catalog[id]?.name ?? id}${m ? ` — ${MASTERY_LABELS[m]}` : ''}`
+        })
+        .join(', ')} (эффекты в бою — позже).`,
+    )
+  if (c.invocations?.length && rules.invocations)
+    lines.push(`Таинственные воззвания: ${c.invocations.map((x) => `${invocationLabel(x, rules)} — ${rules.invocations[x.id]?.description ?? ''}`).join('; ')}`)
+  return lines
 }
 
 /** Сколько последних записей «Летописи» идёт в запрос. */

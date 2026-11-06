@@ -26,7 +26,7 @@ import { importLegacy, type LegacyContext } from './legacyImport'
 import type { KeyValueStorage } from './legacySave'
 import type { StoryRepository } from './repository'
 import type { MagicRules } from './magic'
-import type { CharacterMagic } from '../types/spells'
+import type { SheetCompletion } from './sheetCompletion'
 import {
   applyAction,
   checkAction,
@@ -289,7 +289,7 @@ export function createAppStore(options: AppStoreOptions) {
     },
 
     /** Выбрать заклинания герою из «Моих героев» (старое сохранение заклинателя). */
-    async chooseHeroSpells(heroId: string, completion: { order?: string; magic?: CharacterMagic }): Promise<CommandResult> {
+    async chooseHeroSpells(heroId: string, completion: SheetCompletion): Promise<CommandResult> {
       if (!rules) return 'Нет данных правил магии.'
       const reason = applyRoster(chooseHeroSpells(state.roster, heroId, completion, rules))
       if (!reason) await saveRoster()

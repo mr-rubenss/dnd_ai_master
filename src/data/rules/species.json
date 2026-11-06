@@ -31,64 +31,101 @@
           "id": "black",
           "name": "Чёрный",
           "nameEn": "Black",
-          "description": "Кислота"
+          "description": "Кислота",
+          "damageType": "acid"
         },
         {
           "id": "blue",
           "name": "Синий",
           "nameEn": "Blue",
-          "description": "Электричество"
+          "description": "Электричество",
+          "damageType": "lightning"
         },
         {
           "id": "brass",
           "name": "Латунный",
           "nameEn": "Brass",
-          "description": "Огонь"
+          "description": "Огонь",
+          "damageType": "fire"
         },
         {
           "id": "bronze",
           "name": "Бронзовый",
           "nameEn": "Bronze",
-          "description": "Электричество"
+          "description": "Электричество",
+          "damageType": "lightning"
         },
         {
           "id": "copper",
           "name": "Медный",
           "nameEn": "Copper",
-          "description": "Кислота"
+          "description": "Кислота",
+          "damageType": "acid"
         },
         {
           "id": "gold",
           "name": "Золотой",
           "nameEn": "Gold",
-          "description": "Огонь"
+          "description": "Огонь",
+          "damageType": "fire"
         },
         {
           "id": "green",
           "name": "Зелёный",
           "nameEn": "Green",
-          "description": "Яд"
+          "description": "Яд",
+          "damageType": "poison"
         },
         {
           "id": "red",
           "name": "Красный",
           "nameEn": "Red",
-          "description": "Огонь"
+          "description": "Огонь",
+          "damageType": "fire"
         },
         {
           "id": "silver",
           "name": "Серебряный",
           "nameEn": "Silver",
-          "description": "Холод"
+          "description": "Холод",
+          "damageType": "cold"
         },
         {
           "id": "white",
           "name": "Белый",
           "nameEn": "White",
-          "description": "Холод"
+          "description": "Холод",
+          "damageType": "cold"
         }
       ]
-    }
+    },
+    "resources": [
+      {
+        "id": "breath-weapon",
+        "name": "Оружие дыхания",
+        "nameEn": "Breath Weapon",
+        "usesProficiency": true,
+        "description": "Вместо одной атаки — конус 15 футов или линия 30 футов: спасбросок Ловкости, 1к10 урона вида предка (половина при успехе).",
+        "effect": {
+          "damage": {
+            "count": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4],
+            "die": 10
+          },
+          "save": {
+            "ability": "dex",
+            "dcAbility": "con"
+          }
+        }
+      },
+      {
+        "id": "draconic-flight",
+        "name": "Драконий полёт",
+        "nameEn": "Draconic Flight",
+        "minLevel": 5,
+        "uses": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "description": "Бонусным действием — призрачные крылья на 10 минут: скорость полёта равна скорости."
+      }
+    ]
   },
   {
     "id": "dwarf",
@@ -114,6 +151,15 @@
         "name": "Знание камня",
         "nameEn": "Stonecunning",
         "description": "Бонусным действием на 10 минут получаете чувство вибрации в радиусе 60 футов, стоя на камне или касаясь его. Применений — бонус мастерства до долгого отдыха."
+      }
+    ],
+    "resources": [
+      {
+        "id": "stonecunning",
+        "name": "Знание камня",
+        "nameEn": "Stonecunning",
+        "usesProficiency": true,
+        "description": "Бонусным действием — чувство вибрации 60 футов на 10 минут, стоя на камне или касаясь его."
       }
     ]
   },
@@ -313,7 +359,24 @@
           "description": "Гром бури: урон звуком атакующему."
         }
       ]
-    }
+    },
+    "resources": [
+      {
+        "id": "giant-ancestry",
+        "name": "Великанье происхождение",
+        "nameEn": "Giant Ancestry",
+        "usesProficiency": true,
+        "description": "Дар предков-великанов, выбранный при создании."
+      },
+      {
+        "id": "large-form",
+        "name": "Большая форма",
+        "nameEn": "Large Form",
+        "minLevel": 5,
+        "uses": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "description": "Бонусным действием на 10 минут становитесь Большим: преимущество на проверки Силы, скорость +10 футов."
+      }
+    ]
   },
   {
     "id": "halfling",
@@ -396,6 +459,26 @@
         "name": "Неутомимая стойкость",
         "nameEn": "Relentless Endurance",
         "description": "Опустившись до 0 хитов (но не погибнув сразу), можете остаться с 1 хитом. Снова — после долгого отдыха."
+      }
+    ],
+    "resources": [
+      {
+        "id": "adrenaline-rush",
+        "name": "Прилив адреналина",
+        "nameEn": "Adrenaline Rush",
+        "usesProficiency": true,
+        "shortRest": "all",
+        "description": "Рывок бонусным действием и временные хиты, равные бонусу мастерства.",
+        "effect": {
+          "tempHp": "proficiency"
+        }
+      },
+      {
+        "id": "relentless-endurance",
+        "name": "Неутомимая стойкость",
+        "nameEn": "Relentless Endurance",
+        "uses": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "description": "Опустившись до 0 хитов (но не погибнув сразу), остаётесь с 1 хитом."
       }
     ]
   },

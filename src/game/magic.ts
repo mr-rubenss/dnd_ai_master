@@ -16,7 +16,8 @@ import {
 } from '../types/spells'
 
 /** Что нужно правилам магии из данных игры. */
-export type MagicRules = Pick<RulesData, 'classes' | 'species' | 'backgrounds' | 'feats' | 'spells' | 'spellSlots'>
+/** Правила героя целиком: классы, виды, черты, заклинания, языки, воззвания и справочник предметов (оружие для приёмов). */
+export type MagicRules = Pick<RulesData, 'classes' | 'species' | 'backgrounds' | 'feats' | 'spells' | 'spellSlots' | 'invocations' | 'languages' | 'catalog'>
 
 /** Черта «Посвящённый в магию». */
 export const MAGIC_INITIATE = 'magic-initiate'
@@ -24,7 +25,8 @@ export const MAGIC_INITIATE = 'magic-initiate'
 export const INITIATE_CANTRIPS = 2
 
 /** Что о герое нужно правилам магии. */
-export type MagicSubject = Pick<Character, 'classId' | 'level' | 'abilities' | 'feats' | 'speciesId' | 'speciesOption' | 'backgroundId' | 'magic' | 'classOrder'>
+export type MagicSubject = Pick<Character, 'classId' | 'level' | 'abilities' | 'feats' | 'speciesId' | 'speciesOption' | 'backgroundId' | 'magic' | 'classOrder'> &
+  Partial<Pick<Character, 'invocations'>>
 
 const levelIndex = (level: number) => Math.min(20, Math.max(1, level)) - 1
 
@@ -117,7 +119,7 @@ export function classSpellList(listId: string, spellLevel: number, rules: MagicR
 
 // ---------- Врождённые заклинания: вид и «Посвящённый в магию» ----------
 
-export type InnateSource = 'species' | 'initiate' | 'feature'
+export type InnateSource = 'species' | 'initiate' | 'feature' | 'invocation'
 
 export interface InnateSpell {
   spellId: string
@@ -130,11 +132,17 @@ export interface InnateSpell {
   freeUsed: number
   /** Ключ в magic.freeUsed. */
   key: string
+  /** Без ячейки сколько угодно раз («Доспех теней», «Договор цепи»). */
+  atWill?: boolean
 }
 
 export const INITIATE_LIST_NAMES: Record<InitiateList, string> = { cleric: 'жрец', druid: 'друид', wizard: 'волшебник' }
 
 export const freeKey = (source: InnateSource, spellId: string) => `${source}:${spellId}`
+/** Ключ бесплатного сотворения экземпляра «Посвящённого в магию»: первый — initiate:…, второй — initiate2:… */
+export const initiateKey = (index: number, spellId: string) => (index === 0 ? freeKey('initiate', spellId) : `initiate${index + 1}:${spellId}`)
+/** Ключи сотворений «сколько угодно» не считаются. */
+export const AT_WILL_PREFIX = 'atwill:'
 
 /** Врождённые заклинания вида (с учётом ветви). */
 export function speciesSpellGrants(speciesId: string, option: string | null, rules: MagicRules) {
@@ -146,12 +154,20 @@ export function speciesSpellGrants(speciesId: string, option: string | null, rul
 
 /** Есть ли у героя черта «Посвящённый в магию». */
 export const hasInitiate = (subject: Pick<Character, 'feats'>) => subject.feats.includes(MAGIC_INITIATE)
+/** Сколько раз взята черта «Посвящённый в магию» (повторяемая: предыстория + «Разносторонность» человека). */
+export const initiateCount = (subject: Pick<Character, 'feats'>) => subject.feats.filter((f) => f === MAGIC_INITIATE).length
+
+/** Экземпляры «Посвящённого в магию» в магии героя (старые листы — одно поле initiate). */
+export const initiatesOf = (magic: CharacterMagic | undefined): InitiateMagic[] => magic?.initiates ?? (magic?.initiate ? [magic.initiate] : [])
 
 /** Список «Посвящённого в магию», заданный предысторией (Послушник — жрец, Мудрец — волшебник); null — на выбор. */
 export function fixedInitiateList(backgroundId: string, rules: MagicRules): InitiateList | null {
   const bg = rules.backgrounds[backgroundId]
   return bg?.feat === MAGIC_INITIATE ? (bg.featSpellList ?? null) : null
 }
+
+/** Список, заданный для экземпляра черты: первый экземпляр — от предыстории (если она его задаёт). */
+export const fixedListFor = (index: number, backgroundId: string, rules: MagicRules) => (index === 0 ? fixedInitiateList(backgroundId, rules) : null)
 
 export function innateSpells(subject: MagicSubject, rules: MagicRules): InnateSpell[] {
   const result: InnateSpell[] = []
@@ -179,13 +195,33 @@ export function innateSpells(subject: MagicSubject, rules: MagicRules): InnateSp
     const freeMax = fs.freeUses ? fs.freeUses[levelIndex(subject.level)] : null
     result.push({ spellId: fs.spellId, source: 'feature', sourceName: fs.feature, ability: sc.ability, freeMax, freeUsed: used[key] ?? 0, key })
   }
-  const initiate = subject.magic?.initiate
-  if (initiate && hasInitiate(subject)) {
-    const sourceName = `Посвящённый в магию (${INITIATE_LIST_NAMES[initiate.list]})`
-    for (const spellId of initiate.cantrips)
-      result.push({ spellId, source: 'initiate', sourceName, ability: initiate.ability, freeMax: null, freeUsed: 0, key: freeKey('initiate', spellId) })
-    const key = freeKey('initiate', initiate.spell)
-    result.push({ spellId: initiate.spell, source: 'initiate', sourceName, ability: initiate.ability, freeMax: 1, freeUsed: used[key] ?? 0, key })
+  initiatesOf(subject.magic)
+    .slice(0, initiateCount(subject))
+    .forEach((initiate, index) => {
+      const sourceName = `Посвящённый в магию (${INITIATE_LIST_NAMES[initiate.list]})`
+      for (const spellId of initiate.cantrips)
+        result.push({ spellId, source: 'initiate', sourceName, ability: initiate.ability, freeMax: null, freeUsed: 0, key: initiateKey(index, spellId) })
+      const key = initiateKey(index, initiate.spell)
+      result.push({ spellId: initiate.spell, source: 'initiate', sourceName, ability: initiate.ability, freeMax: 1, freeUsed: used[key] ?? 0, key })
+    })
+  // Воззвания колдуна: заклинания без ячейки и книга «Договора гримуара» (заклинания колдуна — его характеристика).
+  const warlockAbility = sc?.ability ?? 'cha'
+  for (const choice of subject.invocations ?? []) {
+    const inv = rules.invocations?.[choice.id]
+    if (!inv) continue
+    const sourceName = `Воззвание «${inv.name}»`
+    if (inv.spell?.id && rules.spells[inv.spell.id]) {
+      const spellId = inv.spell.id
+      if (inv.spell.free === 'at-will')
+        result.push({ spellId, source: 'invocation', sourceName, ability: warlockAbility, freeMax: null, freeUsed: 0, key: `${AT_WILL_PREFIX}${choice.id}:${spellId}`, atWill: true })
+      else {
+        const key = freeKey('invocation', spellId)
+        result.push({ spellId, source: 'invocation', sourceName, ability: warlockAbility, freeMax: 1, freeUsed: used[key] ?? 0, key })
+      }
+    }
+    if (inv.tome)
+      for (const spellId of [...(choice.cantrips ?? []), ...(choice.rituals ?? [])])
+        result.push({ spellId, source: 'invocation', sourceName, ability: warlockAbility, freeMax: null, freeUsed: 0, key: `tome:${spellId}` })
   }
   return result
 }
@@ -204,7 +240,7 @@ export function hasMagic(subject: MagicSubject, rules: MagicRules): boolean {
 export function needsSpellChoice(subject: MagicSubject, rules: MagicRules): boolean {
   const magic = subject.magic
   if (classSpellcasting(subject.classId, rules) && (!magic || classChoiceProblems(subject.classId, subject.level, magic, rules, subject.classOrder).length > 0)) return true
-  if (hasInitiate(subject) && (!magic?.initiate || initiateProblems(magic.initiate, fixedInitiateList(subject.backgroundId, rules), rules).length > 0)) return true
+  if (hasInitiate(subject) && allInitiateProblems(subject, magic, rules).length > 0) return true
   return false
 }
 
@@ -280,11 +316,27 @@ export function initiateProblems(initiate: InitiateMagic | undefined, fixedList:
   return problems
 }
 
+/** Все экземпляры «Посвящённого в магию»: каждый проверен, списки разные (SRD: «a different spell list each time»). */
+export function allInitiateProblems(subject: Pick<MagicSubject, 'feats' | 'backgroundId'>, magic: CharacterMagic | undefined, rules: MagicRules): string[] {
+  const count = initiateCount(subject)
+  const list = initiatesOf(magic)
+  if (count === 0) return list.length ? ['Без черты «Посвящённый в магию» её заклинаний нет'] : []
+  const problems: string[] = []
+  if (list.length < count) problems.push(count > 1 ? `«Посвящённый в магию»: выберите заклинания для каждой из ${count} черт` : '«Посвящённый в магию»: выберите заклинания')
+  if (list.length > count) problems.push('«Посвящённых в магию» больше, чем черт')
+  list.slice(0, count).forEach((initiate, i) => {
+    const prefix = count > 1 ? `${i + 1}-я черта: ` : ''
+    problems.push(...initiateProblems(initiate, fixedListFor(i, subject.backgroundId, rules), rules).map((p) => prefix + p))
+  })
+  const lists = list.map((x) => x.list)
+  if (new Set(lists).size !== lists.length) problems.push('«Посвящённый в магию» взят дважды — каждый раз с другим списком заклинаний')
+  return problems
+}
+
 /** Полная проверка магии героя (выбор заклинаний при создании и для старых сохранений). */
 export function magicProblems(subject: Omit<MagicSubject, 'magic'>, magic: CharacterMagic, rules: MagicRules): string[] {
   const problems = classChoiceProblems(subject.classId, subject.level, magic, rules, subject.classOrder)
-  if (hasInitiate(subject)) problems.push(...initiateProblems(magic.initiate, fixedInitiateList(subject.backgroundId, rules), rules))
-  else if (magic.initiate) problems.push('Без черты «Посвящённый в магию» её заклинаний нет')
+  problems.push(...allInitiateProblems(subject, magic, rules))
   if (magic.speciesAbility !== undefined && !(INNATE_ABILITIES as readonly string[]).includes(magic.speciesAbility))
     problems.push('Характеристика заклинаний вида — Интеллект, Мудрость или Харизма')
   return problems
@@ -378,7 +430,7 @@ export function planCast(subject: MagicSubject & { name?: string }, request: Cas
   if (castable.length === 0) return `«${spell.name}» есть в книге заклинаний, но не подготовлено — подготовить можно после долгого отдыха (или сотворить ритуалом, если это ритуал).`
   const slots = spellSlots(subject, rules)
   if (request.slotLevel === undefined || request.slotLevel === null) {
-    const free = castable.find((k) => k.innate && k.innate.freeMax !== null && k.innate.freeUsed < k.innate.freeMax)
+    const free = castable.find((k) => k.innate && (k.innate.atWill || (k.innate.freeMax !== null && k.innate.freeUsed < k.innate.freeMax)))
     if (free) return plan(free, null, free.innate!.key, false)
     const slot = slots.find((s) => s.level >= spell.level && s.left > 0)
     if (!slot) {
@@ -402,7 +454,7 @@ export function spendCast(magic: CharacterMagic | undefined, cast: { slotLevel: 
     const k = String(cast.slotLevel)
     return { ...base, slotsUsed: { ...base.slotsUsed, [k]: (base.slotsUsed[k] ?? 0) + 1 } }
   }
-  if (cast.freeKey) return { ...base, freeUsed: { ...base.freeUsed, [cast.freeKey]: (base.freeUsed?.[cast.freeKey] ?? 0) + 1 } }
+  if (cast.freeKey && !cast.freeKey.startsWith(AT_WILL_PREFIX)) return { ...base, freeUsed: { ...base.freeUsed, [cast.freeKey]: (base.freeUsed?.[cast.freeKey] ?? 0) + 1 } }
   return base
 }
 
@@ -432,21 +484,26 @@ export interface SpellChoice {
   prepared: string[]
   /** Книга заклинаний (Волшебник). */
   spellbook: string[]
-  initiateList: InitiateList | null
-  initiateAbility: Ability | null
-  initiateCantrips: string[]
-  initiateSpell: string | null
+  /** «Посвящённый в магию» — по экземпляру черты. */
+  initiates: InitiateChoice[]
   speciesAbility: Ability | null
 }
+
+/** Выбор одного экземпляра «Посвящённого в магию». */
+export interface InitiateChoice {
+  list: InitiateList | null
+  ability: Ability | null
+  cantrips: string[]
+  spell: string | null
+}
+
+export const emptyInitiateChoice = (): InitiateChoice => ({ list: null, ability: null, cantrips: [], spell: null })
 
 export const emptySpellChoice = (): SpellChoice => ({
   cantrips: [],
   prepared: [],
   spellbook: [],
-  initiateList: null,
-  initiateAbility: null,
-  initiateCantrips: [],
-  initiateSpell: null,
+  initiates: [],
   speciesAbility: null,
 })
 
@@ -455,13 +512,14 @@ export function spellChoiceNeeds(subject: Omit<MagicSubject, 'magic'>, rules: Ma
   return {
     classSpells: Boolean(classSpellcasting(subject.classId, rules)),
     initiate: hasInitiate(subject),
+    initiateCount: initiateCount(subject),
     species: speciesSpellGrants(subject.speciesId, subject.speciesOption, rules).length > 0,
   }
 }
 
-/** Список «Посвящённого в магию»: заданный предысторией или выбранный игроком. */
-export const initiateListOf = (subject: Pick<MagicSubject, 'backgroundId'>, choice: SpellChoice, rules: MagicRules): InitiateList | null =>
-  fixedInitiateList(subject.backgroundId, rules) ?? choice.initiateList
+/** Список экземпляра «Посвящённого в магию»: заданный предысторией или выбранный игроком. */
+export const initiateListOf = (subject: Pick<MagicSubject, 'backgroundId'>, choice: SpellChoice, index: number, rules: MagicRules): InitiateList | null =>
+  fixedListFor(index, subject.backgroundId, rules) ?? choice.initiates[index]?.list ?? null
 
 /** Магия героя из выбора игрока (ничего не потрачено). */
 export function magicFromChoice(subject: Omit<MagicSubject, 'magic'>, choice: SpellChoice, rules: MagicRules): CharacterMagic {
@@ -469,12 +527,15 @@ export function magicFromChoice(subject: Omit<MagicSubject, 'magic'>, choice: Sp
   const magic: CharacterMagic = { cantrips: needs.classSpells ? [...choice.cantrips] : [], prepared: needs.classSpells ? [...choice.prepared] : [], slotsUsed: {} }
   if (needs.classSpells && classSpellcasting(subject.classId, rules)?.spellbook) magic.spellbook = [...choice.spellbook]
   if (needs.initiate)
-    magic.initiate = {
-      list: (initiateListOf(subject, choice, rules) ?? '') as InitiateList,
-      ability: choice.initiateAbility ?? bestInnateAbility(subject.abilities),
-      cantrips: [...choice.initiateCantrips],
-      spell: choice.initiateSpell ?? '',
-    }
+    magic.initiates = Array.from({ length: needs.initiateCount }, (_, i) => {
+      const c = choice.initiates[i] ?? emptyInitiateChoice()
+      return {
+        list: (initiateListOf(subject, choice, i, rules) ?? '') as InitiateList,
+        ability: c.ability ?? bestInnateAbility(subject.abilities),
+        cantrips: [...c.cantrips],
+        spell: c.spell ?? '',
+      }
+    })
   if (needs.species) magic.speciesAbility = choice.speciesAbility ?? bestInnateAbility(subject.abilities)
   return magic
 }
@@ -486,10 +547,7 @@ export function choiceFromMagic(magic: CharacterMagic | undefined): SpellChoice 
     cantrips: [...magic.cantrips],
     prepared: [...magic.prepared],
     spellbook: [...(magic.spellbook ?? [])],
-    initiateList: magic.initiate?.list ?? null,
-    initiateAbility: magic.initiate?.ability ?? null,
-    initiateCantrips: [...(magic.initiate?.cantrips ?? [])],
-    initiateSpell: magic.initiate?.spell || null,
+    initiates: initiatesOf(magic).map((x) => ({ list: x.list ?? null, ability: x.ability ?? null, cantrips: [...x.cantrips], spell: x.spell || null })),
     speciesAbility: magic.speciesAbility ?? null,
   }
 }
@@ -515,6 +573,7 @@ export function castProblem(subject: MagicSubject & { name?: string }, cast: Cas
   if (!known.some((k) => !k.inBookOnly)) return `«${spell.name}» не подготовлено.`
   if (cast.freeKey !== null) {
     const innate = known.find((k) => k.innate?.key === cast.freeKey)?.innate
+    if (innate?.atWill) return null
     if (!innate || innate.freeMax === null) return `У «${spell.name}» нет бесплатных сотворений.`
     return innate.freeUsed < innate.freeMax ? null : `Бесплатные сотворения «${spell.name}» потрачены — восстанавливаются после долгого отдыха.`
   }

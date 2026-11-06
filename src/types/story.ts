@@ -3,7 +3,7 @@
 // (src/game/storyActions.ts). Журнал действий хранится вместе с историей (src/game/repository.ts).
 
 import type { ActiveCondition } from '../engine/conditions'
-import type { Character, Equipment, Inventory } from './character'
+import type { Character, Equipment, Inventory, InvocationChoice } from './character'
 import type { Coins } from '../game/coins'
 import type { CharacterMagic } from './spells'
 import type { ArmorType } from './items'
@@ -134,6 +134,8 @@ export interface RestHeroResult {
   resources: Record<string, number>
   /** Снят уровень Истощения (долгий). */
   exhaustionRemoved: boolean
+  /** Долгий отдых: можно сменить приёмы оружия (у классов с «Приёмами оружия»). */
+  masterySwap?: boolean
 }
 
 /**
@@ -190,6 +192,12 @@ export type StoryEvent =
   /** Герой применил умение класса из запаса («Наложение рук»): потрачено amount. */
   /** Игрок выбрал заклинания (старое сохранение заклинателя или «Посвящённый в магию» без выбора). */
   | { type: 'spellsChosen'; heroId: string; magic: CharacterMagic }
+  /** Игрок выбрал приёмы оружия (старое сохранение) или сменил их после долгого отдыха. */
+  | { type: 'weaponMasteriesChosen'; heroId: string; weapons: string[] }
+  /** Игрок выбрал языки (старое сохранение): весь список известных языков. */
+  | { type: 'languagesChosen'; heroId: string; languages: string[] }
+  /** Игрок выбрал таинственные воззвания (старое сохранение колдуна). */
+  | { type: 'invocationsChosen'; heroId: string; invocations: InvocationChoice[] }
   /** Игрок изменил подготовленные заклинания (в пределах лимита класса; у Волшебника — из книги). */
   | { type: 'preparedSpellsChanged'; heroId: string; prepared: string[] }
   /** Герой сотворил заклинание: потрачена ячейка (slotLevel), бесплатное сотворение (freeKey) или ритуал; у заговора — ничего. */

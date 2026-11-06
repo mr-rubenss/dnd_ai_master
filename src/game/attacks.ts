@@ -1,7 +1,7 @@
 // Атаки экипированным оружием (SRD 5.2): бонус атаки, урон и пояснения. Чистые функции.
 import { abilityModifier, proficiencyBonus, type Ability, type AbilityScores } from '../engine/abilities'
 import type { Equipment } from '../types/character'
-import type { DamageType, ItemCatalog, ItemDefinition } from '../types/items'
+import { isRangedWeapon, type DamageType, type ItemCatalog, type ItemDefinition } from '../types/items'
 import type { MartialWeaponTraining } from '../types/rules'
 import { wieldedTwoHanded } from './equipment'
 
@@ -65,7 +65,7 @@ export function weaponAttacks(
     const ability = attackAbility(item, subject.abilities)
     const mod = abilityModifier(subject.abilities[ability])
     const proficient = isWeaponProficient(item, training)
-    const ranged = weapon.properties.includes('ammunition')
+    const ranged = isRangedWeapon(weapon)
     const notes: string[] = []
 
     let attackBonus = mod + (proficient ? pb : 0)

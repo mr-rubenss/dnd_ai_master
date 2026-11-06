@@ -35,7 +35,10 @@ import {
   applyBackgroundProposal,
   chooseCustomBackground,
   decideProposalDetail,
+  draftMagic,
   draftMagicSubject,
+  featChoiceCount,
+  featToolOptions,
   type CreationDraft,
 } from '../../game/creation'
 import {
@@ -57,6 +60,7 @@ import type { EquipmentOption } from '../../types/rules'
 import { ChoiceChip, OptionCard } from './OptionCard'
 import { SpellChoiceForm } from '../SpellPicker'
 import { ClassOrderPicker } from '../ClassOrderPicker'
+import { InvocationPicker, LanguagePicker, WeaponMasteryPicker } from '../OriginPickers'
 
 export interface StepProps {
   draft: CreationDraft
@@ -133,6 +137,12 @@ export function ClassStep({ draft, update }: StepProps) {
           </ul>
 
           <ClassOrderPicker classId={selected.id} value={draft.classOrder} onChange={(classOrder) => update({ ...draft, classOrder })} />
+
+          <WeaponMasteryPicker
+            subject={{ classId: selected.id, level: 1, classOrder: draft.classOrder ?? undefined }}
+            value={draft.weaponMasteries}
+            onChange={(weaponMasteries) => update({ ...draft, weaponMasteries })}
+          />
 
           {selected.fightingStyle && (
             <>
@@ -732,10 +742,23 @@ export function SpeciesStep({ draft, update }: StepProps) {
                   </OptionCard>
                 ))}
               </div>
+              {draft.originFeat && draft.originFeat === backgroundOf(draft, data)?.feat && (
+                <p className="hint" role="note">
+                  {data.feats[draft.originFeat]?.repeatable
+                    ? 'Эту черту уже даёт предыстория — она будет у героя дважды (черту можно брать повторно).'
+                    : 'Эту черту уже даёт предыстория, а брать её повторно нельзя — выберите другую.'}
+                </p>
+              )}
             </>
           )}
         </Details>
       )}
+      <LanguagePicker
+        classId={draft.classId ?? ''}
+        standard={draft.languages}
+        extra={draft.classLanguages}
+        onChange={({ standard, extra }) => update({ ...draft, languages: standard, classLanguages: extra })}
+      />
     </>
   )
 }
@@ -878,6 +901,7 @@ export function SkillsStep({ draft, update }: StepProps) {
     new Set<SkillId>([...granted, ...slots.filter((s) => s.key !== key).flatMap((s) => draft[s.key])])
   const needExpertise = expertiseCount(draft, data)
   const proficient = proficientSkills(draft, data)
+  const featCount = featChoiceCount(draft, data)
 
   return (
     <>
@@ -922,6 +946,35 @@ export function SkillsStep({ draft, update }: StepProps) {
         )
       })}
 
+      {featCount > 0 && (
+        <section className="skill-slot" aria-label="Инструменты черты «Одарённый»" data-slot="featTools">
+          <h4>
+            «Одарённый»: инструменты вместо навыков
+            <span className="slot-count">{draft.featTools.length}</span>
+          </h4>
+          <p className="hint">
+            Черта даёт {featCount} владения навыками или инструментами в любом сочетании: каждый выбранный инструмент — на один навык меньше.
+          </p>
+          <div className="chip-row">
+            {featToolOptions(draft, data).map((id) => {
+              const checked = draft.featTools.includes(id)
+              const full = draft.featTools.length + draft.featSkills.length >= featCount
+              return (
+                <ChoiceChip
+                  key={id}
+                  value={id}
+                  checked={checked}
+                  disabled={!checked && full}
+                  onToggle={() => update({ ...draft, featTools: checked ? draft.featTools.filter((t) => t !== id) : [...draft.featTools, id] })}
+                >
+                  {itemCatalog[id].name}
+                </ChoiceChip>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {needExpertise > 0 && (
         <section className="skill-slot" aria-label="Компетентность" data-slot="expertise">
           <h4>
@@ -957,7 +1010,16 @@ export function SkillsStep({ draft, update }: StepProps) {
 // ---------- Заклинания ----------
 
 export function SpellsStep({ draft, update }: StepProps) {
-  return <SpellChoiceForm subject={draftMagicSubject(draft, data)} choice={draft.spells} onChange={(spells) => update({ ...draft, spells })} />
+  return (
+    <>
+      <SpellChoiceForm subject={draftMagicSubject(draft, data)} choice={draft.spells} onChange={(spells) => update({ ...draft, spells })} />
+      <InvocationPicker
+        subject={{ classId: draft.classId ?? '', level: 1, magic: draftMagic(draft, data) }}
+        value={draft.invocations}
+        onChange={(invocations) => update({ ...draft, invocations })}
+      />
+    </>
+  )
 }
 
 // ---------- Снаряжение ----------

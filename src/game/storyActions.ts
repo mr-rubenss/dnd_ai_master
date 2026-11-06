@@ -26,7 +26,10 @@ import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
-import { magicShapeProblems, migrateInventory } from './character'
+import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
+import { invocationProblems, needsInvocationChoice } from './invocations'
+import { languageProblems, needsLanguageChoice } from './languages'
+import { masteryChangeProblem } from './weaponMastery'
 import { needsOrderChoice, orderProblem } from './classOrder'
 import { applyRestResult, featureResources, restRequestProblem, restResultProblem, restSummaryText } from './rest'
 import { castProblem, emptyMagic, magicProblems, needsSpellChoice, preparedProblems, spendCast, type MagicRules } from './magic'
@@ -237,6 +240,15 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       })
     case 'spellsChosen':
       return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, magic: structuredClone(action.magic) } }))
+    case 'weaponMasteriesChosen':
+      return updateMember(state, action.heroId, (m) => {
+        const { masterySwapReady: _r, ...character } = m.character
+        return { ...m, character: { ...character, weaponMasteries: [...action.weapons] } }
+      })
+    case 'languagesChosen':
+      return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, languages: [...action.languages] } }))
+    case 'invocationsChosen':
+      return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, invocations: structuredClone(action.invocations) } }))
     case 'preparedSpellsChanged':
       return updateMember(state, action.heroId, (m) => ({
         ...m,
@@ -457,6 +469,33 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const shape = magicShapeProblems(action.magic)
       if (shape.length) return `Некорректная магия: ${shape[0]}.`
       return magicProblems(hero.character, action.magic, rules)[0] ?? null
+    }
+    case 'weaponMasteriesChosen': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил.'
+      if (action.author.kind !== 'player' && action.author.kind !== 'system') return 'Приёмы оружия выбирает игрок.'
+      if (!Array.isArray(action.weapons) || !action.weapons.every((id) => typeof id === 'string')) return 'Приёмы оружия — список видов оружия.'
+      return masteryChangeProblem(hero.character, action.weapons, rules)
+    }
+    case 'languagesChosen': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил.'
+      if (action.author.kind !== 'player' && action.author.kind !== 'system') return 'Языки выбирает игрок.'
+      if (!needsLanguageChoice(hero.character, rules)) return 'Языки этого героя уже выбраны.'
+      if (!Array.isArray(action.languages) || !action.languages.every((id) => typeof id === 'string')) return 'Языки — список.'
+      return languageProblems(hero.character.classId, action.languages, rules)[0] ?? null
+    }
+    case 'invocationsChosen': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил.'
+      if (action.author.kind !== 'player' && action.author.kind !== 'system') return 'Воззвания выбирает игрок.'
+      if (!needsInvocationChoice(hero.character, rules)) return 'Воззвания этого героя уже выбраны.'
+      const shape = invocationShapeProblems(action.invocations)
+      if (shape.length) return `Некорректные воззвания: ${shape[0]}.`
+      return invocationProblems(hero.character, action.invocations, rules)[0] ?? null
     }
     case 'preparedSpellsChanged': {
       const hero = member(action.heroId)

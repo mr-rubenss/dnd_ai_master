@@ -45,7 +45,8 @@ const PROPERTY_LABELS: Record<WeaponProperty, string> = {
   versatile: 'универсальное',
 }
 
-const MASTERY_LABELS: Record<WeaponMastery, string> = {
+/** Русские названия приёмов оружия (наш перевод). */
+export const MASTERY_LABELS: Record<WeaponMastery, string> = {
   cleave: 'Рассечение',
   graze: 'Задевание',
   nick: 'Подрез',

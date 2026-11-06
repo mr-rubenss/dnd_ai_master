@@ -104,7 +104,8 @@
       "range": {
         "normal": 80,
         "long": 320
-      }
+      },
+      "ranged": true
     },
     "cost": 25
   },
@@ -486,9 +487,521 @@
       "range": {
         "normal": 150,
         "long": 600
+      },
+      "ranged": true
+    },
+    "cost": 50
+  },
+  {
+    "id": "club",
+    "name": "Дубинка",
+    "nameEn": "Club",
+    "category": "weapon",
+    "icon": "🏏",
+    "weight": 2,
+    "description": "Простое рукопашное оружие. Увесистая деревянная палка.",
+    "weapon": {
+      "kind": "simple",
+      "damage": "1d4",
+      "damageType": "bludgeoning",
+      "properties": [
+        "light"
+      ],
+      "mastery": "slow"
+    },
+    "cost": 0.1
+  },
+  {
+    "id": "greatclub",
+    "name": "Палица",
+    "nameEn": "Greatclub",
+    "category": "weapon",
+    "icon": "🏏",
+    "weight": 10,
+    "description": "Простое рукопашное оружие. Тяжёлая двуручная дубина.",
+    "weapon": {
+      "kind": "simple",
+      "damage": "1d8",
+      "damageType": "bludgeoning",
+      "properties": [
+        "two-handed"
+      ],
+      "mastery": "push"
+    },
+    "cost": 0.2
+  },
+  {
+    "id": "light-hammer",
+    "name": "Лёгкий молот",
+    "nameEn": "Light Hammer",
+    "category": "weapon",
+    "icon": "🔨",
+    "weight": 2,
+    "description": "Простое рукопашное оружие. Небольшой молот, его можно метать.",
+    "weapon": {
+      "kind": "simple",
+      "damage": "1d4",
+      "damageType": "bludgeoning",
+      "properties": [
+        "light",
+        "thrown"
+      ],
+      "mastery": "nick",
+      "range": {
+        "normal": 20,
+        "long": 60
+      }
+    },
+    "cost": 2
+  },
+  {
+    "id": "dart",
+    "name": "Дротик",
+    "nameEn": "Dart",
+    "category": "weapon",
+    "icon": "🎯",
+    "weight": 0.25,
+    "description": "Простое дальнобойное оружие. Маленький метательный снаряд.",
+    "weapon": {
+      "kind": "simple",
+      "damage": "1d4",
+      "damageType": "piercing",
+      "properties": [
+        "finesse",
+        "thrown"
+      ],
+      "mastery": "vex",
+      "ranged": true,
+      "range": {
+        "normal": 20,
+        "long": 60
+      }
+    },
+    "cost": 0.05
+  },
+  {
+    "id": "light-crossbow",
+    "name": "Лёгкий арбалет",
+    "nameEn": "Light Crossbow",
+    "category": "weapon",
+    "icon": "🏹",
+    "weight": 5,
+    "description": "Простое дальнобойное оружие. Нужны арбалетные болты.",
+    "weapon": {
+      "kind": "simple",
+      "damage": "1d8",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "loading",
+        "two-handed"
+      ],
+      "mastery": "slow",
+      "ranged": true,
+      "range": {
+        "normal": 80,
+        "long": 320
+      }
+    },
+    "cost": 25
+  },
+  {
+    "id": "sling",
+    "name": "Праща",
+    "nameEn": "Sling",
+    "category": "weapon",
+    "icon": "🪨",
+    "weight": 0,
+    "description": "Простое дальнобойное оружие. Нужны снаряды для пращи.",
+    "weapon": {
+      "kind": "simple",
+      "damage": "1d4",
+      "damageType": "bludgeoning",
+      "properties": [
+        "ammunition"
+      ],
+      "mastery": "slow",
+      "ranged": true,
+      "range": {
+        "normal": 30,
+        "long": 120
+      }
+    },
+    "cost": 0.1
+  },
+  {
+    "id": "battleaxe",
+    "name": "Боевой топор",
+    "nameEn": "Battleaxe",
+    "category": "weapon",
+    "icon": "🪓",
+    "weight": 4,
+    "description": "Воинское рукопашное оружие. Можно держать одной или двумя руками.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d8",
+      "damageType": "slashing",
+      "properties": [
+        "versatile"
+      ],
+      "mastery": "topple",
+      "versatileDamage": "1d10"
+    },
+    "cost": 10
+  },
+  {
+    "id": "glaive",
+    "name": "Глефа",
+    "nameEn": "Glaive",
+    "category": "weapon",
+    "icon": "🔱",
+    "weight": 6,
+    "description": "Воинское рукопашное оружие. Длинное древко с клинком.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d10",
+      "damageType": "slashing",
+      "properties": [
+        "heavy",
+        "reach",
+        "two-handed"
+      ],
+      "mastery": "graze"
+    },
+    "cost": 20
+  },
+  {
+    "id": "halberd",
+    "name": "Алебарда",
+    "nameEn": "Halberd",
+    "category": "weapon",
+    "icon": "🪓",
+    "weight": 6,
+    "description": "Воинское рукопашное оружие. Топор на длинном древке.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d10",
+      "damageType": "slashing",
+      "properties": [
+        "heavy",
+        "reach",
+        "two-handed"
+      ],
+      "mastery": "cleave"
+    },
+    "cost": 20
+  },
+  {
+    "id": "lance",
+    "name": "Кавалерийское копьё",
+    "nameEn": "Lance",
+    "category": "weapon",
+    "icon": "🔱",
+    "weight": 6,
+    "description": "Воинское рукопашное оружие. Двуручное, если вы не верхом.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d10",
+      "damageType": "piercing",
+      "properties": [
+        "heavy",
+        "reach",
+        "two-handed"
+      ],
+      "mastery": "topple"
+    },
+    "cost": 10
+  },
+  {
+    "id": "maul",
+    "name": "Молот",
+    "nameEn": "Maul",
+    "category": "weapon",
+    "icon": "🔨",
+    "weight": 10,
+    "description": "Воинское рукопашное оружие. Огромный двуручный молот.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "2d6",
+      "damageType": "bludgeoning",
+      "properties": [
+        "heavy",
+        "two-handed"
+      ],
+      "mastery": "topple"
+    },
+    "cost": 10
+  },
+  {
+    "id": "morningstar",
+    "name": "Моргенштерн",
+    "nameEn": "Morningstar",
+    "category": "weapon",
+    "icon": "🔨",
+    "weight": 4,
+    "description": "Воинское рукопашное оружие. Шипастая булава.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d8",
+      "damageType": "piercing",
+      "properties": [],
+      "mastery": "sap"
+    },
+    "cost": 15
+  },
+  {
+    "id": "pike",
+    "name": "Пика",
+    "nameEn": "Pike",
+    "category": "weapon",
+    "icon": "🔱",
+    "weight": 18,
+    "description": "Воинское рукопашное оружие. Очень длинное копьё.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d10",
+      "damageType": "piercing",
+      "properties": [
+        "heavy",
+        "reach",
+        "two-handed"
+      ],
+      "mastery": "push"
+    },
+    "cost": 5
+  },
+  {
+    "id": "rapier",
+    "name": "Рапира",
+    "nameEn": "Rapier",
+    "category": "weapon",
+    "icon": "🤺",
+    "weight": 2,
+    "description": "Воинское рукопашное оружие. Тонкий колющий клинок.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d8",
+      "damageType": "piercing",
+      "properties": [
+        "finesse"
+      ],
+      "mastery": "vex"
+    },
+    "cost": 25
+  },
+  {
+    "id": "trident",
+    "name": "Трезубец",
+    "nameEn": "Trident",
+    "category": "weapon",
+    "icon": "🔱",
+    "weight": 4,
+    "description": "Воинское рукопашное оружие. Его можно метать.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d8",
+      "damageType": "piercing",
+      "properties": [
+        "thrown",
+        "versatile"
+      ],
+      "mastery": "topple",
+      "versatileDamage": "1d10",
+      "range": {
+        "normal": 20,
+        "long": 60
+      }
+    },
+    "cost": 5
+  },
+  {
+    "id": "warhammer",
+    "name": "Боевой молот",
+    "nameEn": "Warhammer",
+    "category": "weapon",
+    "icon": "🔨",
+    "weight": 5,
+    "description": "Воинское рукопашное оружие. Можно держать одной или двумя руками.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d8",
+      "damageType": "bludgeoning",
+      "properties": [
+        "versatile"
+      ],
+      "mastery": "push",
+      "versatileDamage": "1d10"
+    },
+    "cost": 15
+  },
+  {
+    "id": "war-pick",
+    "name": "Боевая кирка",
+    "nameEn": "War Pick",
+    "category": "weapon",
+    "icon": "⛏️",
+    "weight": 2,
+    "description": "Воинское рукопашное оружие. Можно держать одной или двумя руками.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d8",
+      "damageType": "piercing",
+      "properties": [
+        "versatile"
+      ],
+      "mastery": "sap",
+      "versatileDamage": "1d10"
+    },
+    "cost": 5
+  },
+  {
+    "id": "whip",
+    "name": "Кнут",
+    "nameEn": "Whip",
+    "category": "weapon",
+    "icon": "〰️",
+    "weight": 3,
+    "description": "Воинское рукопашное оружие. Длинный плетёный кнут.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d4",
+      "damageType": "slashing",
+      "properties": [
+        "finesse",
+        "reach"
+      ],
+      "mastery": "slow"
+    },
+    "cost": 2
+  },
+  {
+    "id": "blowgun",
+    "name": "Духовая трубка",
+    "nameEn": "Blowgun",
+    "category": "weapon",
+    "icon": "🎯",
+    "weight": 1,
+    "description": "Воинское дальнобойное оружие. Нужны иглы.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "loading"
+      ],
+      "mastery": "vex",
+      "ranged": true,
+      "range": {
+        "normal": 25,
+        "long": 100
+      }
+    },
+    "cost": 10
+  },
+  {
+    "id": "hand-crossbow",
+    "name": "Ручной арбалет",
+    "nameEn": "Hand Crossbow",
+    "category": "weapon",
+    "icon": "🏹",
+    "weight": 3,
+    "description": "Воинское дальнобойное оружие. Нужны арбалетные болты.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d6",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "light",
+        "loading"
+      ],
+      "mastery": "vex",
+      "ranged": true,
+      "range": {
+        "normal": 30,
+        "long": 120
+      }
+    },
+    "cost": 75
+  },
+  {
+    "id": "heavy-crossbow",
+    "name": "Тяжёлый арбалет",
+    "nameEn": "Heavy Crossbow",
+    "category": "weapon",
+    "icon": "🏹",
+    "weight": 18,
+    "description": "Воинское дальнобойное оружие. Нужны арбалетные болты.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d10",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "heavy",
+        "loading",
+        "two-handed"
+      ],
+      "mastery": "push",
+      "ranged": true,
+      "range": {
+        "normal": 100,
+        "long": 400
       }
     },
     "cost": 50
+  },
+  {
+    "id": "musket",
+    "name": "Мушкет",
+    "nameEn": "Musket",
+    "category": "weapon",
+    "icon": "🔫",
+    "weight": 10,
+    "description": "Воинское дальнобойное оружие. Нужны пули.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d12",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "loading",
+        "two-handed"
+      ],
+      "mastery": "slow",
+      "ranged": true,
+      "range": {
+        "normal": 40,
+        "long": 120
+      }
+    },
+    "cost": 500
+  },
+  {
+    "id": "pistol",
+    "name": "Пистолет",
+    "nameEn": "Pistol",
+    "category": "weapon",
+    "icon": "🔫",
+    "weight": 3,
+    "description": "Воинское дальнобойное оружие. Нужны пули.",
+    "weapon": {
+      "kind": "martial",
+      "damage": "1d10",
+      "damageType": "piercing",
+      "properties": [
+        "ammunition",
+        "loading"
+      ],
+      "mastery": "vex",
+      "ranged": true,
+      "range": {
+        "normal": 30,
+        "long": 90
+      }
+    },
+    "cost": 250
   },
   {
     "id": "leather-armor",

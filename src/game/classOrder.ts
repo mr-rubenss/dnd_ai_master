@@ -5,7 +5,6 @@ import { abilityModifier } from '../engine/abilities'
 import type { CheckSubject } from '../engine/checks'
 import type { Character } from '../types/character'
 import type { ClassOrderOption, MartialWeaponTraining, RulesData } from '../types/rules'
-import { needsSpellChoice, type MagicRules, type MagicSubject } from './magic'
 
 type OrderRules = Pick<RulesData, 'classes'>
 
@@ -47,9 +46,4 @@ export function checkSubjectOf<C extends Omit<CheckSubject, 'skillBonuses'> & Pi
   if (!option?.skillBonus) return c
   const value = Math.max(1, abilityModifier(c.abilities[option.skillBonus.ability]))
   return { ...c, skillBonuses: [{ skills: option.skillBonus.skills, label: option.name, value }] }
-}
-
-/** Нужно ли дополнить лист героя (старое сохранение): выбрать порядок класса или заклинания. */
-export function needsSheetCompletion(c: MagicSubject, rules: MagicRules): boolean {
-  return needsOrderChoice(c, rules) || needsSpellChoice(c, rules)
 }

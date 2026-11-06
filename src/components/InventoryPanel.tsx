@@ -10,8 +10,10 @@ import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types
 import type { StoryMemory, WorldFact } from '../types/story'
 import { AdventureJournal } from './AdventureJournal'
 import { MagicPanel } from './MagicPanel'
-import { needsSheetCompletion, weaponTraining } from '../game/classOrder'
-import { ResourcesSection } from './RestPanel'
+import { weaponTraining } from '../game/classOrder'
+import { needsSheetCompletion } from '../game/sheetCompletion'
+import { OriginSection, ResourcesSection } from './RestPanel'
+import { hasMastery } from '../game/weaponMastery'
 import { hasMagic } from '../game/magic'
 import { CharacterStats } from './CharacterStats'
 import { Flash } from './Flash'
@@ -31,6 +33,8 @@ interface Props {
   onPrepareSpells?: (prepared: string[]) => string | null
   /** Открыть окно выбора заклинаний (старое сохранение заклинателя). */
   onChooseSpells?: () => void
+  /** Сменить приёмы оружия после долгого отдыха; возвращает причину отказа или null. */
+  onChangeMasteries?: (weapons: string[]) => string | null
 }
 
 type Tab = 'stats' | 'equipment' | 'magic' | 'journal'
@@ -77,7 +81,7 @@ function formatAttack(attack: WeaponAttack): string {
 }
 
 /** Панель персонажа и инвентаря. На узком экране сворачивается в кнопку. */
-export function InventoryPanel({ character, inventory, catalog, onEquipChange, journal, onPrepareSpells, onChooseSpells }: Props) {
+export function InventoryPanel({ character, inventory, catalog, onEquipChange, journal, onPrepareSpells, onChooseSpells, onChangeMasteries }: Props) {
   // Вкладка «Магия» — только у тех, кто владеет магией.
   const magical = hasMagic(character, rulesData)
   const TABS = ALL_TABS.filter((t) => t.id !== 'magic' || magical)
@@ -210,7 +214,16 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
         <div id="sheet-panel-stats" role="tabpanel" aria-labelledby="sheet-tab-stats" hidden={tab !== 'stats'}>
           {tab === 'stats' && (
             <>
+              {onChooseSpells && needsSheetCompletion(character, rulesData) && (
+                <p className="hint sheet-incomplete">
+                  Лист не дополнен (новые правила SRD).{' '}
+                  <button type="button" className="link-button" onClick={onChooseSpells} data-testid="complete-sheet">
+                    Дополнить лист
+                  </button>
+                </p>
+              )}
               <ResourcesSection character={character} />
+              <OriginSection character={character} onChangeMasteries={onChangeMasteries} />
               <CharacterStats character={character} />
             </>
           )}
@@ -240,6 +253,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
                       {attack ? (
                         <small data-testid={`attack-${slot}`}>
                           {formatAttack(attack)}
+                          {id && hasMastery(character, id) && <span className="attack-notes"> · приём освоен</span>}
                           {attack.notes.length > 0 && <span className="attack-notes"> · {attack.notes.join(' · ')}</span>}
                         </small>
                       ) : (
@@ -296,6 +310,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
                           setEquipError(null)
                         }}
                         onChange={onEquipChange ? (request) => change(entry.itemId, request) : undefined}
+                        mastered={hasMastery(character, entry.itemId)}
                       />
                     ))}
                   </ul>
@@ -338,9 +353,11 @@ interface ItemRowProps {
   onToggle: () => void
   /** Смена экипировки; нет — только чтение. */
   onChange?: (change: EquipmentChange) => void
+  /** Приём этого вида оружия освоен героем («Приёмы оружия»). */
+  mastered?: boolean
 }
 
-function ItemRow({ item, quantity, charges, slots, expanded, error, onToggle, onChange }: ItemRowProps) {
+function ItemRow({ item, quantity, charges, slots, expanded, error, onToggle, onChange, mastered }: ItemRowProps) {
   const detailsId = `item-details-${item.id}`
   const actions = equipActions(item)
   return (
@@ -352,6 +369,11 @@ function ItemRow({ item, quantity, charges, slots, expanded, error, onToggle, on
         <span className="item-name">
           {item.name}
           {slots.length > 0 && <span className="item-badge">{slots.map((s) => SLOT_NAMES[s].toLowerCase()).join(', ')}</span>}
+          {mastered && (
+            <span className="item-badge is-mastery" data-testid={`mastery-${item.id}`}>
+              приём освоен
+            </span>
+          )}
         </span>
         <Flash value={`${quantity}:${charges ?? ''}`} className="item-qty">
           {quantity > 1 ? `×${quantity}` : ''}
@@ -366,7 +388,10 @@ function ItemRow({ item, quantity, charges, slots, expanded, error, onToggle, on
             {itemStatLines(item).map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
-                <dd>{value}</dd>
+                <dd>
+                  {value}
+                  {label === 'Приём' && (mastered ? ' — освоен' : ' — не освоен')}
+                </dd>
               </div>
             ))}
             <div>

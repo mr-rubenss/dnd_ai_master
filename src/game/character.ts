@@ -85,11 +85,26 @@ export function magicShapeProblems(magic: unknown): string[] {
   if (magic.spellbook !== undefined && !isIdList(magic.spellbook)) problems.push('spellbook — список id заклинаний')
   if (!isCounter(magic.slotsUsed)) problems.push('slotsUsed — { круг: потрачено }')
   if (magic.freeUsed !== undefined && !isCounter(magic.freeUsed)) problems.push('freeUsed — { источник:заклинание: потрачено }')
-  const i = magic.initiate
-  if (i !== undefined && (!isObject(i) || !isNonEmptyString(i.list) || !isNonEmptyString(i.ability) || !isIdList(i.cantrips) || typeof i.spell !== 'string'))
-    problems.push('initiate — { list, ability, cantrips, spell }')
+  const isInitiate = (i: unknown) => isObject(i) && isNonEmptyString(i.list) && isNonEmptyString(i.ability) && isIdList(i.cantrips) && typeof i.spell === 'string'
+  if (magic.initiate !== undefined && !isInitiate(magic.initiate)) problems.push('initiate — { list, ability, cantrips, spell }')
+  if (magic.initiates !== undefined && (!Array.isArray(magic.initiates) || !magic.initiates.every(isInitiate))) problems.push('initiates — список { list, ability, cantrips, spell }')
   if (magic.speciesAbility !== undefined && !(ABILITIES as readonly unknown[]).includes(magic.speciesAbility)) problems.push('speciesAbility — характеристика')
   return problems
+}
+
+/** Форма Character.invocations (правила — invocationProblems в src/game/invocations.ts). */
+export function invocationShapeProblems(list: unknown): string[] {
+  if (!Array.isArray(list)) return ['список воззваний']
+  const ok = list.every(
+    (x) =>
+      isObject(x) &&
+      isNonEmptyString(x.id) &&
+      (x.cantrips === undefined || isIdList(x.cantrips)) &&
+      (x.rituals === undefined || isIdList(x.rituals)) &&
+      (x.spellId === undefined || isNonEmptyString(x.spellId)) &&
+      (x.feat === undefined || isNonEmptyString(x.feat)),
+  )
+  return ok ? [] : ['каждое — { id, cantrips?, rituals?, spellId?, feat? }']
 }
 
 /** Проверяет лист персонажа (персонаж + инвентарь) по справочнику предметов. */
@@ -145,6 +160,10 @@ export function parseCharacterSheet(input: unknown, catalog: ItemCatalog): Chara
     if (ch.hitDiceUsed !== undefined && (!isInt(ch.hitDiceUsed) || ch.hitDiceUsed < 0)) fail('character.hitDiceUsed: целое не меньше 0')
     if (ch.featureUses !== undefined && !isCounter(ch.featureUses)) fail('character.featureUses: { умение: потрачено }')
     if (ch.magic !== undefined) for (const problem of magicShapeProblems(ch.magic)) fail(`character.magic: ${problem}`)
+    if (ch.weaponMasteries !== undefined && !isIdList(ch.weaponMasteries)) fail('character.weaponMasteries: список id оружия')
+    if (ch.masterySwapReady !== undefined && typeof ch.masterySwapReady !== 'boolean') fail('character.masterySwapReady: да или нет')
+    if (ch.languages !== undefined && !isIdList(ch.languages)) fail('character.languages: список id языков')
+    if (ch.invocations !== undefined) for (const problem of invocationShapeProblems(ch.invocations)) fail(`character.invocations: ${problem}`)
 
     const prof = ch.proficiencies
     if (!isObject(prof)) {

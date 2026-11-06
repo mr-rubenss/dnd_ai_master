@@ -52,8 +52,28 @@ export interface Character {
   classOrder?: string
   /** Потрачено костей хитов (всего их — уровень, кость — класса). Нет поля — ни одной. */
   hitDiceUsed?: number
-  /** Потрачено применений умений класса (id из resources класса). */
+  /** Потрачено применений умений (id из resources класса, вида или воззвания). */
   featureUses?: Record<string, number>
+  /** «Приёмы оружия»: виды оружия (id предметов справочника), чьи приёмы освоены. Нет поля — не выбраны. */
+  weaponMasteries?: string[]
+  /** После долгого отдыха можно сменить приёмы оружия (один вид или все — по классу). */
+  masterySwapReady?: boolean
+  /** Известные языки (id из rules/languages.json): Общий, выбранные и от класса. Нет поля — не выбраны. */
+  languages?: string[]
+  /** Таинственные воззвания (Колдун). Нет поля — не выбраны. */
+  invocations?: InvocationChoice[]
+}
+
+/**
+ * Выбранное воззвание: id из rules/invocations.json; у «Договора гримуара» — заговоры и ритуалы книги,
+ * у воззваний для заговора — заговор (spellId), у «Уроков Первых» — черта (feat).
+ */
+export interface InvocationChoice {
+  id: string
+  cantrips?: string[]
+  rituals?: string[]
+  spellId?: string
+  feat?: string
 }
 
 /** Чем закончился для героя путь в истории. */

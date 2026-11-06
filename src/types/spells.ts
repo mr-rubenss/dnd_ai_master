@@ -118,7 +118,10 @@ export interface CharacterMagic {
   spellbook?: string[]
   /** Потрачено ячеек по кругам: «1» → 1. У Колдуна — ячейки магии договора (их круг). */
   slotsUsed: Record<string, number>
+  /** Устарело (одна черта): первый «Посвящённый в магию». Новые листы — initiates. */
   initiate?: InitiateMagic
+  /** «Посвящённый в магию» — каждый экземпляр черты отдельно (черта повторяемая, списки разные). */
+  initiates?: InitiateMagic[]
   /** Характеристика врождённых заклинаний вида (нет — лучшая из Инт/Мдр/Хар). */
   speciesAbility?: Ability
   /** Потрачено бесплатных сотворений: ключ — «источник:заклинание» (initiate:sleep, species:speak-with-animals). */

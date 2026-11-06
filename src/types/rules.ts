@@ -64,8 +64,25 @@ export interface ClassDefinition {
   featureSpells?: { spellId: string; feature: string; freeUses?: number[] }[]
   /** Умения с ограниченным числом применений («Второе дыхание», «Ярость»), восстанавливаются отдыхом. */
   resources?: ClassResource[]
+  /** «Приёмы оружия» (Weapon Mastery): сколько видов оружия по уровням, каких, что можно сменить после долгого отдыха. */
+  weaponMastery?: WeaponMasteryRule
+  /** Языки от умений класса: заданные («Друидический») и сколько выбрать ещё («Воровской жаргон» — 1 из любых). */
+  languages?: { fixed?: string[]; choose?: number }
+  /** Число таинственных воззваний по уровням 1–20 (Колдун). */
+  invocations?: number[]
   /** Использование заклинаний (нет — класс без магии на 1-м уровне). */
   spellcasting?: ClassSpellcasting
+}
+
+/**
+ * «Приёмы оружия»: count — видов оружия по уровням 1–20; weapons — melee (простое или воинское рукопашное, Варвар),
+ * any (простое или воинское, Воин), proficient (которым владеет герой); swap — после долгого отдыха сменить
+ * один вид (one) или весь выбор (all).
+ */
+export interface WeaponMasteryRule {
+  count: number[]
+  weapons: 'melee' | 'any' | 'proficient'
+  swap: 'one' | 'all'
 }
 
 /** Вариант порядка: дополнительный заговор и бонус к навыкам или владение оружием и доспехами. */
@@ -82,9 +99,12 @@ export interface ClassOrderOption {
 }
 
 /**
- * Умение с применениями: число по уровням 1–20 (uses) или по модификатору характеристики (usesAbility, минимум 1).
- * Короткий отдых возвращает shortRest применений (нет — только долгий), долгий — все.
- * effect.healing — лечение броском движка (+ уровень класса при addLevel).
+ * Умение с применениями (класс, вид, воззвание): число по уровням 1–20 (uses), по модификатору характеристики
+ * (usesAbility, минимум 1) или равное бонусу мастерства (usesProficiency). Короткий отдых возвращает shortRest
+ * применений ('all' — все; нет — только долгий), долгий — все. minLevel — с какого уровня персонажа умение есть.
+ * effect: healing — лечение броском движка (+ уровень класса при addLevel); damage — урон броском движка
+ * (кубиков по уровням, тип — у варианта вида), save — спасбросок цели (Сл 8 + мод. dcAbility + БМ);
+ * tempHp: 'proficiency' — временные хиты, равные бонусу мастерства.
  */
 export interface ClassResource {
   id: string
@@ -92,12 +112,25 @@ export interface ClassResource {
   description: string
   uses?: number[]
   usesAbility?: Ability
-  shortRest?: number
+  usesProficiency?: boolean
+  shortRest?: number | 'all'
+  minLevel?: number
   /** Запас (Наложение рук): применение тратит произвольное количество, лечит на это количество. */
   pool?: boolean
   nameEn?: string
-  effect?: { healing: string; addLevel?: boolean }
+  effect?: ResourceEffect
 }
+
+export interface ResourceEffect {
+  healing?: string
+  addLevel?: boolean
+  damage?: { count: number[]; die: number }
+  save?: { ability: Ability; dcAbility: Ability }
+  tempHp?: 'proficiency'
+}
+
+/** Умение с применениями — общее имя для классов, видов и воззваний. */
+export type FeatureResource = ClassResource
 
 /** Воинское оружие: всё, никакое, только лёгкое (Монах), фехтовальное или лёгкое (Плут). */
 export type MartialWeaponTraining = 'all' | 'none' | 'light' | 'finesse-or-light'
@@ -131,6 +164,8 @@ export interface SpeciesOption {
   darkvision?: number
   /** Врождённые заклинания ветви (заговоры наследия, «Разговор с животными» лесного гнома). */
   innateSpells?: InnateSpellGrant[]
+  /** Тип урона ветви (драконий предок — оружие дыхания и сопротивление). */
+  damageType?: string
 }
 
 export interface SpeciesDefinition {
@@ -151,6 +186,8 @@ export interface SpeciesDefinition {
   originFeat?: boolean
   /** Врождённые заклинания вида для всех ветвей (Тифлинг — «Чудотворство»). */
   innateSpells?: InnateSpellGrant[]
+  /** Особенности вида с применениями (оружие дыхания, «Прилив адреналина»). */
+  resources?: ClassResource[]
 }
 
 export const FEAT_CATEGORIES = ['origin', 'fighting-style'] as const
@@ -165,6 +202,40 @@ export interface FeatDefinition {
   description: string
   /** Сколько навыков даёт черта на выбор (Одарённый — 3). */
   skillChoices?: number
+  /** Вместо навыков можно выбрать инструменты в любом сочетании (Одарённый). */
+  orTools?: boolean
+  /**
+   * Можно взять несколько раз (SRD: «Repeatable»): any — без ограничений (Одарённый), different-list — каждый раз
+   * с другим списком заклинаний («Посвящённый в магию»). Нет поля — только один раз.
+   */
+  repeatable?: 'any' | 'different-list'
+}
+
+/** Язык SRD 5.2.1: обычный (Standard) или редкий (Rare). */
+export interface LanguageDefinition {
+  id: string
+  name: string
+  nameEn: string
+  rarity: 'standard' | 'rare'
+  note?: string
+}
+
+/**
+ * Таинственное воззвание колдуна. prerequisite: уровень колдуна, другое воззвание, заговор колдуна с уроном
+ * (damage) или с броском атаки (attack). spell — заклинание без ячейки (at-will — сколько угодно, long-rest — раз до
+ * долгого отдыха; id — из справочника, пока заклинания нет — только nameEn), tome — «Договор гримуара» (заговоры
+ * и ритуалы на выбор), resource — применения (раз до долгого отдыха).
+ */
+export interface InvocationDefinition {
+  id: string
+  name: string
+  nameEn: string
+  description: string
+  prerequisite?: { level?: number; invocation?: string; cantrip?: 'damage' | 'attack' }
+  repeatable?: boolean
+  spell?: { id?: string; nameEn?: string; free: 'at-will' | 'long-rest'; self?: boolean }
+  tome?: { cantrips: number; rituals: number }
+  resource?: ClassResource
 }
 
 export interface PackDefinition {
@@ -180,6 +251,10 @@ export interface RulesData {
   species: Record<string, SpeciesDefinition>
   feats: Record<string, FeatDefinition>
   packs: Record<string, PackDefinition>
+  /** Языки (обычные и редкие) — rules/languages.json. */
+  languages: Record<string, LanguageDefinition>
+  /** Таинственные воззвания колдуна — rules/invocations.json. */
+  invocations: Record<string, InvocationDefinition>
   /** Справочник заклинаний и таблицы ячеек (src/data/spells.json, rules/spell-slots.json). */
   spells: SpellCatalog
   spellSlots: SpellSlotTables

@@ -10,6 +10,8 @@ import pricesJson from './prices.json'
 import backgroundsJson from './rules/backgrounds.json'
 import classesJson from './rules/classes.json'
 import featsJson from './rules/feats.json'
+import invocationsJson from './rules/invocations.json'
+import languagesJson from './rules/languages.json'
 import packsJson from './rules/packs.json'
 import speciesJson from './rules/species.json'
 import spellSlotsJson from './rules/spell-slots.json'
@@ -27,7 +29,7 @@ export const itemCatalog = parseItemCatalog(itemsJson)
 export const priceList = parsePrices(pricesJson)
 /** Правила создания персонажа и магии (классы, виды, черты, заклинания, таблицы ячеек). */
 export const rulesData = parseRulesData(
-  { classes: classesJson, backgrounds: backgroundsJson, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson },
+  { classes: classesJson, backgrounds: backgroundsJson, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson, languages: languagesJson, invocations: invocationsJson },
   itemCatalog,
 )
 /** Готовый персонаж для быстрого старта. */

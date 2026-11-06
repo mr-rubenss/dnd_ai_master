@@ -4,6 +4,8 @@ import itemsJson from '../data/items.json'
 import backgroundsJson from '../data/rules/backgrounds.json'
 import classesJson from '../data/rules/classes.json'
 import featsJson from '../data/rules/feats.json'
+import invocationsJson from '../data/rules/invocations.json'
+import languagesJson from '../data/rules/languages.json'
 import packsJson from '../data/rules/packs.json'
 import speciesJson from '../data/rules/species.json'
 import { abilityModifier } from '../engine/abilities'
@@ -16,10 +18,10 @@ import {
   chooseCustomBackground,
   chooseAbilityMethod,
   chooseBackground,
-  chooseClass,
+  chooseClass as chooseClassBase,
   chooseSpecies,
   CreationError,
-  emptyDraft,
+  emptyDraft as emptyDraftBase,
   finalScores,
   firstIncompleteStep,
   recommendedAssignment,
@@ -47,9 +49,24 @@ const WIZARD_SPELLS = {
   prepared: ['magic-missile', 'shield', 'sleep', 'mage-armor'],
 }
 const data = parseRulesData(
-  { classes: classesJson, backgrounds: backgroundsJson, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson },
+  { classes: classesJson, backgrounds: backgroundsJson, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson, languages: languagesJson, invocations: invocationsJson },
   catalog,
 )
+
+/** Черновик с выбранными языками (Общий + два обычных) — чтобы старые проверки шагов не зависели от языков. */
+const emptyDraft = (): CreationDraft => ({ ...emptyDraftBase(), languages: ['dwarvish', 'elvish'] })
+/** Приёмы оружия по умолчанию для классов с «Приёмами оружия» (Плуту — ещё язык к «Воровскому жаргону»). */
+const DEFAULT_MASTERIES: Record<string, string[]> = {
+  fighter: ['greatsword', 'flail', 'javelin'],
+  barbarian: ['greataxe', 'handaxe'],
+  paladin: ['longsword', 'javelin'],
+  ranger: ['longbow', 'shortsword'],
+  rogue: ['dagger', 'shortbow'],
+}
+const chooseClass = (d: CreationDraft, id: string): CreationDraft => {
+  const next = chooseClassBase(d, id)
+  return next === d ? d : { ...next, weaponMasteries: DEFAULT_MASTERIES[id] ?? [], classLanguages: id === 'rogue' ? ['goblin'] : [] }
+}
 
 /** Значение генератора для грани `face` на к6. */
 const d6 = (face: number) => (face - 0.5) / 6
@@ -130,7 +147,7 @@ describe('данные правил SRD 5.2', () => {
     const brokenBackgrounds = structuredClone(backgroundsJson)
     brokenBackgrounds[0].feat = 'flight'
     expect(() =>
-      parseRulesData({ classes: brokenClasses, backgrounds: brokenBackgrounds, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson }, catalog),
+      parseRulesData({ classes: brokenClasses, backgrounds: brokenBackgrounds, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson, languages: languagesJson, invocations: invocationsJson }, catalog),
     ).toThrow(
       /classes "barbarian": вариант A: неизвестный предмет "laser-sword"[\s\S]*неизвестный набор "magic-pack"[\s\S]*backgrounds "acolyte": неизвестная черта "flight"/,
     )
@@ -371,11 +388,11 @@ describe('готовый лист персонажа', () => {
     const d = { ...fighterDraft(), originFeat: 'magic-initiate', featSkills: [] }
     expect(creationSteps(d, data).map((s) => s.id)).toContain('spells')
     expect(stepProblems('spells', d, data)).toContain('«Посвящённый в магию»: выберите список заклинаний')
-    const spells = { ...emptySpellChoice(), initiateList: 'wizard' as const, initiateCantrips: ['fire-bolt', 'light'], initiateSpell: 'sleep' }
+    const spells = { ...emptySpellChoice(), initiates: [{ list: 'wizard' as const, ability: null, cantrips: ['fire-bolt', 'light'], spell: 'sleep' }] }
     expect(stepProblems('spells', { ...d, spells }, data)).toEqual([])
     const sheet = buildCharacterSheet({ ...d, spells }, data, catalog, 'h')
     // Характеристика по умолчанию — лучшая из Инт/Мдр/Хар.
-    expect(sheet.character.magic?.initiate).toEqual({ list: 'wizard', ability: 'int', cantrips: ['fire-bolt', 'light'], spell: 'sleep' })
+    expect(sheet.character.magic?.initiates).toEqual([{ list: 'wizard', ability: 'int', cantrips: ['fire-bolt', 'light'], spell: 'sleep' }])
   })
 
   it('Плут: компетентность записывается в навыки', () => {

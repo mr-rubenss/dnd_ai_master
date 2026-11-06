@@ -11,7 +11,7 @@ import { RestButton, RestDialog } from './components/RestPanel'
 import { changeNames, REST_NAMES, restBlocker, restEvents } from './game/rest'
 import { changeList, ledgerOf, turnDelta } from './game/turnChanges'
 import type { RestKind } from './types/story'
-import { needsSheetCompletion } from './game/classOrder'
+import { needsSheetCompletion } from './game/sheetCompletion'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
@@ -34,7 +34,7 @@ import { AiProgress, AiTaskError } from './components/AiTask'
 import { useAiTask } from './components/useAiTask'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
-import type { StoryEpilogue, StoryState } from './types/story'
+import type { StoryEpilogue, StoryEvent, StoryState } from './types/story'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
 /** Ответ, пока ведущий не настроен (нет ключа API и т. п.). */
@@ -535,14 +535,27 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
 
   // Старое сохранение заклинателя: магия теперь часть листа — при загрузке предлагаем выбрать заклинания.
   const [spellDialog, setSpellDialog] = useState(() => !readOnly && needsSheetCompletion(lead.character, rulesData))
-  const chooseSpells = ({ order, magic }: SheetCompletion): string | null => {
+  const chooseSpells = ({ order, magic, weaponMasteries, languages, invocations }: SheetCompletion): string | null => {
+    const as = player(lead.heroId)
+    const heroId = lead.heroId
     if (order) {
       const armor = rulesData.classes[lead.character.classId]?.order?.options.find((o) => o.id === order)?.armor ?? []
-      const reason = appStore.dispatch({ type: 'classOrderChosen', heroId: lead.heroId, order, armor: [...armor] }, player(lead.heroId))
+      const reason = appStore.dispatch({ type: 'classOrderChosen', heroId, order, armor: [...armor] }, as)
       if (reason) return reason
     }
-    return magic ? appStore.dispatch({ type: 'spellsChosen', heroId: lead.heroId, magic }, player(lead.heroId)) : null
+    const steps: StoryEvent[] = [
+      ...(magic ? [{ type: 'spellsChosen' as const, heroId, magic }] : []),
+      ...(invocations ? [{ type: 'invocationsChosen' as const, heroId, invocations }] : []),
+      ...(weaponMasteries ? [{ type: 'weaponMasteriesChosen' as const, heroId, weapons: weaponMasteries }] : []),
+      ...(languages ? [{ type: 'languagesChosen' as const, heroId, languages }] : []),
+    ]
+    for (const event of steps) {
+      const reason = appStore.dispatch(event, as)
+      if (reason) return reason
+    }
+    return null
   }
+  const changeMasteries = (weapons: string[]) => appStore.dispatch({ type: 'weaponMasteriesChosen', heroId: lead.heroId, weapons }, player(lead.heroId))
   const prepareSpells = (prepared: string[]) => appStore.dispatch({ type: 'preparedSpellsChanged', heroId: lead.heroId, prepared }, player(lead.heroId))
 
   const handleEquipChange = (change: EquipmentChange): string | null => {
@@ -616,6 +629,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
           onEquipChange={readOnly ? undefined : handleEquipChange}
           journal={{ memory: story.memory, facts: story.world.facts }}
           onPrepareSpells={readOnly ? undefined : prepareSpells}
+          onChangeMasteries={readOnly ? undefined : changeMasteries}
           onChooseSpells={readOnly ? undefined : () => setSpellDialog(true)}
         />
       </div>

@@ -2,7 +2,7 @@
 // выбор заклинаний старому заклинателю. На телефоне — без горизонтальной прокрутки (широкий шрифт — фикстура).
 import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
-import { act, addHeroCopy, collectPageErrors, expectNoHorizontalScroll, fillSpellStep, MASTER, openCharacterCreation, startQuickGame } from './helpers'
+import { act, addHeroCopy, collectPageErrors, expectNoHorizontalScroll, fillLanguages, fillSpellStep, MASTER, openCharacterCreation, startQuickGame } from './helpers'
 
 const next = (page: Page) => page.getByRole('button', { name: 'Далее', exact: true })
 const option = (page: Page, group: string, id: string) => page.getByRole('radiogroup', { name: group }).locator(`[data-option="${id}"]`)
@@ -32,6 +32,7 @@ test('создание волшебника: шаг «Заклинания», к
   await page.getByRole('radiogroup', { name: 'Прибавка +1' }).locator('[data-value="con"]').click()
   await next(page).click()
   await option(page, 'Вид', 'human').click()
+  await fillLanguages(page)
   await page.getByRole('radiogroup', { name: 'Черта происхождения' }).locator('[data-option="alert"]').click()
   await next(page).click()
   await page.getByRole('button', { name: /Расставить под класс/ }).click()
@@ -205,6 +206,7 @@ test('создание жреца: «Божественный порядок» �
   await page.getByLabel('Ваш инструмент').selectOption('dice-set')
   await next(page).click()
   await option(page, 'Вид', 'dwarf').click()
+  await fillLanguages(page)
   await next(page).click()
   await page.getByRole('button', { name: /Расставить под класс/ }).click()
   await next(page).click()

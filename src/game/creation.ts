@@ -4,7 +4,7 @@ import { ABILITIES, abilityModifier, type Ability, type AbilityScores } from '..
 import type { Proficiencies } from '../engine/checks'
 import { roll, type Rng, type RollResult } from '../engine/dice'
 import { SKILLS, type SkillId } from '../engine/skills'
-import type { CharacterSheet, Equipment, InventoryEntry } from '../types/character'
+import type { CharacterSheet, Equipment, InventoryEntry, InvocationChoice } from '../types/character'
 import type { ItemCatalog } from '../types/items'
 import type { ToolKind } from '../types/items'
 import type { BackgroundDefinition, ClassDefinition, EquipmentOption, RulesData, SkillChoice } from '../types/rules'
@@ -18,6 +18,9 @@ import {
 import type { BackgroundProposal } from './backgroundFromStory'
 import { MAX_BACKSTORY_LENGTH } from './character'
 import { coinsFromGold } from './coins'
+import { invocationProblems } from './invocations'
+import { knownLanguages, languageChoiceProblems } from './languages'
+import { masteryProblems } from './weaponMastery'
 import { armorWithOrder, orderProblem } from './classOrder'
 import { emptySpellChoice, hasMagic, magicFromChoice, magicProblems, type MagicSubject, type SpellChoice } from './magic'
 
@@ -85,6 +88,16 @@ export interface CreationDraft {
   backgroundProposal: BackgroundProposal | null
   /** Шаг «Заклинания»: заговоры и заклинания класса, книга Волшебника, «Посвящённый в магию», характеристика вида. */
   spells: SpellChoice
+  /** «Приёмы оружия» (Варвар, Воин, Паладин, Следопыт, Плут): виды оружия — id предметов. */
+  weaponMasteries: string[]
+  /** Два обычных языка (Общий известен всем). */
+  languages: string[]
+  /** Языки на выбор от класса (Плут — ещё один к «Воровскому жаргону»). */
+  classLanguages: string[]
+  /** Инструменты черты «Одарённый» (вместо части навыков). */
+  featTools: string[]
+  /** Таинственные воззвания (Колдун). */
+  invocations: InvocationChoice[]
 }
 
 export function emptyDraft(): CreationDraft {
@@ -117,6 +130,11 @@ export function emptyDraft(): CreationDraft {
     backgroundSource: 'manual',
     backgroundProposal: null,
     spells: emptySpellChoice(),
+    weaponMasteries: [],
+    languages: [],
+    classLanguages: [],
+    featTools: [],
+    invocations: [],
   }
 }
 
@@ -146,7 +164,20 @@ export function decideProposalDetail(draft: CreationDraft, index: number, accept
 export function chooseClass(draft: CreationDraft, classId: string): CreationDraft {
   if (draft.classId === classId) return draft
   const spells = { ...draft.spells, cantrips: [], prepared: [], spellbook: [] }
-  return { ...draft, classId, fightingStyle: null, classOrder: null, classTools: [], classSkills: [], expertise: [], classEquipment: null, spells }
+  return {
+    ...draft,
+    classId,
+    fightingStyle: null,
+    classOrder: null,
+    classTools: [],
+    classSkills: [],
+    expertise: [],
+    classEquipment: null,
+    spells,
+    weaponMasteries: [],
+    classLanguages: [],
+    invocations: [],
+  }
 }
 
 /** Навыки предыстории даются автоматически — убираем их из выбранных в других местах. */
@@ -188,7 +219,7 @@ export function toolProficiencies(draft: CreationDraft, data: RulesData): string
   const cls = draft.classId ? data.classes[draft.classId] : undefined
   const background = backgroundOf(draft, data)
   const backgroundTool = background?.tool.itemId || (background?.tool.choose ? draft.backgroundTool : null)
-  return [...new Set([...(cls?.tools?.fixed ?? []), ...draft.classTools, ...(backgroundTool ? [backgroundTool] : [])])]
+  return [...new Set([...(cls?.tools?.fixed ?? []), ...draft.classTools, ...(backgroundTool ? [backgroundTool] : []), ...(draft.featTools ?? [])])]
 }
 
 /** Инструменты вида (или видов) из справочника. */
@@ -287,15 +318,21 @@ export function grantedSkills(draft: CreationDraft, data: RulesData): SkillId[] 
   return [...(backgroundOf(draft, data)?.skills ?? [])]
 }
 
-/** Черты персонажа: от предыстории, (у Человека) черта происхождения на выбор и боевой стиль (Воин). */
+/**
+ * Черты персонажа: от предыстории, (у Человека) черта происхождения на выбор и боевой стиль (Воин).
+ * Повторяемая черта («Посвящённый в магию», «Одарённый») может быть в списке дважды — каждый экземпляр отдельно.
+ */
 export function chosenFeats(draft: CreationDraft, data: RulesData): string[] {
   const feats: string[] = []
+  const add = (id: string) => {
+    if (!feats.includes(id) || data.feats[id]?.repeatable) feats.push(id)
+  }
   const background = backgroundOf(draft, data)
-  if (background?.feat) feats.push(background.feat)
-  if (draft.originFeat) feats.push(draft.originFeat)
+  if (background?.feat) add(background.feat)
+  if (draft.originFeat) add(draft.originFeat)
   const cls = draft.classId ? data.classes[draft.classId] : undefined
-  if (cls?.fightingStyle && draft.fightingStyle) feats.push(draft.fightingStyle)
-  return [...new Set(feats)]
+  if (cls?.fightingStyle && draft.fightingStyle) add(draft.fightingStyle)
+  return feats
 }
 
 /** Черты нужной категории (происхождения или боевого стиля). */
@@ -317,9 +354,22 @@ export function skillSlots(draft: CreationDraft, data: RulesData): SkillSlot[] {
       options: resolveChoice(species.skillChoice),
     })
   }
-  const featCount = chosenFeats(draft, data).reduce((sum, id) => sum + (data.feats[id]?.skillChoices ?? 0), 0)
-  if (featCount > 0) slots.push({ key: 'featSkills', label: 'Черта «Одарённый»', count: featCount, options: [...SKILLS] })
+  const featCount = featChoiceCount(draft, data)
+  if (featCount > 0) {
+    const label = featCount > 3 ? 'Черта «Одарённый» (дважды)' : 'Черта «Одарённый»'
+    // Навыки и инструменты в любом сочетании: навыков — сколько осталось после выбранных инструментов.
+    slots.push({ key: 'featSkills', label, count: Math.max(0, featCount - (draft.featTools ?? []).length), options: [...SKILLS] })
+  }
   return slots
+}
+
+/** Сколько выборов дают черты («Одарённый» — 3 навыка или инструмента, повторно — ещё 3). */
+export const featChoiceCount = (draft: CreationDraft, data: RulesData) => chosenFeats(draft, data).reduce((sum, id) => sum + (data.feats[id]?.skillChoices ?? 0), 0)
+
+/** Инструменты, которые можно взять чертой «Одарённый»: любые, которыми герой ещё не владеет. */
+export function featToolOptions(draft: CreationDraft, data: RulesData): string[] {
+  const own = new Set(toolProficiencies({ ...draft, featTools: [] }, data))
+  return toolsOfKinds(['artisan', 'gaming', 'musical', 'kit'], data).filter((id) => !own.has(id))
 }
 
 /** Все навыки, которыми будет владеть персонаж. */
@@ -428,6 +478,7 @@ export function draftMagicSubject(draft: CreationDraft, data: RulesData): Omit<M
     speciesOption: draft.speciesOption,
     backgroundId: draft.backgroundId ?? '',
     ...(draft.classOrder ? { classOrder: draft.classOrder } : {}),
+    invocations: draft.invocations,
   }
 }
 
@@ -467,6 +518,7 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
         const problem = orderProblem(cls.id, draft.classOrder, data)
         if (problem) problems.push(problem)
       }
+      if (cls.weaponMastery) problems.push(...masteryProblems({ classId: cls.id, level: 1, classOrder: draft.classOrder ?? undefined }, draft.weaponMasteries, data))
       if (cls.tools?.choose) {
         const { count, kinds } = cls.tools.choose
         const allowed = new Set(toolsOfKinds(kinds, data))
@@ -513,7 +565,10 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
           problems.push(`Выберите: ${species.choice.label.toLowerCase()}`)
         }
         if (species.originFeat && data.feats[draft.originFeat ?? '']?.category !== 'origin') problems.push('Выберите черту происхождения')
+        else if (species.originFeat && draft.originFeat && draft.originFeat === background?.feat && !data.feats[draft.originFeat]?.repeatable)
+          problems.push('Эту черту уже даёт предыстория — выберите другую')
       }
+      problems.push(...languageChoiceProblems(draft.classId ?? '', draft.languages, draft.classLanguages, data))
       break
     case 'abilities': {
       if (draft.abilityMethod === 'roll' && (draft.rolls?.length ?? 0) !== 6) problems.push('Бросьте кубики')
@@ -533,6 +588,10 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
           taken.add(skill)
         }
       }
+      const featTools = draft.featTools ?? []
+      if (featTools.length > featChoiceCount(draft, data)) problems.push('Черта «Одарённый»: выборов больше, чем даёт черта')
+      if (featTools.some((t) => !featToolOptions(draft, data).includes(t)) || new Set(featTools).size !== featTools.length)
+        problems.push('Черта «Одарённый»: инструмент — из справочника, без повторов и которым вы ещё не владеете')
       const needExpertise = expertiseCount(draft, data)
       if (needExpertise > 0) {
         const proficient = new Set(proficientSkills(draft, data))
@@ -544,6 +603,7 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
     case 'spells': {
       const magic = draftMagic(draft, data)
       if (magic) problems.push(...magicProblems(draftMagicSubject(draft, data), magic, data))
+      if (cls?.invocations) problems.push(...invocationProblems({ classId: cls.id, level: 1, magic }, draft.invocations, data))
       break
     }
     case 'equipment':
@@ -620,6 +680,9 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
       appearance: draft.appearance.trim(),
       ...(draft.backstory.trim() ? { backstory: draft.backstory.trim() } : {}),
       ...(magic ? { magic } : {}),
+      ...(cls.weaponMastery ? { weaponMasteries: [...draft.weaponMasteries] } : {}),
+      languages: knownLanguages(cls.id, [...draft.languages, ...draft.classLanguages], data),
+      ...(cls.invocations ? { invocations: structuredClone(draft.invocations) } : {}),
     },
     inventory: startingInventory(draft, data, catalog),
   }

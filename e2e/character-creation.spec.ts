@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
-import { collectPageErrors, continueGame, expectNoHorizontalScroll, face, fillSpellStep, flushSaves, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
+import { collectPageErrors, continueGame, expectNoHorizontalScroll, face, fillLanguages, fillMasteries, fillSpellStep, flushSaves, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
 
 const next = (page: Page) => page.getByRole('button', { name: 'Далее', exact: true })
 const option = (page: Page, group: string, id: string) => page.getByRole('radiogroup', { name: group }).locator(`[data-option="${id}"]`)
@@ -33,6 +33,8 @@ test('шаги вперёд закрыты, пока текущий не зав�
   await expectNoHorizontalScroll(page)
 
   await option(page, 'Класс', 'fighter').click()
+
+  await fillMasteries(page)
   await expect(page.locator('.creation-details')).toContainText('к10')
   // Воину нужен боевой стиль.
   await expect(next(page)).toBeDisabled()
@@ -46,6 +48,7 @@ test('полный путь: плут-эльф с предысторией пр�
 
   // 1. Класс
   await option(page, 'Класс', 'rogue').click()
+  await fillMasteries(page)
   await expect(page.locator('.creation-details')).toContainText('Скрытая атака')
   await expectNoHorizontalScroll(page)
   await next(page).click()
@@ -63,6 +66,7 @@ test('полный путь: плут-эльф с предысторией пр�
   // 3. Вид: лесной эльф
   await expect(stepTitle(page)).toHaveText('3. Вид')
   await option(page, 'Вид', 'elf').click()
+  await fillLanguages(page)
   await expect(page.locator('.creation-problems')).toHaveText('Выберите: эльфийская ветвь')
   await option(page, 'Эльфийская ветвь', 'wood-elf').click()
   await expect(page.locator('.creation-details')).toContainText('35 футов')
@@ -151,6 +155,7 @@ test('полный путь: плут-эльф с предысторией пр�
 
 test('человек с чертой «Одарённый» выбирает ещё три навыка; можно вернуться назад', async ({ page }) => {
   await option(page, 'Класс', 'fighter').click()
+  await fillMasteries(page)
   await option(page, 'Боевой стиль', 'great-weapon-fighting').click()
   await next(page).click()
   await option(page, 'Предыстория', 'soldier').click()
@@ -158,6 +163,7 @@ test('человек с чертой «Одарённый» выбирает е�
   await page.getByRole('radio', { name: '+1 к трём' }).click()
   await next(page).click()
   await option(page, 'Вид', 'human').click()
+  await fillLanguages(page)
   await expect(page.locator('.creation-problems')).toHaveText('Выберите черту происхождения')
   await option(page, 'Черта происхождения', 'skilled').click()
   await next(page).click()
@@ -215,6 +221,8 @@ test('своя предыстория по шаблону 2024: сборка, б
   await next(page).click()
 
   await option(page, 'Вид', 'orc').click()
+
+  await fillLanguages(page)
   await next(page).click()
   await page.getByRole('button', { name: /Расставить под класс/ }).click()
   await next(page).click()

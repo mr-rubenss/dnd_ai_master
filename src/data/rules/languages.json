@@ -1,0 +1,117 @@
+[
+  {
+    "id": "common",
+    "name": "Общий",
+    "nameEn": "Common",
+    "rarity": "standard"
+  },
+  {
+    "id": "common-sign-language",
+    "name": "Общий язык жестов",
+    "nameEn": "Common Sign Language",
+    "rarity": "standard"
+  },
+  {
+    "id": "draconic",
+    "name": "Драконий",
+    "nameEn": "Draconic",
+    "rarity": "standard"
+  },
+  {
+    "id": "dwarvish",
+    "name": "Дварфийский",
+    "nameEn": "Dwarvish",
+    "rarity": "standard"
+  },
+  {
+    "id": "elvish",
+    "name": "Эльфийский",
+    "nameEn": "Elvish",
+    "rarity": "standard"
+  },
+  {
+    "id": "giant",
+    "name": "Великаний",
+    "nameEn": "Giant",
+    "rarity": "standard"
+  },
+  {
+    "id": "gnomish",
+    "name": "Гномий",
+    "nameEn": "Gnomish",
+    "rarity": "standard"
+  },
+  {
+    "id": "goblin",
+    "name": "Гоблинский",
+    "nameEn": "Goblin",
+    "rarity": "standard"
+  },
+  {
+    "id": "halfling",
+    "name": "Язык полуросликов",
+    "nameEn": "Halfling",
+    "rarity": "standard"
+  },
+  {
+    "id": "orc",
+    "name": "Орочий",
+    "nameEn": "Orc",
+    "rarity": "standard"
+  },
+  {
+    "id": "abyssal",
+    "name": "Язык Бездны",
+    "nameEn": "Abyssal",
+    "rarity": "rare"
+  },
+  {
+    "id": "celestial",
+    "name": "Небесный",
+    "nameEn": "Celestial",
+    "rarity": "rare"
+  },
+  {
+    "id": "deep-speech",
+    "name": "Глубинная речь",
+    "nameEn": "Deep Speech",
+    "rarity": "rare"
+  },
+  {
+    "id": "druidic",
+    "name": "Друидический",
+    "nameEn": "Druidic",
+    "rarity": "rare"
+  },
+  {
+    "id": "infernal",
+    "name": "Инфернальный",
+    "nameEn": "Infernal",
+    "rarity": "rare"
+  },
+  {
+    "id": "primordial",
+    "name": "Первичный",
+    "nameEn": "Primordial",
+    "rarity": "rare",
+    "note": "Включает диалекты аквана, аурана, игнана и террана; знающие один диалект понимают другие."
+  },
+  {
+    "id": "sylvan",
+    "name": "Сильван",
+    "nameEn": "Sylvan",
+    "rarity": "rare"
+  },
+  {
+    "id": "thieves-cant",
+    "name": "Воровской жаргон",
+    "nameEn": "Thieves' Cant",
+    "rarity": "rare"
+  },
+  {
+    "id": "undercommon",
+    "name": "Подземный",
+    "nameEn": "Undercommon",
+    "rarity": "rare"
+  }
+]

@@ -199,3 +199,22 @@ export async function fillSpellStep(page: Page) {
     for (let k = chosen; k < total; k++) await slot.locator('.spell-option-toggle[aria-checked="false"]:not([disabled])').first().click()
   }
 }
+
+/** Выбрать первые доступные варианты в каждом списке-«фишках» внутри области (до «N из N»). */
+export async function fillChipSlots(slots: Locator) {
+  for (let i = 0; i < (await slots.count()); i++) {
+    const slot = slots.nth(i)
+    const [chosen, total] = ((await slot.locator('.slot-count').first().textContent()) ?? '0 из 0').split(' из ').map(Number)
+    for (let k = chosen; k < total; k++) await slot.locator('.choice-chip[aria-checked="false"]:not([disabled])').first().click()
+  }
+}
+
+/** Шаг «Вид»: два обычных языка (и язык от класса, если он есть) — первые в списке. */
+export async function fillLanguages(page: Page) {
+  await fillChipSlots(page.getByTestId('languages').locator('[data-slot]'))
+}
+
+/** Шаг «Класс»: приёмы оружия — первые виды оружия в списке. */
+export async function fillMasteries(page: Page) {
+  await fillChipSlots(page.getByTestId('weapon-masteries'))
+}

@@ -2,7 +2,7 @@
 // нарушение шаблона с исправлением, «Предложить иначе», дописанные детали, история — в листе и в контексте ведущего.
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, openCharacterCreation, withEndTurn, fillSpellStep } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, openCharacterCreation, withEndTurn, fillSpellStep, fillLanguages } from './helpers'
 
 const KEY = 'sk-e2e-fake-key-123456'
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions'
@@ -83,6 +83,7 @@ async function toBackground(page: Page) {
 async function finishCreation(page: Page, name: string) {
   await next(page).click()
   await option(page, 'Вид', 'orc').click()
+  await fillLanguages(page)
   await next(page).click()
   await page.getByRole('button', { name: /Расставить под класс/ }).click()
   await next(page).click()

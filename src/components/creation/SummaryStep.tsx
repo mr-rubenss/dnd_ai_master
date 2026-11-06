@@ -5,7 +5,9 @@ import { passivePerception, savingThrowModifier, skillModifier } from '../../eng
 import { SKILL_DEFINITIONS } from '../../engine/skills'
 import { armorClass, inventoryWeight } from '../../game/character'
 import type { CharacterSheet } from '../../types/character'
-import { formatNumber } from '../itemText'
+import { formatNumber, MASTERY_LABELS } from '../itemText'
+import { invocationLabel } from '../../game/invocations'
+import { languageNames } from '../../game/languages'
 import { knownSpells } from '../../game/magic'
 
 /** Итоговый лист персонажа перед началом игры. */
@@ -86,10 +88,28 @@ export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
           <p data-testid="summary-tools">
             {character.proficiencies.tools.length === 0 ? 'нет' : character.proficiencies.tools.map((id) => itemCatalog[id].name).join(', ')}
           </p>
+          <h4>Языки</h4>
+          <p data-testid="summary-languages">{languageNames(character.languages, rulesData)}</p>
+          {character.weaponMasteries?.length ? (
+            <>
+              <h4>Приёмы оружия</h4>
+              <p data-testid="summary-masteries">
+                {character.weaponMasteries
+                  .map((id) => `${itemCatalog[id]?.name ?? id}${itemCatalog[id]?.weapon?.mastery ? ` (${MASTERY_LABELS[itemCatalog[id].weapon!.mastery!]})` : ''}`)
+                  .join(', ')}
+              </p>
+            </>
+          ) : null}
+          {character.invocations?.length ? (
+            <>
+              <h4>Таинственные воззвания</h4>
+              <p data-testid="summary-invocations">{character.invocations.map((x) => invocationLabel(x, rulesData)).join('; ')}</p>
+            </>
+          ) : null}
           <h4>Черты</h4>
           <ul className="feature-list">
-            {character.feats.map((id) => (
-              <li key={id}>
+            {character.feats.map((id, i) => (
+              <li key={`${id}-${i}`}>
                 <strong>{rulesData.feats[id].name}.</strong> {rulesData.feats[id].description}
               </li>
             ))}

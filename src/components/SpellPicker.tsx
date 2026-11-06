@@ -7,7 +7,8 @@ import {
   classSpellcasting,
   classSpellList,
   featureSpellIds,
-  fixedInitiateList,
+  emptyInitiateChoice,
+  fixedListFor,
   INITIATE_CANTRIPS,
   INITIATE_LIST_NAMES,
   initiateListOf,
@@ -17,6 +18,7 @@ import {
   spellLimits,
   speciesSpellGrants,
   type MagicSubject,
+  type InitiateChoice,
   type SpellChoice,
 } from '../game/magic'
 import { INITIATE_LISTS, INNATE_ABILITIES, type SpellDefinition } from '../types/spells'
@@ -158,9 +160,6 @@ export function SpellChoiceForm({
   const alwaysPrepared = featureSpellIds(subject.classId, rules)
   const className = rules.classes[subject.classId]?.name ?? ''
   const set = (patch: Partial<SpellChoice>) => onChange({ ...choice, ...patch })
-  const fixedList = fixedInitiateList(subject.backgroundId, rules)
-  const initiateList = initiateListOf(subject, choice, rules)
-  const initiateAbility = choice.initiateAbility ?? bestInnateAbility(subject.abilities)
   const speciesAbility = choice.speciesAbility ?? bestInnateAbility(subject.abilities)
   const classLevelOne = classSpellList(subject.classId, 1, rules).filter((sp) => !alwaysPrepared.includes(sp.id))
   const book = choice.spellbook
@@ -226,56 +225,73 @@ export function SpellChoiceForm({
         </>
       )}
 
-      {needs.initiate && (
-        <section className="creation-details" aria-label="Посвящённый в магию" data-testid="initiate-choice">
-          <h3>Посвящённый в магию</h3>
-          <p className="hint">
-            {INITIATE_CANTRIPS} заговора и 1 заклинание 1-го круга из одного списка. Заклинание можно сотворить раз в день без ячейки (и ячейками, если они есть).
-          </p>
-          <div className="spell-initiate-fields">
-            <label className="field">
-              <span>Список заклинаний</span>
-              <select
-                value={initiateList ?? ''}
-                disabled={Boolean(fixedList)}
-                data-testid="initiate-list"
-                onChange={(e) =>
-                  set({ initiateList: (e.target.value || null) as SpellChoice['initiateList'], initiateCantrips: [], initiateSpell: null })
-                }
-              >
-                {!initiateList && <option value="">— выберите —</option>}
-                {INITIATE_LISTS.map((l) => (
-                  <option key={l} value={l}>
-                    {INITIATE_LIST_NAMES[l][0].toUpperCase() + INITIATE_LIST_NAMES[l].slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <AbilityChoice label="Характеристика заклинаний" value={initiateAbility} testId="initiate-ability" onChange={(initiateAbility) => set({ initiateAbility })} />
-          </div>
-          {fixedList && <p className="hint">Список задан предысторией.</p>}
-          {initiateList && (
-            <>
-              <SpellOptionList
-                label="Заговоры черты"
-                slot="initiate-cantrips"
-                options={classSpellList(initiateList, 0, rules)}
-                selected={choice.initiateCantrips}
-                count={INITIATE_CANTRIPS}
-                onChange={(initiateCantrips) => set({ initiateCantrips })}
-              />
-              <SpellOptionList
-                label="Заклинание 1-го круга черты"
-                slot="initiate-spell"
-                options={classSpellList(initiateList, 1, rules)}
-                selected={choice.initiateSpell ? [choice.initiateSpell] : []}
-                count={1}
-                onChange={(next) => set({ initiateSpell: next.at(-1) ?? null })}
-              />
-            </>
-          )}
-        </section>
-      )}
+      {needs.initiate &&
+        Array.from({ length: needs.initiateCount }, (_, index) => {
+          const fixed = fixedListFor(index, subject.backgroundId, rules)
+          const current = choice.initiates[index] ?? emptyInitiateChoice()
+          const list = initiateListOf(subject, choice, index, rules)
+          const ability = current.ability ?? bestInnateAbility(subject.abilities)
+          const otherLists = Array.from({ length: needs.initiateCount }, (_, j) => j).filter((j) => j !== index).map((j) => initiateListOf(subject, choice, j, rules))
+          const setInstance = (patch: Partial<InitiateChoice>) => {
+            const initiates = Array.from({ length: needs.initiateCount }, (_, j) => (j === index ? { ...current, ...patch } : (choice.initiates[j] ?? emptyInitiateChoice())))
+            set({ initiates })
+          }
+          const title = needs.initiateCount > 1 ? `Посвящённый в магию — ${index + 1}-я черта` : 'Посвящённый в магию'
+          return (
+            <section key={index} className="creation-details" aria-label={title} data-testid={index === 0 ? 'initiate-choice' : `initiate-choice-${index + 1}`}>
+              <h3>{title}</h3>
+              <p className="hint">
+                {INITIATE_CANTRIPS} заговора и 1 заклинание 1-го круга из одного списка. Заклинание можно сотворить раз в день без ячейки (и ячейками, если они есть).
+                {needs.initiateCount > 1 ? ' Черта взята дважды — у каждой свой список заклинаний.' : ''}
+              </p>
+              <div className="spell-initiate-fields">
+                <label className="field">
+                  <span>Список заклинаний</span>
+                  <select
+                    value={list ?? ''}
+                    disabled={Boolean(fixed)}
+                    data-testid={index === 0 ? 'initiate-list' : `initiate-list-${index + 1}`}
+                    onChange={(e) => setInstance({ list: (e.target.value || null) as InitiateChoice['list'], cantrips: [], spell: null })}
+                  >
+                    {!list && <option value="">— выберите —</option>}
+                    {INITIATE_LISTS.map((l) => (
+                      <option key={l} value={l} disabled={l !== list && otherLists.includes(l)}>
+                        {INITIATE_LIST_NAMES[l][0].toUpperCase() + INITIATE_LIST_NAMES[l].slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <AbilityChoice
+                  label="Характеристика заклинаний"
+                  value={ability}
+                  testId={index === 0 ? 'initiate-ability' : `initiate-ability-${index + 1}`}
+                  onChange={(a) => setInstance({ ability: a })}
+                />
+              </div>
+              {fixed && <p className="hint">Список задан предысторией.</p>}
+              {list && (
+                <>
+                  <SpellOptionList
+                    label="Заговоры черты"
+                    slot={index === 0 ? 'initiate-cantrips' : `initiate-cantrips-${index + 1}`}
+                    options={classSpellList(list, 0, rules)}
+                    selected={current.cantrips}
+                    count={INITIATE_CANTRIPS}
+                    onChange={(cantrips) => setInstance({ cantrips })}
+                  />
+                  <SpellOptionList
+                    label="Заклинание 1-го круга черты"
+                    slot={index === 0 ? 'initiate-spell' : `initiate-spell-${index + 1}`}
+                    options={classSpellList(list, 1, rules)}
+                    selected={current.spell ? [current.spell] : []}
+                    count={1}
+                    onChange={(next) => setInstance({ spell: next.at(-1) ?? null })}
+                  />
+                </>
+              )}
+            </section>
+          )
+        })}
 
       {needs.species && (
         <section className="creation-details" aria-label="Магия вида" data-testid="species-magic">

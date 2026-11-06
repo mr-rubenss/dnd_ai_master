@@ -8,7 +8,7 @@ import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
 import type { StoryMeta, StoryState } from '../types/story'
 import { CharacterStats, Chronicle } from './CharacterStats'
 import { SpellChoiceDialog, type SheetCompletion } from './MagicPanel'
-import { needsSheetCompletion } from '../game/classOrder'
+import { needsSheetCompletion } from '../game/sheetCompletion'
 import { rulesData } from '../data'
 
 type Tab = 'heroes' | 'hall'

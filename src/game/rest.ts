@@ -1,15 +1,17 @@
 // Отдых по SRD 5.2 (до боевого этапа). Короткий (1 час): кости хитов по выбору игрока (бросок движком + мод. Тел),
 // ячейки магии договора, умения «до короткого отдыха». Долгий (8 часов): все хиты, все кости хитов, все ячейки
-// и бесплатные сотворения, все умения, −1 уровень Истощения; после него можно сменить подготовленные заклинания.
+// и бесплатные сотворения, все умения, −1 уровень Истощения; после него можно сменить подготовленные заклинания
+// и приёмы оружия.
 // Игровых суток пока нет — ограничения «один долгий отдых за 24 часа» тоже нет. Чистые функции.
 import { abilityModifier } from '../engine/abilities'
 import { roll, type Rng } from '../engine/dice'
 import type { Character } from '../types/character'
-import type { ClassResource, RulesData } from '../types/rules'
+import type { RulesData } from '../types/rules'
 import type { PartyMember, RestHeroResult, RestKind, StoryEvent, StoryState } from '../types/story'
-import { classSpellcasting } from './magic'
+import { featureNames, featureResources, shortRestReturn } from './features'
+import { classSpellcasting, type MagicRules } from './magic'
 
-export type RestRules = Pick<RulesData, 'classes' | 'spells' | 'spellSlots' | 'species' | 'backgrounds' | 'feats'>
+export type RestRules = MagicRules
 
 export const REST_NAMES: Record<RestKind, string> = { short: 'Короткий отдых (1 час)', long: 'Долгий отдых (8 часов)' }
 
@@ -28,29 +30,9 @@ export function hitDiceOf(c: Pick<Character, 'classId' | 'level' | 'hitDiceUsed'
   return { die, total, left: Math.max(0, total - (c.hitDiceUsed ?? 0)) }
 }
 
-// ---------- Умения с применениями ----------
+// ---------- Умения с применениями — src/game/features.ts ----------
 
-export interface ResourceState {
-  resource: ClassResource
-  max: number
-  used: number
-  left: number
-}
-
-/** Сколько применений умения на уровне героя. */
-export function resourceMax(resource: ClassResource, c: Pick<Character, 'level' | 'abilities'>): number {
-  if (resource.uses) return resource.uses[Math.min(20, Math.max(1, c.level)) - 1] ?? 0
-  if (resource.usesAbility) return Math.max(1, abilityModifier(c.abilities[resource.usesAbility]))
-  return 0
-}
-
-export function featureResources(c: Pick<Character, 'classId' | 'level' | 'abilities' | 'featureUses'>, rules: Pick<RulesData, 'classes'>): ResourceState[] {
-  return (rules.classes[c.classId]?.resources ?? []).map((resource) => {
-    const max = resourceMax(resource, c)
-    const used = Math.min(max, c.featureUses?.[resource.id] ?? 0)
-    return { resource, max, used, left: max - used }
-  })
-}
+export { featureResources, resourceMax, type ResourceState } from './features'
 
 // ---------- Отдых ----------
 
@@ -85,7 +67,7 @@ function restoration(m: PartyMember, kind: RestKind, rules: RestRules): Omit<Res
   const pact = classSpellcasting(c.classId, rules)?.progression === 'pact'
   const resources: Record<string, number> = {}
   for (const r of featureResources(c, rules)) {
-    const back = kind === 'long' ? r.used : Math.min(r.used, r.resource.shortRest ?? 0)
+    const back = kind === 'long' ? r.used : shortRestReturn(r)
     if (back > 0) resources[r.resource.id] = back
   }
   const hd = hitDiceOf(c, rules)
@@ -96,6 +78,7 @@ function restoration(m: PartyMember, kind: RestKind, rules: RestRules): Omit<Res
     restoreFreeCasts: kind === 'long',
     resources,
     exhaustionRemoved: kind === 'long' && c.conditions.some((x) => x.id === 'exhaustion'),
+    ...(kind === 'long' && rules.classes[c.classId]?.weaponMastery ? { masterySwap: true } : {}),
   }
 }
 
@@ -149,7 +132,7 @@ export function applyRestResult(c: Character, r: RestHeroResult): Character {
   const conditions = r.exhaustionRemoved
     ? c.conditions.flatMap((x) => (x.id !== 'exhaustion' ? [x] : (x.level ?? 1) > 1 ? [{ ...x, level: (x.level ?? 1) - 1 }] : []))
     : c.conditions
-  const next: Character = { ...c, hp: Math.min(c.maxHp, c.hp + r.hpGained), conditions, ...(magic ? { magic } : {}) }
+  const next: Character = { ...c, hp: Math.min(c.maxHp, c.hp + r.hpGained), conditions, ...(magic ? { magic } : {}), ...(r.masterySwap ? { masterySwapReady: true } : {}) }
   if (hitDiceUsed) next.hitDiceUsed = hitDiceUsed
   else delete next.hitDiceUsed
   if (Object.keys(featureUses).length) next.featureUses = featureUses
@@ -167,14 +150,15 @@ export function restResultProblem(m: PartyMember, kind: RestKind, r: RestHeroRes
   const hd = hitDiceOf(c, rules)
   if (kind === 'long' && r.hitDiceRolls.length > 0) return 'На долгом отдыхе кости хитов не бросают.'
   if (r.hitDiceRolls.length > hd.left) return `У ${c.name} осталось костей хитов: ${hd.left}.`
-  if (kind === 'short' && (r.hitDiceRegained > 0 || r.restoreFreeCasts || r.exhaustionRemoved)) return 'Короткий отдых этого не восстанавливает.'
+  if (kind === 'short' && (r.hitDiceRegained > 0 || r.restoreFreeCasts || r.exhaustionRemoved || r.masterySwap)) return 'Короткий отдых этого не восстанавливает.'
+  if (r.masterySwap && !rules.classes[c.classId]?.weaponMastery) return 'У класса нет приёмов оружия.'
   if (kind === 'short' && r.restoreSlots && classSpellcasting(c.classId, rules)?.progression !== 'pact')
     return 'На коротком отдыхе восстанавливаются только ячейки магии договора.'
   const states = featureResources(c, rules)
   for (const [id, n] of Object.entries(r.resources)) {
     const s = states.find((x) => x.resource.id === id)
     if (!s || n > s.used) return 'Нельзя вернуть больше применений умения, чем потрачено.'
-    if (kind === 'short' && n > (s.resource.shortRest ?? 0)) return `«${s.resource.name}» на коротком отдыхе возвращает не больше ${s.resource.shortRest ?? 0}.`
+    if (kind === 'short' && n > shortRestReturn(s)) return `«${s.resource.name}» на коротком отдыхе возвращает не больше ${shortRestReturn(s)}.`
   }
   return null
 }
@@ -187,8 +171,7 @@ export function restSummaryText(kind: RestKind): string {
 }
 
 /** Названия заклинаний и умений по id — для строки изменений. */
-export function changeNames(rules: Pick<RulesData, 'spells' | 'classes'>) {
+export function changeNames(rules: Pick<RulesData, 'spells' | 'classes'> & Partial<Pick<RulesData, 'species' | 'invocations'>>) {
   const spells = Object.fromEntries(Object.values(rules.spells).map((s) => [s.id, s.name]))
-  const features = Object.fromEntries(Object.values(rules.classes).flatMap((c) => (c.resources ?? []).map((r) => [r.id, r.name])))
-  return { spells, features }
+  return { spells, features: featureNames(rules) }
 }

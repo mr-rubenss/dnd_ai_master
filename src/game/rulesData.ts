@@ -8,7 +8,10 @@ import type {
   BackgroundDefinition,
   ClassDefinition,
   EquipmentOption,
+  ClassResource,
   FeatDefinition,
+  InvocationDefinition,
+  LanguageDefinition,
   PackDefinition,
   RulesData,
   SkillChoice,
@@ -28,6 +31,9 @@ export interface RawRulesData {
   /** Справочник заклинаний (src/data/spells.json) и таблицы ячеек (rules/spell-slots.json). */
   spells: unknown
   spellSlots: unknown
+  /** Языки (rules/languages.json) и таинственные воззвания (rules/invocations.json). */
+  languages: unknown
+  invocations: unknown
 }
 
 const isAbility = (value: unknown) => (ABILITIES as readonly unknown[]).includes(value)
@@ -67,6 +73,32 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
     }
   }
   const twenty = (a: unknown) => Array.isArray(a) && a.length === 20 && a.every((n) => isInt(n) && n >= 0)
+  const checkResources = (list: unknown, where: string) => {
+    if (list === undefined) return
+    if (!Array.isArray(list)) return fail(`${where}: "resources" — массив`)
+    for (const r of list as ClassResource[]) {
+      if (!isNonEmptyString(r.id) || !isNonEmptyString(r.name) || !isNonEmptyString(r.description)) fail(`${where}: умение с применениями — id, name, description`)
+      if ([r.uses, r.usesAbility, r.usesProficiency].filter((x) => x !== undefined).length !== 1)
+        fail(`${where}: "${r.id}": нужно ровно одно — uses (по уровням), usesAbility или usesProficiency`)
+      if (r.uses && !twenty(r.uses)) fail(`${where}: "${r.id}": uses — 20 целых`)
+      if (r.usesAbility !== undefined && !isAbility(r.usesAbility)) fail(`${where}: "${r.id}": usesAbility — характеристика`)
+      if (r.usesProficiency !== undefined && r.usesProficiency !== true) fail(`${where}: "${r.id}": usesProficiency — true`)
+      if (r.shortRest !== undefined && r.shortRest !== 'all' && (!isInt(r.shortRest) || r.shortRest < 1)) fail(`${where}: "${r.id}": shortRest — положительное целое или "all"`)
+      if (r.minLevel !== undefined && (!isInt(r.minLevel) || r.minLevel < 1 || r.minLevel > 20)) fail(`${where}: "${r.id}": minLevel — уровень 1–20`)
+      if (r.pool && r.effect) fail(`${where}: "${r.id}": у запаса лечение — само количество`)
+      const e = r.effect
+      if (e !== undefined) {
+        if (e.damage && (!twenty(e.damage.count) || ![4, 6, 8, 10, 12].includes(e.damage.die))) fail(`${where}: "${r.id}": effect.damage — { count: 20 целых, die }`)
+        if (e.save && (!isAbility(e.save.ability) || !isAbility(e.save.dcAbility))) fail(`${where}: "${r.id}": effect.save — характеристики`)
+        if (e.tempHp !== undefined && e.tempHp !== 'proficiency') fail(`${where}: "${r.id}": effect.tempHp — proficiency`)
+      }
+    }
+  }
+
+  const languages = byId<LanguageDefinition>(raw.languages, 'languages', (lang, where) => {
+    if (lang.rarity !== 'standard' && lang.rarity !== 'rare') fail(`${where}: "rarity" — standard или rare`)
+  })
+  if (!languages.common) fail('languages: нет языка "common" — Общий знают все')
 
   const packs = byId<PackDefinition>(raw.packs, 'packs', (pack, where) => {
     if (!Array.isArray(pack.contents)) return fail(`${where}: "contents" должно быть массивом`)
@@ -79,6 +111,8 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
   const feats = byId<FeatDefinition>(raw.feats, 'feats', (feat, where) => {
     if (!isNonEmptyString(feat.description)) fail(`${where}: нет описания`)
     if (feat.category !== 'origin' && feat.category !== 'fighting-style') fail(`${where}: "category" — origin или fighting-style`)
+    if (feat.repeatable !== undefined && feat.repeatable !== 'any' && feat.repeatable !== 'different-list') fail(`${where}: "repeatable" — any или different-list`)
+    if (feat.orTools !== undefined && (feat.orTools !== true || !isInt(feat.skillChoices))) fail(`${where}: "orTools" — true и только вместе со skillChoices`)
   })
 
   const isToolItem = (id: unknown) => typeof id === 'string' && catalog[id]?.toolKind !== undefined
@@ -156,13 +190,19 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
       if (!isNonEmptyString(fs.feature)) fail(`${where}: featureSpells: нужно название умения`)
       if (fs.freeUses !== undefined && !twenty(fs.freeUses)) fail(`${where}: featureSpells.freeUses — 20 целых`)
     }
-    for (const r of (cls.resources as ClassDefinition['resources']) ?? []) {
-      if (!isNonEmptyString(r.id) || !isNonEmptyString(r.name) || !isNonEmptyString(r.description)) fail(`${where}: умение с применениями — id, name, description`)
-      if (!r.uses === !r.usesAbility) fail(`${where}: "${r.id}": нужно ровно одно — uses (по уровням) или usesAbility`)
-      if (r.uses && !twenty(r.uses)) fail(`${where}: "${r.id}": uses — 20 целых`)
-      if (r.shortRest !== undefined && (!isInt(r.shortRest) || r.shortRest < 1)) fail(`${where}: "${r.id}": shortRest — положительное целое`)
-      if (r.pool && r.effect) fail(`${where}: "${r.id}": у запаса лечение — само количество`)
+    checkResources(cls.resources, where)
+    const wm = cls.weaponMastery as ClassDefinition['weaponMastery']
+    if (wm !== undefined) {
+      if (!isObject(wm) || !twenty(wm.count) || !['melee', 'any', 'proficient'].includes(wm.weapons) || !['one', 'all'].includes(wm.swap))
+        fail(`${where}: "weaponMastery" — { count: 20 целых, weapons: melee/any/proficient, swap: one/all }`)
+      else if (Object.values(catalog).filter((i) => i.weapon?.mastery).length < Math.max(...wm.count)) fail(`${where}: в справочнике меньше видов оружия с приёмами, чем нужно выбрать`)
     }
+    const langs = cls.languages as ClassDefinition['languages']
+    if (langs !== undefined) {
+      for (const id of langs.fixed ?? []) if (!languages[id]) fail(`${where}: неизвестный язык "${id}"`)
+      if (langs.choose !== undefined && (!isInt(langs.choose) || langs.choose < 1)) fail(`${where}: languages.choose — положительное целое`)
+    }
+    if (cls.invocations !== undefined && !twenty(cls.invocations)) fail(`${where}: "invocations" — 20 целых`)
     const sc = cls.spellcasting as ClassSpellcasting | undefined
     if (sc !== undefined) {
       if (!isObject(sc) || !isAbility(sc.ability)) fail(`${where}: spellcasting.ability — характеристика`)
@@ -204,7 +244,34 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
       else for (const o of choice.options as { id?: string; innateSpells?: unknown }[]) checkInnate(o.innateSpells, `${where} / ${o.id}`)
     }
     checkInnate(sp.innateSpells, where)
+    checkResources(sp.resources, where)
   })
+
+  const invocations = byId<InvocationDefinition>(raw.invocations, 'invocations', (inv, where) => {
+    if (!isNonEmptyString(inv.description)) fail(`${where}: нет описания`)
+    const pre = inv.prerequisite as InvocationDefinition['prerequisite']
+    if (pre !== undefined) {
+      if (!isObject(pre)) fail(`${where}: "prerequisite" — объект`)
+      else {
+        if (pre.level !== undefined && (!isInt(pre.level) || pre.level < 1 || pre.level > 20)) fail(`${where}: prerequisite.level — 1–20`)
+        if (pre.cantrip !== undefined && pre.cantrip !== 'damage' && pre.cantrip !== 'attack') fail(`${where}: prerequisite.cantrip — damage или attack`)
+      }
+    }
+    const spell = inv.spell as InvocationDefinition['spell']
+    if (spell !== undefined) {
+      if (spell.free !== 'at-will' && spell.free !== 'long-rest') fail(`${where}: spell.free — at-will или long-rest`)
+      if (spell.id !== undefined && !spells[spell.id]) fail(`${where}: неизвестное заклинание "${spell.id}"`)
+      // Заклинания 2-го круга и выше ещё не в справочнике — такие воззвания доступны только с 3-го уровня и выше.
+      if (spell.id === undefined && (!isNonEmptyString(spell.nameEn) || ((pre?.level ?? 1) < 3))) fail(`${where}: у заклинания нет id из справочника`)
+    }
+    const tome = inv.tome as InvocationDefinition['tome']
+    if (tome !== undefined && (!isInt(tome.cantrips) || !isInt(tome.rituals))) fail(`${where}: tome — { cantrips, rituals }`)
+    if (inv.resource !== undefined) checkResources([inv.resource], where)
+  })
+  for (const inv of Object.values(invocations)) {
+    const need = inv.prerequisite?.invocation
+    if (need && !invocations[need]) fail(`invocations "${inv.id}": требуется неизвестное воззвание "${need}"`)
+  }
 
   // Официальные предыстории обязаны укладываться в тот же шаблон 2024, что и свои.
   for (const bg of Object.values(backgrounds)) {
@@ -212,5 +279,5 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
   }
 
   if (problems.length > 0) throw new ValidationError('Некорректные данные правил', problems)
-  return { classes, backgrounds, species, feats, packs, catalog, spells, spellSlots }
+  return { classes, backgrounds, species, feats, packs, catalog, spells, spellSlots, languages, invocations }
 }

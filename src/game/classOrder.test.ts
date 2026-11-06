@@ -6,7 +6,8 @@ import type { AiToolCall } from '../ai/types'
 import { abilityCheck } from '../engine/checks'
 import type { Character } from '../types/character'
 import type { StoryEvent, StoryState } from '../types/story'
-import { checkSubjectOf, needsOrderChoice, needsSheetCompletion, weaponTraining } from './classOrder'
+import { checkSubjectOf, needsOrderChoice, weaponTraining } from './classOrder'
+import { needsSheetCompletion } from './sheetCompletion'
 import { buildCharacterSheet, creationSteps, emptyDraft, stepProblems, type CreationDraft } from './creation'
 import { emptySpellChoice, knownSpells, needsSpellChoice, planCast, spellLimits } from './magic'
 import { executeTool } from './masterTools'
@@ -56,6 +57,7 @@ describe('порядки жреца и друида', () => {
 function clericDraft(): CreationDraft {
   return {
     ...emptyDraft(),
+    languages: ['elvish', 'orc'],
     classId: 'cleric',
     classSkills: ['insight', 'medicine'],
     backgroundId: 'soldier',

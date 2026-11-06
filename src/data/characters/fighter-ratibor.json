@@ -43,6 +43,8 @@
       "alert",
       "great-weapon-fighting"
     ],
+    "weaponMasteries": ["greatsword", "flail", "javelin"],
+    "languages": ["common", "dwarvish", "giant"],
     "appearance": "Широкоплечий ветеран с коротко стриженной бородой и шрамом через бровь. Носит потёртую кольчугу со знаком своего бывшего отряда."
   },
   "inventory": {

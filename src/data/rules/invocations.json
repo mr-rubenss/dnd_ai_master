@@ -1,0 +1,316 @@
+[
+  {
+    "id": "agonizing-blast",
+    "name": "Мучительный взрыв",
+    "nameEn": "Agonizing Blast",
+    "prerequisite": {
+      "level": 2,
+      "cantrip": "damage"
+    },
+    "repeatable": true,
+    "description": "Выберите известный вам заговор колдуна, наносящий урон: к его броскам урона добавляется модификатор Харизмы. Можно взять несколько раз — каждый раз для другого заговора."
+  },
+  {
+    "id": "armor-of-shadows",
+    "name": "Доспех теней",
+    "nameEn": "Armor of Shadows",
+    "description": "Можете творить на себя «Доспехи мага» без траты ячейки.",
+    "spell": {
+      "id": "mage-armor",
+      "free": "at-will",
+      "self": true
+    }
+  },
+  {
+    "id": "ascendant-step",
+    "name": "Восходящий шаг",
+    "nameEn": "Ascendant Step",
+    "prerequisite": {
+      "level": 5
+    },
+    "description": "Можете творить на себя «Левитацию» (Levitate) без траты ячейки.",
+    "spell": {
+      "nameEn": "Levitate",
+      "free": "at-will",
+      "self": true
+    }
+  },
+  {
+    "id": "devils-sight",
+    "name": "Дьявольское зрение",
+    "nameEn": "Devil's Sight",
+    "prerequisite": {
+      "level": 2
+    },
+    "description": "Видите нормально в тусклом свете и темноте — магической и обычной — в пределах 120 футов."
+  },
+  {
+    "id": "devouring-blade",
+    "name": "Пожирающий клинок",
+    "nameEn": "Devouring Blade",
+    "prerequisite": {
+      "level": 12,
+      "invocation": "thirsting-blade"
+    },
+    "description": "«Дополнительная атака» воззвания «Жаждущий клинок» даёт две дополнительные атаки вместо одной."
+  },
+  {
+    "id": "eldritch-mind",
+    "name": "Таинственный разум",
+    "nameEn": "Eldritch Mind",
+    "description": "Преимущество на спасброски Телосложения для поддержания концентрации."
+  },
+  {
+    "id": "eldritch-smite",
+    "name": "Таинственная кара",
+    "nameEn": "Eldritch Smite",
+    "prerequisite": {
+      "level": 5,
+      "invocation": "pact-of-the-blade"
+    },
+    "description": "Раз в ход, попав оружием договора, можете потратить ячейку магии договора: +1к8 урона силовым полем и ещё 1к8 за каждый круг ячейки; цель размером не больше Огромной можно сбить с ног (Сбит с ног)."
+  },
+  {
+    "id": "eldritch-spear",
+    "name": "Таинственное копьё",
+    "nameEn": "Eldritch Spear",
+    "prerequisite": {
+      "level": 2,
+      "cantrip": "damage"
+    },
+    "repeatable": true,
+    "description": "Выберите известный вам заговор колдуна, наносящий урон, с дистанцией 10 футов и больше: его дистанция увеличивается на 30 футов × уровень колдуна. Можно взять несколько раз — для разных заговоров."
+  },
+  {
+    "id": "fiendish-vigor",
+    "name": "Бодрость исчадия",
+    "nameEn": "Fiendish Vigor",
+    "prerequisite": {
+      "level": 2
+    },
+    "description": "Можете творить на себя «Ложную жизнь» без траты ячейки; временные хиты не бросаются — всегда максимум кости.",
+    "spell": {
+      "id": "false-life",
+      "free": "at-will",
+      "self": true
+    }
+  },
+  {
+    "id": "gaze-of-two-minds",
+    "name": "Взгляд двух разумов",
+    "nameEn": "Gaze of Two Minds",
+    "prerequisite": {
+      "level": 5
+    },
+    "description": "Бонусным действием касаетесь согласного существа и до конца следующего хода воспринимаете мир его чувствами (продлевается бонусным действием); можете творить заклинания из его пространства, если вы в пределах 60 футов друг от друга."
+  },
+  {
+    "id": "gift-of-the-depths",
+    "name": "Дар глубин",
+    "nameEn": "Gift of the Depths",
+    "prerequisite": {
+      "level": 5
+    },
+    "description": "Дышите под водой, скорость плавания равна скорости. Раз до долгого отдыха можете сотворить «Подводное дыхание» (Water Breathing) без ячейки.",
+    "spell": {
+      "nameEn": "Water Breathing",
+      "free": "long-rest"
+    }
+  },
+  {
+    "id": "gift-of-the-protectors",
+    "name": "Дар защитников",
+    "nameEn": "Gift of the Protectors",
+    "prerequisite": {
+      "level": 9,
+      "invocation": "pact-of-the-tome"
+    },
+    "description": "В Книге теней — страница для имён (число — модификатор Харизмы, минимум 1). Записанный там, опустившись до 0 хитов (но не погибнув сразу), остаётся с 1 хитом. Срабатывает раз до долгого отдыха.",
+    "resource": {
+      "id": "gift-of-the-protectors",
+      "name": "Дар защитников",
+      "nameEn": "Gift of the Protectors",
+      "description": "Записанный в книге не падает до 0 хитов — остаётся с 1 хитом.",
+      "uses": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    }
+  },
+  {
+    "id": "investment-of-the-chain-master",
+    "name": "Вложение господина цепи",
+    "nameEn": "Investment of the Chain Master",
+    "prerequisite": {
+      "level": 5,
+      "invocation": "pact-of-the-chain"
+    },
+    "description": "Фамильяр от «Поиска фамильяра» получает скорость полёта или плавания 40 футов, атакует по вашему бонусному действию, может наносить некротический или излучением вместо дробящего, колющего и рубящего, использует вашу Сл заклинаний; реакцией вы даёте ему сопротивление урону."
+  },
+  {
+    "id": "lessons-of-the-first-ones",
+    "name": "Уроки Первых",
+    "nameEn": "Lessons of the First Ones",
+    "prerequisite": {
+      "level": 2
+    },
+    "repeatable": true,
+    "description": "Получаете черту происхождения на выбор. Можно взять несколько раз — каждый раз другую черту."
+  },
+  {
+    "id": "lifedrinker",
+    "name": "Пьющий жизнь",
+    "nameEn": "Lifedrinker",
+    "prerequisite": {
+      "level": 9,
+      "invocation": "pact-of-the-blade"
+    },
+    "description": "Раз в ход, попав оружием договора, +1к6 некротического, психического или излучением урона; можете потратить кость хитов и восстановить её бросок + мод. Телосложения хитов (минимум 1)."
+  },
+  {
+    "id": "mask-of-many-faces",
+    "name": "Маска многих лиц",
+    "nameEn": "Mask of Many Faces",
+    "prerequisite": {
+      "level": 2
+    },
+    "description": "Можете творить «Маскировку» без траты ячейки.",
+    "spell": {
+      "id": "disguise-self",
+      "free": "at-will"
+    }
+  },
+  {
+    "id": "master-of-myriad-forms",
+    "name": "Мастер мириад форм",
+    "nameEn": "Master of Myriad Forms",
+    "prerequisite": {
+      "level": 5
+    },
+    "description": "Можете творить «Изменение себя» (Alter Self) без траты ячейки.",
+    "spell": {
+      "nameEn": "Alter Self",
+      "free": "at-will"
+    }
+  },
+  {
+    "id": "misty-visions",
+    "name": "Туманные видения",
+    "nameEn": "Misty Visions",
+    "prerequisite": {
+      "level": 2
+    },
+    "description": "Можете творить «Безмолвный образ» без траты ячейки.",
+    "spell": {
+      "id": "silent-image",
+      "free": "at-will"
+    }
+  },
+  {
+    "id": "one-with-shadows",
+    "name": "Единый с тенями",
+    "nameEn": "One with Shadows",
+    "prerequisite": {
+      "level": 5
+    },
+    "description": "В тусклом свете или темноте можете творить на себя «Невидимость» (Invisibility) без траты ячейки.",
+    "spell": {
+      "nameEn": "Invisibility",
+      "free": "at-will",
+      "self": true
+    }
+  },
+  {
+    "id": "otherworldly-leap",
+    "name": "Потусторонний прыжок",
+    "nameEn": "Otherworldly Leap",
+    "prerequisite": {
+      "level": 2
+    },
+    "description": "Можете творить на себя «Прыжок» без траты ячейки.",
+    "spell": {
+      "id": "jump",
+      "free": "at-will",
+      "self": true
+    }
+  },
+  {
+    "id": "pact-of-the-blade",
+    "name": "Договор клинка",
+    "nameEn": "Pact of the Blade",
+    "description": "Бонусным действием призываете в руку оружие договора — простое или воинское рукопашное на выбор — или связываете себя с магическим оружием, которого касаетесь. Пока связь есть, вы владеете этим оружием и можете использовать его как фокус; атакуя им, можете использовать Харизму вместо Силы или Ловкости и наносить некротический, психический или излучением урон вместо обычного. Связь кончается при повторном использовании, если оружие дальше 5 футов минуту и дольше или если вы умираете; призванное оружие исчезает."
+  },
+  {
+    "id": "pact-of-the-chain",
+    "name": "Договор цепи",
+    "nameEn": "Pact of the Chain",
+    "description": "Вы знаете «Поиск фамильяра» и творите его действием «Магия» без траты ячейки; фамильяр может принять и особый облик (бес, псевдодракон, квазит, скелет, сфинкс чудес, спрайт, ядовитая змея). Совершая действие «Атака», можете отказаться от одной своей атаки, чтобы фамильяр атаковал реакцией.",
+    "spell": {
+      "id": "find-familiar",
+      "free": "at-will"
+    }
+  },
+  {
+    "id": "pact-of-the-tome",
+    "name": "Договор гримуара",
+    "nameEn": "Pact of the Tome",
+    "description": "В конце короткого или долгого отдыха в руке появляется Книга теней. Выберите три заговора и два заклинания 1-го круга с пометкой «ритуал» из списка любого класса — которые у вас ещё не подготовлены. Пока книга при вас, они подготовлены и считаются заклинаниями колдуна. Книга — фокус для заклинаний.",
+    "tome": {
+      "cantrips": 3,
+      "rituals": 2
+    }
+  },
+  {
+    "id": "repelling-blast",
+    "name": "Отталкивающий взрыв",
+    "nameEn": "Repelling Blast",
+    "prerequisite": {
+      "level": 2,
+      "cantrip": "attack"
+    },
+    "repeatable": true,
+    "description": "Выберите известный вам заговор колдуна с броском атаки: попав им по существу размером не больше Большого, можете оттолкнуть его на 10 футов от себя. Можно взять несколько раз — для разных заговоров."
+  },
+  {
+    "id": "thirsting-blade",
+    "name": "Жаждущий клинок",
+    "nameEn": "Thirsting Blade",
+    "prerequisite": {
+      "level": 5,
+      "invocation": "pact-of-the-blade"
+    },
+    "description": "«Дополнительная атака» — только для оружия договора: действием «Атака» атакуете им дважды."
+  },
+  {
+    "id": "visions-of-distant-realms",
+    "name": "Видения далёких миров",
+    "nameEn": "Visions of Distant Realms",
+    "prerequisite": {
+      "level": 9
+    },
+    "description": "Можете творить «Магический глаз» (Arcane Eye) без траты ячейки.",
+    "spell": {
+      "nameEn": "Arcane Eye",
+      "free": "at-will"
+    }
+  },
+  {
+    "id": "whispers-of-the-grave",
+    "name": "Шёпот могилы",
+    "nameEn": "Whispers of the Grave",
+    "prerequisite": {
+      "level": 7
+    },
+    "description": "Можете творить «Разговор с мёртвыми» (Speak with Dead) без траты ячейки.",
+    "spell": {
+      "nameEn": "Speak with Dead",
+      "free": "at-will"
+    }
+  },
+  {
+    "id": "witch-sight",
+    "name": "Ведьмин взгляд",
+    "nameEn": "Witch Sight",
+    "prerequisite": {
+      "level": 15
+    },
+    "description": "Истинное зрение на 30 футов."
+  }
+]

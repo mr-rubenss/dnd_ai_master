@@ -21,11 +21,15 @@ import {
   type KnownSpell,
   type SpellChoice,
 } from '../game/magic'
-import type { Character } from '../types/character'
-import type { CharacterMagic } from '../types/spells'
+import type { Character, InvocationChoice } from '../types/character'
+import { invocationProblems } from '../game/invocations'
+import { knownLanguages, languageChoiceProblems, splitLanguages } from '../game/languages'
+import { sheetNeeds, type SheetCompletion } from '../game/sheetCompletion'
+import { masteryProblems } from '../game/weaponMastery'
+import { InvocationPicker, LanguagePicker, WeaponMasteryPicker } from './OriginPickers'
 import { Flash } from './Flash'
 import { ClassOrderPicker } from './ClassOrderPicker'
-import { needsOrderChoice, orderProblem } from '../game/classOrder'
+import { orderProblem } from '../game/classOrder'
 import { SpellChoiceForm, SpellDetails, SpellOptionList } from './SpellPicker'
 import { spellLevelText, spellMeta } from './spellText'
 
@@ -231,15 +235,12 @@ export function MagicPanel({ character, onPrepare, onChooseSpells, needsChoice }
   )
 }
 
-/** Что дополняет игрок в листе старого героя: порядок класса и (или) заклинания. */
-export interface SheetCompletion {
-  order?: string
-  magic?: CharacterMagic
-}
+export type { SheetCompletion } from '../game/sheetCompletion'
 
 /**
- * Окно «Дополните лист» для героя из старого сохранения: «Божественный/Изначальный порядок» и заклинания.
- * Выбор порядка сразу меняет нужное число заговоров (Чудотворец, Маг — на один больше).
+ * Окно «Дополните лист» для героя из старого сохранения: «Божественный/Изначальный порядок», заклинания, приёмы
+ * оружия, языки, таинственные воззвания — только то, чего не хватает. Выбор порядка сразу меняет нужное число
+ * заговоров (Чудотворец, Маг — на один больше).
  */
 export function SpellChoiceDialog({
   character,
@@ -251,21 +252,35 @@ export function SpellChoiceDialog({
   onClose: () => void
 }) {
   const titleId = useId()
-  const orderNeeded = needsOrderChoice(character, rules)
+  const [needs] = useState(() => sheetNeeds(character, rules))
   const [order, setOrder] = useState<string | null>(null)
   const [choice, setChoice] = useState<SpellChoice>(() => choiceFromMagic(character.magic))
+  const [weapons, setWeapons] = useState<string[]>(() => character.weaponMasteries ?? [])
+  const [langs, setLangs] = useState(() => splitLanguages(character.classId, character.languages, rules))
+  const [invocations, setInvocations] = useState<InvocationChoice[]>(() => character.invocations ?? [])
   const [error, setError] = useState<string | null>(null)
-  const subject: Character = orderNeeded && order ? { ...character, classOrder: order } : character
-  const spellsNeeded = needsSpellChoice(subject, rules)
+  const subject: Character = needs.order && order ? { ...character, classOrder: order } : character
+  const spellsNeeded = needs.spells || needsSpellChoice(subject, rules)
   const magic = { ...magicFromChoice(subject, choice, rules), slotsUsed: character.magic?.slotsUsed ?? {}, ...(character.magic?.freeUsed ? { freeUsed: character.magic.freeUsed } : {}) }
+  const withMagic: Character = spellsNeeded ? { ...subject, magic } : subject
+  const languages = knownLanguages(character.classId, [...langs.standard, ...langs.extra], rules)
   const problems = [
-    ...(orderNeeded ? [orderProblem(character.classId, order, rules)].filter((p): p is string => Boolean(p)) : []),
+    ...(needs.order ? [orderProblem(character.classId, order, rules)].filter((p): p is string => Boolean(p)) : []),
     ...(spellsNeeded ? magicProblems(subject, magic, rules) : []),
+    ...(needs.masteries ? masteryProblems(subject, weapons, rules) : []),
+    ...(needs.languages ? languageChoiceProblems(character.classId, langs.standard, langs.extra, rules) : []),
+    ...(needs.invocations ? invocationProblems(withMagic, invocations, rules) : []),
   ]
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (problems.length) return
-    const reason = await onSubmit({ ...(orderNeeded && order ? { order } : {}), ...(spellsNeeded ? { magic } : {}) })
+    const reason = await onSubmit({
+      ...(needs.order && order ? { order } : {}),
+      ...(spellsNeeded ? { magic } : {}),
+      ...(needs.masteries ? { weaponMasteries: weapons } : {}),
+      ...(needs.languages ? { languages } : {}),
+      ...(needs.invocations ? { invocations } : {}),
+    })
     setError(reason)
     if (!reason) onClose()
   }
@@ -284,8 +299,11 @@ export function SpellChoiceDialog({
           </div>
         </header>
         <div className="spell-dialog-body">
-          {orderNeeded && <ClassOrderPicker classId={character.classId} value={order} onChange={setOrder} />}
+          {needs.order && <ClassOrderPicker classId={character.classId} value={order} onChange={setOrder} />}
           {spellsNeeded && <SpellChoiceForm subject={subject} choice={choice} onChange={setChoice} />}
+          {needs.invocations && <InvocationPicker subject={withMagic} value={invocations} onChange={setInvocations} />}
+          {needs.masteries && <WeaponMasteryPicker subject={subject} value={weapons} onChange={setWeapons} />}
+          {needs.languages && <LanguagePicker classId={character.classId} standard={langs.standard} extra={langs.extra} onChange={setLangs} />}
         </div>
         <footer className="spell-dialog-footer">
           <p className="creation-problems" role="status">

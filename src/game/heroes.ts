@@ -6,10 +6,9 @@ import type { CharacterSheet } from '../types/character'
 import type { HallOfFameEntry, HeroFate, HeroRecord, HeroRoster } from '../types/heroes'
 import type { ItemCatalog } from '../types/items'
 import type { PartyMember, StoryMeta, StoryState } from '../types/story'
-import { magicShapeProblems, parseCharacterSheet } from './character'
-import { magicProblems, needsSpellChoice, type MagicRules } from './magic'
-import { armorWithOrder, needsOrderChoice, needsSheetCompletion, orderProblem } from './classOrder'
-import type { CharacterMagic } from '../types/spells'
+import { parseCharacterSheet } from './character'
+import type { MagicRules } from './magic'
+import { applySheetCompletion, type SheetCompletion } from './sheetCompletion'
 import { isNonEmptyString, isNumber, isObject, isOneOf, ValidationError } from './validation'
 
 export const EMPTY_ROSTER: HeroRoster = { heroes: [], hallOfFame: [] }
@@ -77,26 +76,13 @@ export function renameHero(roster: HeroRoster, heroId: string, name: string): Ro
  * Выбрать заклинания герою из «Моих героев» (старое сохранение заклинателя). Герой в незавершённой истории
  * выбирает их в самой истории (действие spellsChosen).
  */
-export function chooseHeroSpells(roster: HeroRoster, heroId: string, completion: { order?: string; magic?: CharacterMagic }, rules: MagicRules): RosterResult {
+export function chooseHeroSpells(roster: HeroRoster, heroId: string, completion: SheetCompletion, rules: MagicRules): RosterResult {
   const hero = findHero(roster, heroId)
   if (!hero) return notFound()
   if (hero.storyId) return { ok: false, reason: 'Герой в истории — лист дополняется в ней.' }
-  let c = hero.sheet.character
-  if (completion.order !== undefined) {
-    if (!needsOrderChoice(c, rules)) return { ok: false, reason: 'Порядок уже выбран.' }
-    const problem = orderProblem(c.classId, completion.order, rules)
-    if (problem) return { ok: false, reason: problem }
-    const option = rules.classes[c.classId]?.order?.options.find((o) => o.id === completion.order)
-    c = { ...c, classOrder: completion.order, proficiencies: { ...c.proficiencies, armor: armorWithOrder(c.proficiencies.armor, option) } }
-  }
-  if (completion.magic) {
-    if (!needsSpellChoice(c, rules)) return { ok: false, reason: 'Заклинания этого героя уже выбраны.' }
-    const problem = magicShapeProblems(completion.magic)[0] ?? magicProblems(c, completion.magic, rules)[0]
-    if (problem) return { ok: false, reason: problem }
-    c = { ...c, magic: structuredClone(completion.magic) }
-  }
-  if (needsSheetCompletion(c, rules)) return { ok: false, reason: 'Лист ещё не дополнен.' }
-  const sheet = { ...hero.sheet, character: c }
+  const result = applySheetCompletion(hero.sheet.character, completion, rules)
+  if ('reason' in result) return { ok: false, reason: result.reason }
+  const sheet = { ...hero.sheet, character: result.character }
   return { ok: true, roster: replaceHero(roster, { ...hero, sheet }) }
 }
 

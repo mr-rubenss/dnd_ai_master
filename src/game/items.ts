@@ -14,7 +14,7 @@ import {
 import { isInt, isNonEmptyString, isNumber, isObject, isOneOf, ValidationError } from './validation'
 
 const DICE_HEAL_RE = /^\d+d\d+([+-]\d+)?$/
-const DICE_RE = /^\d+d\d+$/
+const DICE_RE = /^(\d+d\d+|\d+)$/
 
 /** Проверяет массив описаний предметов и возвращает справочник по id. */
 export function parseItemCatalog(raw: unknown): ItemCatalog {
@@ -62,6 +62,7 @@ export function parseItemCatalog(raw: unknown): ItemCatalog {
         if (!Array.isArray(w.properties) || !w.properties.every((p) => isOneOf(WEAPON_PROPERTIES, p))) {
           fail(`${where}: "weapon.properties" — массив из: ${WEAPON_PROPERTIES.join(', ')}`)
         }
+        if (w.ranged !== undefined && w.ranged !== true) fail(`${where}: "weapon.ranged" — true или нет поля`)
         if (w.mastery !== undefined && !isOneOf(WEAPON_MASTERIES, w.mastery)) {
           fail(`${where}: "weapon.mastery" должно быть одним из: ${WEAPON_MASTERIES.join(', ')}`)
         }
