@@ -35,6 +35,7 @@ import { applyRestResult, featureResources, restRequestProblem, restResultProble
 import { castProblem, emptyMagic, magicProblems, needsSpellChoice, preparedProblems, spendCast, type MagicRules } from './magic'
 import { changeCoins, coinsFromCp, coinsValue, formatCoins, formatCp, gpToCp, isCoins } from './coins'
 import { isNonEmptyString } from './validation'
+import { advanceProblem, gameTime, LONG_REST_MINUTES, SHORT_REST_MINUTES, type GameTime } from '../engine/time'
 
 export const TONE_LABELS: Record<StoryTone, string> = {
   'dark-fantasy': 'Тёмное фэнтези',
@@ -105,8 +106,15 @@ export function newStorySeed({ id, title, tone, adventure, locations, party, now
     journal: [],
     messages: adventure.intro,
     rolls: [],
+    time: gameTime(1, adventure.startHour ?? DEFAULT_START_HOUR),
   })
 }
+
+/** Час начала истории, если приключение его не задаёт. */
+export const DEFAULT_START_HOUR = 8
+
+/** Игровое время истории (у старых историй без поля — День 1, 8:00). */
+export const storyTime = (state: Pick<StoryState, 'time'>): GameTime => state.time ?? gameTime(1, DEFAULT_START_HOUR)
 
 /** Оформляет событие как действие истории: номер, автор, время, id. */
 export function makeAction(
@@ -268,8 +276,18 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         const r = action.heroes.find((h) => h.heroId === m.heroId)
         return r ? { ...m, character: applyRestResult(m.character, r) } : m
       })
-      return { ...rest, party, messages: [...state.messages, { id: action.messageId, author: 'system', text: restSummaryText(action.kind) }] }
+      // Отдых занимает время: короткий — 1 час, долгий — 8 часов.
+      const time = storyTime(state) + (action.kind === 'long' ? LONG_REST_MINUTES : SHORT_REST_MINUTES)
+      return {
+        ...rest,
+        party,
+        time,
+        ...(action.kind === 'long' ? { lastLongRestAt: time } : {}),
+        messages: [...state.messages, { id: action.messageId, author: 'system', text: restSummaryText(action.kind) }],
+      }
     }
+    case 'timeAdvanced':
+      return { ...state, time: storyTime(state) + action.minutes }
     case 'featureUsed':
       return updateMember(state, action.heroId, (m) => ({
         ...m,
@@ -518,6 +536,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (action.author.kind !== 'player') return 'Отдых просит игрок.'
       if (!rules) return 'Нет данных правил.'
       return restRequestProblem(state, action.kind, action.hitDice ?? {}, rules)
+    case 'timeAdvanced':
+      if (action.author.kind !== 'master' && action.author.kind !== 'engine' && action.author.kind !== 'system') return 'Время двигает ведущий или движок.'
+      return advanceProblem(action.minutes) ?? (isNonEmptyString(action.reason) ? null : 'Нужна причина, почему прошло время.')
     case 'restInterrupted':
       if (action.author.kind !== 'master' && action.author.kind !== 'system') return 'Прервать отдых может ведущий.'
       if (!state.pendingRest) return 'Сейчас никто не отдыхает.'

@@ -21,7 +21,8 @@ import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
 import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
 import { recoveryText } from './features'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
-import { applyAction, checkAction, ENGINE, makeAction, MASTER } from './storyActions'
+import { applyAction, checkAction, ENGINE, makeAction, MASTER, storyTime } from './storyActions'
+import { advanceProblem, durationText, MAX_ADVANCE_MINUTES, minutesUntilHour, minutesUntilPart, timeText, type PartOfDay } from '../engine/time'
 
 export { DAMAGE_TYPE_NAMES } from './damageTypes'
 type DamageTypeId = keyof typeof DAMAGE_TYPE_NAMES
@@ -139,6 +140,22 @@ export const MASTER_TOOLS: AiTool[] = [
         reason: str('Где и как отдыхают, коротко.'),
       },
       ['kind'],
+    ),
+  },
+  {
+    name: 'advance_time',
+    description:
+      'Сдвинуть игровое время вперёд, когда в рассказе прошло заметное время: «час разговора», «весь день в пути», «проспали до утра». ' +
+      'Укажи minutes (сколько прошло) или until — до какого времени суток (morning — 6:00, day — 12:00, evening — 18:00, night — 22:00) либо until_hour (час 0–23, ближайший в будущем). ' +
+      'Время не идёт назад. Отдых (rest) двигает время сам — не вызывай для него advance_time.',
+    parameters: object(
+      {
+        minutes: int('Сколько минут прошло (1–43200).', 1, MAX_ADVANCE_MINUTES),
+        until: oneOf(['morning', 'day', 'evening', 'night'], 'До начала какого времени суток.'),
+        until_hour: int('До какого часа (0–23), ближайшего в будущем.', 0, 23),
+        reason: str('Что заняло время, коротко: «час разговора с трактирщиком».'),
+      },
+      ['reason'],
     ),
   },
   {
@@ -675,6 +692,25 @@ const HANDLERS: Record<string, Handler> = {
       return `${m.character.name}: +${r.hpGained} хитов${r.hitDiceRolls.length ? ` (кости хитов: ${r.hitDiceRolls.join(' + ')}; осталось ${hd.left - r.hitDiceRolls.length}/${hd.total})` : ''}${r.restoreSlots && Object.keys(m.character.magic?.slotsUsed ?? {}).length ? ', ячейки восстановлены' : ''}${Object.keys(r.resources).length ? ', умения восстановлены' : ''}${r.exhaustionRemoved ? ', Истощение −1' : ''}`
     })
     return { events, result: { kind, message: `${REST_NAMES[kind!]} окончен. ${lines.join('; ')}. Опиши отдых и что было потом.` } }
+  },
+
+  advance_time(state, args) {
+    const reason = text(args, 'reason', true)!
+    const minutesArg = integer(args, 'minutes')
+    const until = choice<PartOfDay>(args, 'until', ['morning', 'day', 'evening', 'night'])
+    const untilHour = integer(args, 'until_hour')
+    const given = [minutesArg, until, untilHour].filter((x) => x !== undefined).length
+    if (given !== 1) reject('Укажи ровно одно: minutes, until или until_hour.')
+    const now = storyTime(state)
+    if (untilHour !== undefined && (untilHour < 0 || untilHour > 23)) reject('«until_hour» — час от 0 до 23.')
+    const minutes = minutesArg ?? (until ? minutesUntilPart(now, until) : minutesUntilHour(now, untilHour!))
+    const problem = advanceProblem(minutes)
+    if (problem) reject(problem)
+    const after = now + minutes
+    return {
+      events: [{ event: { type: 'timeAdvanced', minutes, reason }, author: MASTER }],
+      result: { time: timeText(after), message: `Прошло ${durationText(minutes)}: сейчас ${timeText(after)}. Учитывай время суток в рассказе.` },
+    }
   },
 
   interrupt_rest(state, args, ctx) {

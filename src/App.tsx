@@ -12,6 +12,7 @@ import { changeNames, REST_NAMES, restBlocker, restEvents } from './game/rest'
 import { changeList, ledgerOf, turnDelta } from './game/turnChanges'
 import type { RestKind } from './types/story'
 import { needsSheetCompletion } from './game/sheetCompletion'
+import { GameClock } from './components/GameClock'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
@@ -152,6 +153,7 @@ function App() {
     <div className={`app${current === 'game' ? '' : ' app--page'}`}>
       <header className="app-header">
         <h1>ИИ-Мастер</h1>
+        {current === 'game' && app.active && <GameClock story={app.active} />}
         <div className="header-actions">
           <SettingsButton onClick={() => setSettingsTab('appearance')} />
           {current !== 'menu' && (

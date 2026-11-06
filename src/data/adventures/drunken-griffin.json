@@ -8,6 +8,7 @@
     "drunken-griffin"
   ],
   "startLocationId": "drunken-griffin",
+  "startHour": 19,
   "intro": [
     {
       "id": "intro-1",

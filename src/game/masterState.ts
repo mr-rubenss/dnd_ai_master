@@ -12,7 +12,8 @@ import type { RulesData } from '../types/rules'
 import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
 import { armorClass } from './character'
-import { currentLocation } from './storyActions'
+import { currentLocation, storyTime } from './storyActions'
+import { outdoorLight, partOfDay, timeText, type PartOfDay } from '../engine/time'
 import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
 import { recoveryText } from './features'
@@ -209,12 +210,33 @@ export function locationText(story: StoryState): string {
     .join('\n')
 }
 
+/** Что обычно бывает в это время суток — подсказка ведущему. */
+const PART_OF_DAY_HINTS: Record<PartOfDay, string> = {
+  morning: 'утро: лавки и рынки открываются, люди идут на работу, в тавернах завтракают',
+  day: 'день: светло, лавки, мастерские и рынки открыты, на улицах людно',
+  evening: 'вечер: смеркается, лавки закрываются, таверны полны, зажигают огни',
+  night: 'ночь: темно, лавки закрыты, улицы пусты, в тавернах лишь засидевшиеся гости, по городу ходит стража',
+}
+
+/** Раздел «Время»: день, час, время суток и что из этого следует. */
+export function timeSectionText(story: Pick<StoryState, 'time' | 'lastLongRestAt'>): string {
+  const t = storyTime(story)
+  const light = outdoorLight(t)
+  const lightText = light === 'bright' ? 'яркий дневной свет' : light === 'dim' ? 'сумерки (тусклый свет)' : 'темнота'
+  return [
+    `## Время\nСейчас ${timeText(t)}. Под открытым небом — ${lightText}.`,
+    `Учитывай время суток: ${PART_OF_DAY_HINTS[partOfDay(t)]}.`,
+    'Прошло заметное время (долгий разговор, дорога, ожидание, сон) — вызови advance_time. Время не идёт назад.',
+  ].join('\n')
+}
+
 /** Раздел «Состояние игры» для системного промта — собирается заново для каждого запроса (факты — отдельной частью). */
 export function gameStateText(story: StoryState, ctx: MasterStateContext): string {
   const heroes = story.party.map((m) => heroSheetText(m, ctx)).join('\n\n')
   const quests = story.world.quests.map((q) => `- ${q.title} — ${q.status === 'active' ? 'в работе' : q.status === 'completed' ? 'выполнено' : 'провалено'}`)
   return [
     '## Состояние игры (ведёт код; это главнее твоей памяти)',
+    timeSectionText(story),
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
     quests.length ? `## Задания\n${quests.join('\n')}` : '',

@@ -106,6 +106,13 @@ export interface StoryState {
   pendingRest?: PendingRest
   /** Память ведущего (сводка старой части ленты). Нет поля — сжатий ещё не было. */
   memory?: StoryMemory
+  /**
+   * Игровое время — минуты с полуночи Дня 1 (src/engine/time.ts). Нет поля — старая история: читать через
+   * storyTime (День 1, 8:00).
+   */
+  time?: number
+  /** Когда закончился последний долгий отдых (игровое время) — для правила «16 часов до следующего». */
+  lastLongRestAt?: number
 }
 
 export type RestKind = 'short' | 'long'
@@ -210,6 +217,8 @@ export type StoryEvent =
   | { type: 'restCompleted'; messageId: string; kind: RestKind; heroes: RestHeroResult[] }
   /** Герой применил умение класса («Второе дыхание»). */
   | { type: 'featureUsed'; heroId: string; featureId: string; amount?: number }
+  /** Прошло игровое время (ведущий: «час разговора», «проспали до утра»). Только вперёд. */
+  | { type: 'timeAdvanced'; minutes: number; reason: string }
   /** Строка изменений за ход ведущего — системное сообщение в ленте. */
   | { type: 'turnSummarized'; messageId: string; changes: TurnChange[] }
   /** Урон (с типом) или лечение; хиты не уходят ниже 0 и выше максимума. */

@@ -4,12 +4,14 @@ import { itemCatalog, priceList, rulesData } from '../data'
 import adventureJson from '../data/adventures/drunken-griffin.json'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
-import type { StoryState } from '../types/story'
+import type { StoryEvent, StoryState } from '../types/story'
 import { parseAdventure } from './adventure'
 import { parseCharacterSheet } from './character'
 import { parseLocation } from './location'
 import { executeTool, MASTER_TOOLS, type ToolContext } from './masterTools'
-import { applyAction, makeAction, newStorySeed } from './storyActions'
+import { applyAction, checkAction, makeAction, MASTER, newStorySeed, storyTime } from './storyActions'
+import { gameStateText } from './masterState'
+import { gameTime } from '../engine/time'
 
 const location = parseLocation(drunkenGriffinJson)
 const locations = { [location.id]: location }
@@ -54,6 +56,7 @@ describe('описания инструментов', () => {
       'use_item',
       'cast_spell',
       'rest',
+      'advance_time',
       'interrupt_rest',
       'use_feature',
       'change_hp',
@@ -354,5 +357,51 @@ describe('cast_spell: заклинания героя', () => {
     const { outcome, state } = run(s, 'cast_spell', { spell: 'cure-wounds' }, context([face(1, 8), face(1, 8)]))
     expect(outcome.result).toMatchObject({ healing: 5, hp: '8/8' })
     expect(state.party[0].character.hp).toBe(8)
+  })
+})
+
+describe('advance_time — игровое время', () => {
+  it('история начинается со времени приключения (таверна — День 1, 19:00)', () => {
+    expect(storyTime(fresh())).toBe(gameTime(1, 19))
+  })
+
+  it('сдвиг на минуты и «до утра»; время не идёт назад', () => {
+    const { outcome, state } = run(fresh(), 'advance_time', { minutes: 60, reason: 'час разговора с трактирщиком' })
+    expect(outcome.result.message).toBe('Прошло 1 ч: сейчас День 1, 20:00 (вечер). Учитывай время суток в рассказе.')
+    expect(storyTime(state)).toBe(gameTime(1, 20))
+    const night = run(state, 'advance_time', { until: 'morning', reason: 'проспали до утра' }).state
+    expect(storyTime(night)).toBe(gameTime(2, 6))
+    expect(storyTime(run(night, 'advance_time', { until_hour: 9, reason: 'ждали открытия лавки' }).state)).toBe(gameTime(2, 9))
+    expect(rejected(fresh(), 'advance_time', { minutes: 0, reason: 'x' })).toMatch(/не идёт назад/)
+    expect(rejected(fresh(), 'advance_time', { minutes: -30, reason: 'x' })).toMatch(/не идёт назад/)
+    expect(rejected(fresh(), 'advance_time', { minutes: 10, until: 'night', reason: 'x' })).toBe('Укажи ровно одно: minutes, until или until_hour.')
+    expect(rejected(fresh(), 'advance_time', { reason: 'x' })).toBe('Укажи ровно одно: minutes, until или until_hour.')
+    expect(rejected(fresh(), 'advance_time', { minutes: 10 })).toMatch(/reason/)
+  })
+
+  it('событие timeAdvanced: только ведущий или движок, только вперёд, с причиной', () => {
+    const s = fresh()
+    const check = (event: StoryEvent, author = MASTER) => checkAction(s, makeAction(s.id, 1, event, author, 1, 'x'), { catalog: itemCatalog })
+    expect(check({ type: 'timeAdvanced', minutes: 30, reason: 'ждём' })).toBeNull()
+    expect(check({ type: 'timeAdvanced', minutes: -30, reason: 'назад' })).toMatch(/не идёт назад/)
+    expect(check({ type: 'timeAdvanced', minutes: 30, reason: ' ' })).toBe('Нужна причина, почему прошло время.')
+    expect(check({ type: 'timeAdvanced', minutes: 30, reason: 'ждём' }, { kind: 'player', heroId: 'ratibor' })).toBe('Время двигает ведущий или движок.')
+  })
+
+  it('отдых двигает время: короткий — на час, долгий — на 8 часов и запоминает конец долгого', () => {
+    const s = fresh()
+    const short = run(s, 'rest', { kind: 'short' }).state
+    expect(storyTime(short)).toBe(gameTime(1, 20))
+    const long = run(short, 'rest', { kind: 'long' }).state
+    expect(storyTime(long)).toBe(gameTime(2, 4))
+    expect(long.lastLongRestAt).toBe(gameTime(2, 4))
+  })
+
+  it('ведущий видит время и подсказку по времени суток', () => {
+    const text = gameStateText(fresh(), { catalog: itemCatalog, rules: rulesData })
+    expect(text).toContain('## Время\nСейчас День 1, 19:00 (вечер). Под открытым небом — сумерки (тусклый свет).')
+    expect(text).toContain('лавки закрываются, таверны полны')
+    const night = run(fresh(), 'advance_time', { until: 'night', reason: 'засиделись' }).state
+    expect(gameStateText(night, { catalog: itemCatalog, rules: rulesData })).toContain('лавки закрыты, улицы пусты')
   })
 })

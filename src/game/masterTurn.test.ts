@@ -40,6 +40,12 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('«ты входишь в таверну»')
   })
 
+  it('время: учитывать время суток и двигать его advance_time', () => {
+    expect(DM_PROMPT).toContain('ночью таверна пустеет, лавки закрыты')
+    expect(DM_PROMPT).toContain('вызови `advance_time`')
+    expect(DM_PROMPT).toContain('Время только идёт вперёд')
+  })
+
   it('языки: незнакомую речь и тексты герой не понимает', () => {
     expect(DM_PROMPT).toContain('Герой понимает только языки из строки «Языки»')
     expect(DM_PROMPT).toContain('**непонятны**')

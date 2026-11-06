@@ -16,6 +16,8 @@ export interface AdventureData {
   startLocationId: string
   /** Вступление ведущего. */
   intro: ChatMessage[]
+  /** Час начала истории в День 1 (0–23); нет — 8 утра. */
+  startHour?: number
 }
 
 export function parseAdventure(raw: unknown, locations: Record<string, LocationData>): AdventureData {
@@ -36,6 +38,8 @@ export function parseAdventure(raw: unknown, locations: Record<string, LocationD
       problems.push(`intro[${i}]: ожидается { id, author: "master", text }`)
     }
   })
+  if (raw.startHour !== undefined && !(Number.isInteger(raw.startHour) && (raw.startHour as number) >= 0 && (raw.startHour as number) <= 23))
+    problems.push('"startHour" — час 0–23')
   if (problems.length > 0) throw new ValidationError(title, problems)
   return raw as unknown as AdventureData
 }

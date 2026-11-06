@@ -4580,3 +4580,36 @@ textarea {
 .languages {
   margin-top: var(--space-10);
 }
+
+/* Игровое время в шапке: значок солнца или луны и «День 3, вечер». */
+.game-clock {
+  position: absolute;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  color: var(--color-muted);
+  font-size: var(--text-86);
+  white-space: nowrap;
+}
+
+.game-clock-text {
+  color: var(--color-fg);
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-wrap: wrap;
+    row-gap: var(--space-4);
+  }
+
+  .game-clock {
+    position: static;
+    padding: var(--space-2) var(--space-8);
+    font-size: var(--text-78);
+  }
+}
