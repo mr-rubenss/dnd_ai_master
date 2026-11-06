@@ -437,6 +437,15 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
         problems.push('Выберите предысторию')
         break
       }
+      // «Написать свою историю»: здесь история обязательна — по ней подбирается (или собирается) механика.
+      if (background.id === CUSTOM_BACKGROUND_ID && draft.backgroundSource === 'story' && !draft.backstory.trim()) {
+        problems.push('Напишите историю героя')
+        break
+      }
+      if (background.id === CUSTOM_BACKGROUND_ID && draft.backgroundSource === 'story' && !draft.backgroundProposal && !draft.customBackground.name.trim()) {
+        problems.push('Подберите предысторию по истории или соберите механику вручную')
+        break
+      }
       if (background.id === CUSTOM_BACKGROUND_ID) {
         problems.push(...validateBackgroundTemplate(background, { feats: data.feats, catalog: data.catalog }))
         if (problems.length > 0) break

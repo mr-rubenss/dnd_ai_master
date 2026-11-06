@@ -23,14 +23,19 @@ import { lastNarrative, rewritableMessageId, streamingText } from './game/master
 import { runMasterRewrite, runMasterTurn } from './game/masterTurn'
 import { devLog } from './game/devLog'
 import { compactionNeeded, compactMemory, writeEpilogueSummary } from './game/memory'
-import { masterSession, type MasterSession } from './game/masterSession'
+import { masterSession, timedFor, type MasterSession } from './game/masterSession'
+import { AiProgress, AiTaskError } from './components/AiTask'
+import { useAiTask } from './components/useAiTask'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
-import type { StoryState } from './types/story'
+import type { StoryEpilogue, StoryState } from './types/story'
 
 // Заглушка ответа ведущего, пока ИИ не подключён.
 /** Ответ, пока ведущий не настроен (нет ключа API и т. п.). */
 const STUB_REPLY = 'Ведущий задумчиво молчит… (ИИ-ведущий не подключён: укажите ключ API в «Настройки» → «Ведущий».)'
+
+/** Время для действий (вынесено из компонента: в обработчиках событий, не при отрисовке). */
+const timestamp = () => Date.now()
 
 type Screen = 'menu' | 'stories' | 'new-story' | 'creation' | 'heroes' | 'game'
 
@@ -50,7 +55,9 @@ function App() {
   const closeSettings = useCallback(() => setSettingsTab(null), [])
   const aiState = useAiSettings()
   /** Ведущий пишет черновик итога истории. */
-  const [writingEpilogue, setWritingEpilogue] = useState(false)
+  const epilogueTask = useAiTask()
+  const [pendingEpilogue, setPendingEpilogue] = useState<{ story: StoryState; draft: StoryEpilogue } | null>(null)
+  const writingEpilogue = pendingEpilogue !== null
   const current: Screen = screen === 'game' && !app.active ? 'menu' : screen
   const readOnly = app.active?.status === 'completed'
   const latest = app.stories.find((s) => s.status === 'active') ?? null
@@ -93,21 +100,33 @@ function App() {
         '(погибшие уйдут в «Зал славы»). Итог истории попадёт в «Летопись» героев.',
     )
     if (!confirmed) return
-    let epilogue = draftEpilogue(active, Date.now())
-    // Черновик краткого содержания пишет ведущий — по сводке памяти и журналу фактов; не вышло — черновик из журнала.
-    if (settingsProblems(aiState.settings, aiState.apiKey).length === 0) {
-      setWritingEpilogue(true)
-      try {
-        const session = masterSession(aiState.settings, aiState.apiKey)
-        const summary = await writeEpilogueSummary(session.master, active, session.turn)
-        epilogue = { ...epilogue, summary }
-      } catch (error) {
-        devLog.add({ kind: 'error', text: `Итог истории от ведущего не получен: ${error instanceof Error ? error.message : String(error)}` })
-      } finally {
-        setWritingEpilogue(false)
-      }
-    }
+    const draft = draftEpilogue(active, timestamp())
+    if (settingsProblems(aiState.settings, aiState.apiKey).length === 0) await writeEpilogue(active, draft)
+    else await complete(draft)
+  }
+
+  const complete = async (epilogue: StoryEpilogue) => {
+    setPendingEpilogue(null)
+    epilogueTask.reset()
     if (ok(await appStore.completeStory(epilogue))) setEpilogueOpen(true)
+  }
+
+  /**
+   * Черновик краткого содержания пишет ведущий — по сводке памяти и журналу фактов (индикатор, «Отменить», тайм-аут).
+   * Отменено — черновик из журнала; ошибка или тайм-аут — выбор: попробовать ещё раз или без ведущего.
+   */
+  const writeEpilogue = async (story: StoryState, draft: StoryEpilogue) => {
+    setPendingEpilogue({ story, draft })
+    const session = masterSession(aiState.settings, aiState.apiKey)
+    const result = await epilogueTask.run('Ведущий пишет итог истории для летописи…', ({ signal, setReceived }) =>
+      writeEpilogueSummary(
+        timedFor(session.master, 'epilogue', session.model, { signal, onProgress: (p) => setReceived(p.textChars) }),
+        story,
+        { ...session.turn, signal },
+      ),
+    )
+    if (result.status === 'done') await complete({ ...draft, summary: result.value })
+    else if (result.status === 'cancelled') await complete(draft)
   }
 
   if (!app.ready) {
@@ -151,6 +170,22 @@ function App() {
         </div>
       </header>
       {settingsTab && <SettingsPanel initialTab={settingsTab} onClose={closeSettings} />}
+      {pendingEpilogue && (
+        <div className="ai-task-overlay" role="dialog" aria-modal="true" aria-label="Итог истории" data-testid="epilogue-writing">
+          <div className="ai-task-dialog panel">
+            <h2>Итог истории</h2>
+            <AiProgress state={epilogueTask.state} onCancel={epilogueTask.cancel} note="«Отменить» — итог будет черновиком из журнала, его можно поправить." />
+            <AiTaskError state={epilogueTask.state}>
+              <button type="button" className="primary-button" onClick={() => void writeEpilogue(pendingEpilogue.story, pendingEpilogue.draft)}>
+                Попробовать ещё раз
+              </button>
+              <button type="button" className="secondary-button" onClick={() => void complete(pendingEpilogue.draft)}>
+                Без ведущего
+              </button>
+            </AiTaskError>
+          </div>
+        </div>
+      )}
       {current === 'menu' && (
         <StartMenu
           latest={latest}
@@ -246,6 +281,14 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   const [aiNotice, setAiNotice] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  /** Игрок нажал «Отменить» у «Мастер думает…» (а не ушёл с экрана). */
+  const cancelledRef = useRef(false)
+  /** Идёт настоящий запрос к модели (у заглушки отменять нечего). */
+  const [canCancel, setCanCancel] = useState(false)
+  const cancelMaster = () => {
+    cancelledRef.current = true
+    abortRef.current?.abort()
+  }
   /** Фоновое сжатие памяти ведущего: идёт ли и как его остановить. */
   const [compacting, setCompacting] = useState(false)
   const compactingRef = useRef<Promise<void> | null>(null)
@@ -275,6 +318,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     setReplacingId(rewriteId)
     setStreamText('')
     const finish = () => {
+      setCanCancel(false)
       setWaiting(false)
       setStreamText(null)
       setAiNotice(null)
@@ -292,6 +336,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     }
     const controller = new AbortController()
     abortRef.current = controller
+    cancelledRef.current = false
+    setCanCancel(true)
     // Поток копится целиком, а игроку показывается без строки подсказок «Варианты: …».
     let streamed = ''
     const onText = (delta: string) => {
@@ -302,6 +348,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     const onRetry = ({ delayMs }: { delayMs: number }) =>
       setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`)
     const session = masterSession(ai.settings, ai.apiKey)
+    // Сроки ответа (src/ai/timeouts.ts): нет кусков потока или ответа слишком долго — запрос обрывается с объяснением.
+    const master = timedFor(session.master, rewriteId ? 'rewrite' : 'turn', session.model, { signal: controller.signal })
     const context = { catalog: itemCatalog, rules: rulesData, prices: priceList }
     const common = { verbosity: ai.settings.verbosity, context, ...session.turn, signal: controller.signal, onText, onRetry }
     let ok = false
@@ -311,7 +359,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         try {
           const current = appStore.getState().active ?? story
           if (rewriteId) {
-            const result = await runMasterRewrite(session.master, current, common)
+            const result = await runMasterRewrite(master, current, common)
             if (result && result.messageId === rewriteId) {
               const reason = await appStore.dispatchTo(
                 story.id,
@@ -321,7 +369,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               if (reason) setAiError(reason)
             }
           } else {
-            const { text, suggestions, changes, verification } = await runMasterTurn(session.master, current, {
+            const { text, suggestions, changes, verification } = await runMasterTurn(master, current, {
               ...common,
               // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
               runtime: {
@@ -360,10 +408,11 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         }
       }
     } catch (error) {
-      if (controller.signal.aborted) return
-      setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
+      if (cancelledRef.current) setAiError('Ответ ведущего отменён. Всё, что ведущий успел сделать инструментами, сохранено.')
+      else if (controller.signal.aborted) return
+      else setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
     } finally {
-      if (!controller.signal.aborted) finish()
+      if (!controller.signal.aborted || cancelledRef.current) finish()
     }
     // Сжатие памяти — в фоне после ответа, игрок не ждёт.
     if (ok) void compactNow('budget', session, false)
@@ -386,7 +435,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       setCompacting(true)
       try {
         const result = await compactMemory(
-          session.compactor,
+          timedFor(session.compactor, 'compact', session.compactModel, { signal: controller.signal }),
           {
             getStory: () => {
               const now = appStore.getState().active
@@ -459,6 +508,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               replacingId={replacingId}
               onRewrite={readOnly ? undefined : (messageId) => void askMaster(messageId)}
               rewriteDisabled={waiting}
+              onCancel={canCancel ? cancelMaster : undefined}
             />
             {compacting && !waiting && (
               <p className="master-notice memory-notice" role="status" data-testid="memory-compacting">

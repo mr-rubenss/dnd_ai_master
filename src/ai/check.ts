@@ -78,6 +78,8 @@ export async function runConnectionCheck(
     await master.complete({ messages: [{ role: 'user', content: 'Ответь одним словом: да.' }], maxTokens: 5, stream: false, signal })
     push({ id: 'key', title: CHECK_TITLES.key, status: 'ok', detail: 'Поставщик принял ключ и ответил.' })
   } catch (error) {
+    // Отменено игроком — проверка прекращается целиком.
+    if (signal?.aborted) throw error
     push({ id: 'key', title: CHECK_TITLES.key, status: 'fail', detail: explain(error) })
     push(skipped('stream'))
     push(skipped('tools'))
@@ -125,6 +127,8 @@ export async function runConnectionCheck(
         detail: `Модель прислала пустой ответ — ведущий будет молчать. Нажмите «Диагностика» и пришлите результат. ${how(response)}`,
       })
   } catch (error) {
+    // Отменено игроком — проверка прекращается целиком.
+    if (signal?.aborted) throw error
     push({ id: 'stream', title: CHECK_TITLES.stream, status: 'fail', detail: explain(error) })
   }
 
@@ -168,6 +172,8 @@ export async function runConnectionCheck(
         detail: `Модель не вызывает инструменты — ведущий не сможет запрашивать проверки, броски и изменения в игре. Выберите другую модель. ${how(response)}`,
       })
   } catch (error) {
+    // Отменено игроком — проверка прекращается целиком.
+    if (signal?.aborted) throw error
     push({ id: 'tools', title: CHECK_TITLES.tools, status: 'fail', detail: explain(error) })
   }
   return results

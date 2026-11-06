@@ -3,7 +3,9 @@
 import { calibrationStore } from '../ai/calibrationStore'
 import { createMaster } from '../ai'
 import { aiConnection, compactConnection, contextBudget, type AiSettings } from '../ai/settings'
-import type { AiMaster } from '../ai/types'
+import { timedMaster } from '../ai/timed'
+import { aiTimeouts } from '../ai/timeouts'
+import type { AiMaster, AiProgress } from '../ai/types'
 import { devLog } from './devLog'
 import type { RequestReport } from './masterTurn'
 
@@ -51,4 +53,33 @@ export function masterSession(settings: AiSettings, apiKey: string): MasterSessi
       onRequest: requestReporter(compactConn.model),
     },
   }
+}
+
+/** Назначение запроса — для журнала разработчика. */
+export const ATTEMPT_PURPOSES = {
+  turn: 'Ход ведущего',
+  rewrite: 'Переписать ответ',
+  compact: 'Сжатие памяти',
+  background: 'Предыстория по истории',
+  check: 'Проверка подключения',
+  epilogue: 'Итог истории',
+} as const
+export type AttemptPurpose = keyof typeof ATTEMPT_PURPOSES
+
+/**
+ * Запрос со сроками (src/ai/timeouts.ts) и отменой; каждая попытка — в журнал разработчика
+ * (длительность, размер запроса и ответа, «размышления» модели).
+ */
+export function timedFor(
+  master: AiMaster,
+  purpose: AttemptPurpose,
+  model: string,
+  options: { signal?: AbortSignal; onProgress?: (p: AiProgress) => void } = {},
+): AiMaster {
+  const timeouts = aiTimeouts(purpose === 'turn' || purpose === 'rewrite' ? 'turn' : purpose === 'background' ? 'background' : 'default')
+  return timedMaster(master, {
+    ...timeouts,
+    ...options,
+    onAttempt: (report) => devLog.add({ kind: 'attempt', purpose: ATTEMPT_PURPOSES[purpose], model, ...report }),
+  })
 }

@@ -3979,7 +3979,7 @@ textarea {
 /* ---------- История героя и предыстория «по моей истории» ---------- */
 
 .creation-backstory {
-  margin-bottom: var(--space-14);
+  margin-top: var(--space-14);
   padding: var(--space-12) var(--space-14);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -4103,4 +4103,120 @@ textarea {
 
 .coin-part {
   white-space: nowrap;
+}
+
+/* ---------- Индикатор запроса к ИИ вне ленты (AiProgress) ---------- */
+
+.ai-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-12);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-tint);
+}
+
+.ai-progress-spinner {
+  flex: none;
+  width: var(--space-20);
+  height: var(--space-20);
+  border: 2px solid var(--color-border-bright);
+  border-top-color: var(--color-accent);
+  border-radius: var(--radius-round);
+  animation: ai-spin 0.9s linear infinite;
+}
+
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+:root[data-motion='reduce'] .ai-progress-spinner {
+  animation: ai-pulse 2s steps(2) infinite;
+}
+
+@keyframes ai-pulse {
+  50% { border-top-color: var(--color-border-bright); }
+}
+
+.ai-progress-text {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ai-progress-meta,
+.ai-progress-note {
+  font-size: var(--text-85);
+  color: var(--color-muted);
+}
+
+.ai-task-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--color-danger-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-tint);
+}
+
+.ai-task-error p {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--text-88);
+}
+
+.ai-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* Крупная карточка «Написать свою историю» — на всю ширину сетки вариантов. */
+.option-card--wide {
+  grid-column: 1 / -1;
+  border-width: 2px;
+}
+
+.option-card--wide .option-card-title {
+  font-size: var(--text-120);
+}
+
+.backstory-field textarea {
+  min-height: calc(var(--space-48) * 3);
+}
+
+.backstory-field textarea[readonly] {
+  opacity: 0.7;
+}
+
+.proposal-warning {
+  color: var(--color-warning);
+}
+
+.ai-task-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-16);
+  background: var(--color-backdrop);
+}
+
+.ai-task-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  width: min(100%, 520px);
+  padding: var(--space-16);
+}
+
+.ai-task-dialog h2 {
+  margin: 0;
+  font-family: var(--font-display);
 }

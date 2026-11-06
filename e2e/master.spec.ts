@@ -380,3 +380,64 @@ test.describe('телефон', () => {
     await testInfo.attach('телефон: настройки ведущего', { body: await page.screenshot(), contentType: 'image/png' })
   })
 })
+
+test('«Мастер думает…»: «Отменить» обрывает ответ; тайм-аут — понятное сообщение и «Повторить»', async ({ page }) => {
+  await withKey(page)
+  await page.addInitScript(() => Object.assign(window, { __aiMasterTimeouts: { turn: { totalMs: 5000, idleMs: 1500 } } }))
+  let calls = 0
+  await mockApi(page, DEEPSEEK, async (_, route) => {
+    calls++
+    // 1-й запрос — отменят; 2-й — молчит до тайм-аута; 3-й — отвечает.
+    if (calls <= 2) return new Promise<void>(() => {})
+    await fulfillSse(route, textStream(['Гуннар ', 'кивает.']))
+  })
+  await page.goto('./')
+  await startQuickGame(page)
+  const input = page.locator('.player-input textarea')
+  await input.fill('Подхожу к стойке')
+  await input.press('Enter')
+  await expect(page.getByTestId('master-thinking')).toBeVisible()
+  await page.getByTestId('master-cancel').click()
+  const error = page.getByTestId('master-error')
+  await expect(error).toContainText('Ответ ведущего отменён.')
+  await expect(page.getByTestId('master-streaming')).toHaveCount(0)
+  await expect(input).toBeEnabled()
+
+  await error.getByRole('button', { name: 'Повторить' }).click()
+  await expect(error).toContainText('Модель молчит: за 2 с не пришло ни одного куска ответа. Запрос остановлен.', { timeout: 8_000 })
+  await error.getByRole('button', { name: 'Повторить' }).click()
+  await expect(page.locator('.message--master').last()).toHaveText(/Гуннар кивает\./)
+  await expect(page.locator('.message--player', { hasText: 'Подхожу к стойке' })).toHaveCount(1)
+})
+
+test('проверка подключения: индикатор с этапом и секундами, «Отменить»', async ({ page }) => {
+  await withKey(page)
+  await mockApi(page, DEEPSEEK, () => new Promise<void>(() => {}))
+  await page.goto('./')
+  const panel = await openMasterTab(page)
+  await panel.getByTestId('check-connection').click()
+  const progress = panel.getByTestId('ai-progress')
+  await expect(progress.getByTestId('ai-progress-stage')).toHaveText(/^Проверяю: .+…$/)
+  await expect(progress.getByTestId('ai-progress-seconds')).toHaveText(/^\d+ с$/)
+  await progress.getByTestId('ai-cancel').click()
+  await expect(progress).toHaveCount(0)
+  await expect(panel.getByTestId('check-connection')).toBeEnabled()
+})
+
+test('итог истории: пока ведущий пишет — индикатор; «Отменить» — черновик из журнала', async ({ page }) => {
+  await withKey(page)
+  await mockApi(page, DEEPSEEK, (body, route) => {
+    const system = (body.messages as { content: string }[])[0].content
+    if (system.includes('## Задача: итог истории')) return new Promise<void>(() => {})
+    return fulfillSse(route, textStream(['Ок.']))
+  })
+  await page.goto('./')
+  await startQuickGame(page)
+  page.once('dialog', (dialog) => void dialog.accept())
+  await page.getByTestId('finish-story').click()
+  const writing = page.getByTestId('epilogue-writing')
+  await expect(writing.getByTestId('ai-progress-stage')).toHaveText('Ведущий пишет итог истории для летописи…')
+  await writing.getByTestId('ai-cancel').click()
+  const dialog = page.getByRole('dialog', { name: /Итог истории «/ })
+  await expect(dialog.getByLabel('Краткое содержание')).toHaveValue(/история «.+» разворачивалась/)
+})

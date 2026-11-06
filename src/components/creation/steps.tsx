@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { AiError, createMaster } from '../../ai'
-import { aiConnection, settingsProblems } from '../../ai/settings'
+import { createMaster } from '../../ai'
+import { aiConnection, isReasoningModel, settingsProblems } from '../../ai/settings'
 import { useAiSettings } from '../../ai/settingsStore'
 import { itemCatalog, rulesData } from '../../data'
 import { ABILITIES, ABILITY_ABBREVIATIONS, ABILITY_NAMES, abilityModifier, formatModifier, type Ability } from '../../engine/abilities'
@@ -37,7 +37,18 @@ import {
   decideProposalDetail,
   type CreationDraft,
 } from '../../game/creation'
-import { backstoryProblem, EXPLANATION_KEYS, EXPLANATION_LABELS, suggestBackground } from '../../game/backgroundFromStory'
+import {
+  backstoryProblem,
+  EXPLANATION_KEYS,
+  EXPLANATION_LABELS,
+  MAX_PROPOSAL_ATTEMPTS,
+  partialName,
+  suggestBackground,
+  type SuggestStage,
+} from '../../game/backgroundFromStory'
+import { timedFor } from '../../game/masterSession'
+import { AiProgress, AiTaskError } from '../AiTask'
+import { useAiTask } from '../useAiTask'
 import { MAX_BACKSTORY_LENGTH } from '../../game/character'
 import type { ToolKind } from '../../types/items'
 import { armorTrainingText } from '../itemText'
@@ -389,8 +400,10 @@ function CustomBackgroundForm({ draft, update }: StepProps) {
   )
 }
 
-/** «История героя» — свободный текст игрока; доступна при любой предыстории. */
-function BackstoryField({ draft, update }: StepProps) {
+const BACKSTORY_PLACEHOLDER = 'Например: бывший моряк, сбежал с корабля после бунта, ищет брата.'
+
+/** Готовая предыстория или «Собрать вручную»: внизу — необязательная «История героя» (то же поле, что у своей истории). */
+function OptionalBackstory({ draft, update }: StepProps) {
   return (
     <section className="creation-backstory" aria-label="История героя">
       <label className="field">
@@ -400,61 +413,122 @@ function BackstoryField({ draft, update }: StepProps) {
           maxLength={MAX_BACKSTORY_LENGTH}
           value={draft.backstory}
           onChange={(e) => update({ ...draft, backstory: e.target.value })}
-          placeholder="Кем был ваш герой — своими словами. Например: бывший моряк, сбежал с корабля после бунта, ищет брата."
+          placeholder={BACKSTORY_PLACEHOLDER}
           data-testid="backstory"
         />
       </label>
-      <p className="hint">Ведущий будет знать эту историю и сплетать из неё зацепки для сюжета.</p>
+      <p className="hint">Несколько слов о прошлом героя — ведущий использует это в сюжете.</p>
     </section>
   )
 }
 
-/** «По моей истории»: ИИ предлагает механику предыстории с объяснениями; игрок правит её и решает о дописанных деталях. */
-function StoryProposal({ draft, update }: StepProps) {
+const STAGE_LABELS: Record<SuggestStage, (attempt: number) => string> = {
+  sending: () => 'Отправляю историю…',
+  reading: () => 'Мастер читает и подбирает…',
+  checking: () => 'Проверяю по правилам…',
+  fixing: (attempt) => `Мастер исправляет (попытка ${attempt} из ${MAX_PROPOSAL_ATTEMPTS})…`,
+}
+
+/**
+ * «Написать свою историю»: большое обязательное поле и подбор механики ИИ (этапы, секунды, «Отменить», тайм-аут);
+ * предложение с объяснениями, «Предложить иначе», дописанные детали. Без ключа API — механика собирается вручную.
+ */
+function StoryBackground({ draft, update, aiReady }: StepProps & { aiReady: boolean }) {
   const { settings, apiKey } = useAiSettings()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  // Свежий черновик для ответа ИИ: пока он думает, игрок может править историю.
+  const task = useAiTask()
+  const [preview, setPreview] = useState<string | null>(null)
+  const [reasoning, setReasoning] = useState(false)
+  // Свежий черновик для ответа ИИ: пока он думает, игрок может листать другие пункты.
   const draftRef = useRef(draft)
   useEffect(() => {
     draftRef.current = draft
   }, [draft])
-  useEffect(() => () => abortRef.current?.abort(), [])
   const proposal = draft.backgroundProposal
   const problem = backstoryProblem(draft.backstory)
+  const running = task.state.status === 'running'
+  const model = aiConnection(settings, apiKey).model
+  const reasoningModel = isReasoningModel(model)
 
   const suggest = async () => {
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setLoading(true)
-    setError(null)
-    try {
-      const master = createMaster(aiConnection(settings, apiKey))
-      const next = await suggestBackground(master, draft.backstory, data, { previous: proposal, signal: controller.signal })
-      update(applyBackgroundProposal(draftRef.current, next, data))
-    } catch (e) {
-      if (controller.signal.aborted) return
-      setError(e instanceof AiError ? e.message : 'Не удалось получить предложение.')
-    } finally {
-      if (!controller.signal.aborted) setLoading(false)
-    }
+    setPreview(null)
+    setReasoning(false)
+    const result = await task.run(STAGE_LABELS.sending(1), ({ signal, setStage, setReceived }) => {
+      const master = timedFor(createMaster(aiConnection(settings, apiKey)), 'background', model, { signal })
+      return suggestBackground(master, draftRef.current.backstory, data, {
+        previous: proposal,
+        signal,
+        onStage: (stage, attempt) => setStage(STAGE_LABELS[stage](attempt)),
+        onProgress: (p) => {
+          setReceived(p.textChars + p.toolChars)
+          if (p.reasoningChars > 0) setReasoning(true)
+          const name = partialName(p.toolArgs)
+          if (name) setPreview(name)
+        },
+      })
+    })
+    if (result.status === 'done') update(applyBackgroundProposal(draftRef.current, result.value, data))
   }
 
   return (
-    <section className="creation-details story-proposal" aria-label="Предыстория по моей истории" data-testid="story-proposal">
-      <h3>По моей истории</h3>
-      {problem && !proposal && <p className="hint">{problem}</p>}
-      <button type="button" className="primary-button" onClick={() => void suggest()} disabled={loading || !!problem} data-testid="suggest-background">
-        {loading ? 'ИИ читает историю…' : proposal ? 'Предложить иначе' : 'Предложить по моей истории'}
-      </button>
-      {error && (
-        <p className="proposal-error" role="alert" data-testid="proposal-error">
-          {error}
+    <section className="creation-details story-proposal" aria-label="Своя история героя" data-testid="story-proposal">
+      <label className="field backstory-field">
+        <span>История героя</span>
+        <textarea
+          rows={7}
+          maxLength={MAX_BACKSTORY_LENGTH}
+          value={draft.backstory}
+          readOnly={running}
+          aria-required="true"
+          onChange={(e) => update({ ...draft, backstory: e.target.value })}
+          placeholder={BACKSTORY_PLACEHOLDER}
+          data-testid="backstory"
+        />
+      </label>
+      <p className="hint">
+        О чём написать: откуда герой родом и чем занимался до приключений, что умеет, кого потерял или ищет, кому должен, чего боится.
+        Хватит 3–6 предложений своими словами.
+      </p>
+
+      {aiReady ? (
+        <>
+          {reasoningModel && !running && (
+            <p className="hint proposal-warning" data-testid="reasoning-warning">
+              Выбрана рассуждающая модель ({model}): перед ответом она долго «думает» — подбор может занять минуту и больше.
+            </p>
+          )}
+          {!running && (
+            <button type="button" className="primary-button" onClick={() => void suggest()} disabled={!!problem} data-testid="suggest-background">
+              {proposal ? 'Предложить иначе' : 'Подобрать предысторию по истории'}
+            </button>
+          )}
+          {problem && !running && !proposal && <p className="hint">{problem}</p>}
+          <AiProgress
+            state={task.state}
+            onCancel={task.cancel}
+            note={
+              <>
+                {preview && <span data-testid="proposal-preview">Название: «{preview}»</span>}
+                {reasoning && <span> Модель «размышляет» перед ответом — это дольше обычного.</span>}
+              </>
+            }
+          />
+          <AiTaskError state={task.state} testId="proposal-error">
+            <button type="button" className="primary-button" onClick={() => void suggest()} data-testid="proposal-retry">
+              Попробовать ещё раз
+            </button>
+            <button type="button" className="secondary-button" onClick={() => update(chooseCustomBackground(draft, 'manual', data))} data-testid="proposal-manual">
+              Собрать вручную
+            </button>
+          </AiTaskError>
+        </>
+      ) : (
+        <p className="hint" data-testid="story-no-ai">
+          ИИ-ведущий не настроен (нет ключа API в «Настройки» → «Ведущий»), поэтому механику предыстории соберите вручную ниже — ваша история
+          сохранится в листе героя и попадёт к ведущему.
         </p>
       )}
-      {proposal && (
+
+      {proposal && !running && (
         <>
           <dl className="fact-list proposal-explanations" data-testid="proposal-explanations">
             {EXPLANATION_KEYS.map((key) => (
@@ -475,7 +549,7 @@ function StoryProposal({ draft, update }: StepProps) {
                     {d.status === 'pending' ? (
                       <span className="proposal-detail-actions">
                         <button type="button" className="secondary-button" onClick={() => update(decideProposalDetail(draft, i, true))}>
-                          Добавить в историю
+                          Добавить
                         </button>
                         <button type="button" className="secondary-button" onClick={() => update(decideProposalDetail(draft, i, false))}>
                           Не надо
@@ -505,7 +579,6 @@ export function BackgroundStep({ draft, update }: StepProps) {
   const aiReady = settingsProblems(ai.settings, ai.apiKey).length === 0
   return (
     <>
-      <BackstoryField draft={draft} update={update} />
       <div className="option-grid" role="radiogroup" aria-label="Предыстория">
         {Object.values(data.backgrounds).map((bg) => (
           <OptionCard
@@ -523,27 +596,26 @@ export function BackgroundStep({ draft, update }: StepProps) {
           optionId={CUSTOM_BACKGROUND_ID}
           selected={isCustom && !fromStory}
           onSelect={() => update(chooseCustomBackground(draft, 'manual', data))}
-          title="Своя предыстория"
+          title="Собрать вручную"
           meta="по шаблону правил 2024"
         >
-          Придумайте прошлое героя сами: характеристики, навыки, инструмент, черта и снаряжение.
+          Сами выберите характеристики, навыки, инструмент, черту и снаряжение на 50 зм.
         </OptionCard>
         <OptionCard
           optionId="from-story"
           selected={fromStory}
-          disabled={!aiReady}
+          wide
           onSelect={() => update(chooseCustomBackground(draft, 'story', data))}
-          title="По моей истории"
-          meta={aiReady ? 'ИИ подберёт по «Истории героя»' : 'нужен ключ API'}
+          title="Написать свою историю"
+          meta={aiReady ? 'ИИ подберёт механику по вашим словам' : 'без ключа API — механика вручную'}
         >
-          {aiReady
-            ? 'ИИ прочитает вашу историю и предложит предысторию по шаблону 2024 — с объяснением каждого выбора.'
-            : 'Недоступно без ведущего: укажите ключ API в «Настройки» → «Ведущий». История героя и своя предыстория работают и так.'}
+          Расскажите своими словами, кем был ваш герой до приключений, — ведущий подберёт предысторию по правилам 2024 и объяснит
+          каждый выбор, а потом будет вплетать ваше прошлое в сюжет.
         </OptionCard>
       </div>
 
-      {fromStory && <StoryProposal draft={draft} update={update} />}
-      {isCustom && (!fromStory || draft.backgroundProposal) && <CustomBackgroundForm draft={draft} update={update} />}
+      {fromStory && <StoryBackground draft={draft} update={update} aiReady={aiReady} />}
+      {isCustom && (!fromStory || draft.backgroundProposal || !aiReady) && <CustomBackgroundForm draft={draft} update={update} />}
 
       {selected && !isCustom && feat && (
         <Details title={selected.name}>
@@ -570,11 +642,13 @@ export function BackgroundStep({ draft, update }: StepProps) {
         </Details>
       )}
 
-      {selected && isCustom && (
+      {selected && isCustom && (!fromStory || draft.backgroundProposal || !aiReady) && (
         <section className="creation-details">
           <BonusChooser draft={draft} update={update} abilities={selected.abilities} />
         </section>
       )}
+
+      {selected && !fromStory && <OptionalBackstory draft={draft} update={update} />}
     </>
   )
 }

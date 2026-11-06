@@ -13,6 +13,7 @@ import {
   assignScore,
   autoEquip,
   buildCharacterSheet,
+  chooseCustomBackground,
   chooseAbilityMethod,
   chooseBackground,
   chooseClass,
@@ -484,4 +485,17 @@ describe('своя предыстория', () => {
     const d = updateCustomBackground(customDraft(), { items: [{ itemId: 'spellbook', quantity: 2 }] }, data)
     expect(stepProblems('background', d, data)).toEqual(['Снаряжение стоит 100 зм — больше 50 зм'])
   })
+
+describe('шаг предыстории: «Написать свою историю»', () => {
+  it('история обязательна; пока механики нет — подсказка подобрать или собрать вручную; та же история у всех вариантов', () => {
+    let d = chooseCustomBackground({ ...fighterDraft(), backgroundId: null }, 'story', data)
+    expect(stepProblems('background', d, data)).toEqual(['Напишите историю героя'])
+    d = { ...d, backstory: 'Бывший моряк, ищет брата.' }
+    expect(stepProblems('background', d, data)).toEqual(['Подберите предысторию по истории или соберите механику вручную'])
+    const manual = chooseCustomBackground(d, 'manual', data)
+    expect(manual.backstory).toBe('Бывший моряк, ищет брата.')
+    expect(stepProblems('background', manual, data)[0]).toBe('Введите название предыстории')
+  })
+})
+
 })

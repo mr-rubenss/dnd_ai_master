@@ -12,6 +12,7 @@ const PURPOSES: Record<string, string> = {
 const PART_LABELS: Record<string, string> = { ...PROMPT_PARTS, fragment: 'Фрагмент ленты', story: 'История', rules: 'Правила и промт' }
 const REASONS = { budget: 'запрос больше бюджета', 'context-error': 'ошибка «слишком длинный контекст»', size: 'разрослись сводка или факты' }
 
+const ATTEMPT_STATUS = { ok: 'ответ получен', timeout: 'тайм-аут', cancelled: 'отменено', error: 'ошибка' }
 const VERIFY = { ok: 'всё сходится', fixed: 'исправлено довызовом', unresolved: 'не сходится и после довызова' }
 const n = (v: number) => v.toLocaleString('ru-RU')
 const time = (at: number) => new Date(at).toLocaleTimeString('ru-RU')
@@ -49,6 +50,20 @@ function EntryView({ entry }: { entry: DevLogEntry }) {
           {entry.resummarized ? ' · сводка пересжата' : ''}
           {entry.factsMerged ? ' · факты объединены' : ''}
         </span>
+      </li>
+    )
+  if (entry.kind === 'attempt')
+    return (
+      <li className={`dev-log-entry${entry.status === 'ok' ? '' : ' is-error'}`} data-testid="dev-log-attempt" data-status={entry.status}>
+        <strong>
+          {time(entry.at)} · {entry.purpose} · {entry.model} · {(entry.durationMs / 1000).toFixed(1)} с · {ATTEMPT_STATUS[entry.status]}
+        </strong>
+        <span>
+          Запрос {n(entry.requestChars)} симв. · ответ {n(entry.responseChars)} симв.
+          {entry.firstChunkMs !== null ? ` · первый кусок через ${(entry.firstChunkMs / 1000).toFixed(1)} с` : ' · ни одного куска'}
+          {entry.reasoningChars ? ` · «размышления» модели: ${n(entry.reasoningChars)} симв.` : ''}
+        </span>
+        {entry.error && <span>{entry.error}</span>}
       </li>
     )
   if (entry.kind === 'tool')

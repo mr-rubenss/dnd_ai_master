@@ -147,3 +147,9 @@ export function parseAiSettings(raw: string | null): AiSettings {
     compactModel: str(src.compactModel, d.compactModel),
   }
 }
+
+/**
+ * Похоже на рассуждающую модель (сначала долго «думает», потом отвечает): deepseek-reasoner, *-r1, o1/o3/o4,
+ * *thinking*, qwq. Для неё подбор предыстории и проверки идут заметно дольше — предупреждаем игрока.
+ */
+export const isReasoningModel = (model: string) => /reason|(^|[-/:_.])r1\b|(^|[-/])o[134](\b|-)|think|qwq/i.test(model)

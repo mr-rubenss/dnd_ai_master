@@ -12,6 +12,7 @@ export type AiErrorKind =
   | 'server'
   | 'bad-response'
   | 'aborted'
+  | 'timeout' // модель не ответила вовремя (src/ai/timed.ts)
   | 'not-configured'
 
 const MESSAGES: Record<AiErrorKind, string> = {
@@ -27,6 +28,7 @@ const MESSAGES: Record<AiErrorKind, string> = {
   server: 'Сервер модели перегружен или недоступен. Попробуйте позже.',
   'bad-response': 'Модель прислала ответ в непонятном формате.',
   aborted: 'Запрос отменён.',
+  timeout: 'Модель не ответила вовремя.',
   'not-configured': 'Ведущий не настроен: укажите адрес API, модель и ключ в «Настройки» → «Ведущий».',
 }
 

@@ -9,16 +9,18 @@ interface Props {
   disabled?: boolean
   /** Для тестов и e2e: data-option. */
   optionId?: string
+  /** Крупная карточка на всю ширину сетки. */
+  wide?: boolean
 }
 
 /** Карточка варианта (класс, предыстория, вид…): нажатие выбирает её. */
-export function OptionCard({ selected, onSelect, title, meta, children, disabled, optionId }: Props) {
+export function OptionCard({ selected, onSelect, title, meta, children, disabled, optionId, wide }: Props) {
   return (
     <button
       type="button"
       role="radio"
       aria-checked={selected}
-      className={`option-card${selected ? ' is-selected' : ''}`}
+      className={`option-card${selected ? ' is-selected' : ''}${wide ? ' option-card--wide' : ''}`}
       onClick={onSelect}
       disabled={disabled}
       data-option={optionId}

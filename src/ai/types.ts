@@ -37,9 +37,20 @@ export interface AiRequest {
   /** Стриминг (по умолчанию — да): текст приходит по частям в `onText`. */
   stream?: boolean
   onText?: (delta: string) => void
+  /** После каждого куска ответа (текст, размышления, вызовы инструментов) — для индикатора и тайм-аута простоя. */
+  onProgress?: (progress: AiProgress) => void
   /** Перед автоматическим повтором (превышен лимит запросов, сервер перегружен). */
   onRetry?: (info: { attempt: number; delayMs: number; reason: string }) => void
   signal?: AbortSignal
+}
+
+/** Сколько уже пришло (нарастающим итогом). toolArgs — аргументы вызовов инструментов, как пришли (для показа по ходу). */
+export interface AiProgress {
+  events: number
+  textChars: number
+  reasoningChars: number
+  toolChars: number
+  toolArgs: string
 }
 
 /** Расход токенов. */

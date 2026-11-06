@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { AI_FORMATS, createMaster } from '../ai'
+import { useId, useState } from 'react'
+import { AI_FORMATS, AiError, createMaster } from '../ai'
 import { CHECK_TITLES, runConnectionCheck, type CheckId, type CheckResult } from '../ai/check'
 import {
   AI_PRESETS,
@@ -7,11 +7,17 @@ import {
   DEFAULT_TARGET_TOKENS,
   MIN_CONTEXT_WINDOW,
   MIN_TARGET_TOKENS,
+  isReasoningModel,
   settingsProblems,
   VERBOSITY, type AiPresetId, type AiProvider, type Verbosity } from '../ai/settings'
 import { aiSettingsStore, useAiSettings } from '../ai/settingsStore'
 import type { AiDiagnostics, AiFormat } from '../ai/types'
+import { timeoutMessage } from '../ai/timed'
+import { aiTimeouts } from '../ai/timeouts'
+import { timedFor } from '../game/masterSession'
+import { AiProgress, AiTaskError } from './AiTask'
 import { DevLogView } from './DevLogView'
+import { useAiTask } from './useAiTask'
 
 const STATUS_LABELS: Record<CheckResult['status'], string> = { ok: 'Да', warn: 'Частично', fail: 'Нет', skipped: '—' }
 const PROVIDERS: { id: AiProvider; name: string }[] = [
@@ -23,44 +29,62 @@ const PROVIDERS: { id: AiProvider; name: string }[] = [
 export function MasterSettings() {
   const { settings, apiKey } = useAiSettings()
   const [showKey, setShowKey] = useState(false)
-  const [checking, setChecking] = useState(false)
+  const task = useAiTask()
+  const checking = task.state.status === 'running'
   const [results, setResults] = useState<CheckResult[] | null>(null)
   const [diagnostics, setDiagnostics] = useState<AiDiagnostics | null>(null)
   const [copied, setCopied] = useState(false)
-  const abortRef = useRef<AbortController | null>(null)
   const id = useId()
   const update = aiSettingsStore.update
   const problems = settingsProblems(settings, apiKey)
   const preset = settings.provider === 'custom' ? null : AI_PRESETS[settings.provider]
 
-  useEffect(() => () => abortRef.current?.abort(), [])
 
+  /** Проверка подключения и «Диагностика» — со сроками, индикатором и «Отменить» (общий AiProgress). */
   const check = async () => {
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setChecking(true)
     setResults([])
-    try {
-      const master = createMaster(aiConnection(settings, apiKey))
-      await runConnectionCheck(master, setResults, controller.signal)
-    } finally {
-      if (!controller.signal.aborted) setChecking(false)
-    }
+    setDiagnostics(null)
+    const model = aiConnection(settings, apiKey).model
+    await task.run(`Проверяю: ${CHECK_TITLES.key.toLowerCase()}…`, async ({ signal, setStage }) => {
+      const master = timedFor(createMaster(aiConnection(settings, apiKey)), 'check', model, { signal })
+      const order = Object.keys(CHECK_TITLES) as CheckId[]
+      await runConnectionCheck(
+        master,
+        (r) => {
+          setResults(r)
+          const next = order[r.length]
+          if (next) setStage(`Проверяю: ${CHECK_TITLES[next].toLowerCase()}…`)
+        },
+        signal,
+      )
+    })
   }
 
   const diagnose = async () => {
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setChecking(true)
     setDiagnostics(null)
+    setResults(null)
     setCopied(false)
-    try {
-      setDiagnostics(await createMaster(aiConnection(settings, apiKey)).diagnose({ maxLines: 20, signal: controller.signal }))
-    } finally {
-      if (!controller.signal.aborted) setChecking(false)
-    }
+    const result = await task.run('Диагностика: жду сырой ответ сервера…', async ({ signal }) => {
+      // У диагностики свой срок: общий из конфига, по истечении — понятная ошибка.
+      const limit = aiTimeouts('default').totalMs
+      const controller = new AbortController()
+      const onAbort = () => controller.abort()
+      signal.addEventListener('abort', onAbort, { once: true })
+      let timedOut = false
+      const timer = window.setTimeout(() => {
+        timedOut = true
+        controller.abort()
+      }, limit)
+      try {
+        const d = await createMaster(aiConnection(settings, apiKey)).diagnose({ maxLines: 20, signal: controller.signal })
+        if (timedOut) throw new AiError('timeout', { message: timeoutMessage('total', limit) })
+        return d
+      } finally {
+        window.clearTimeout(timer)
+        signal.removeEventListener('abort', onAbort)
+      }
+    })
+    if (result.status === 'done') setDiagnostics(result.value)
   }
 
   const copyDiagnostics = async () => {
@@ -288,6 +312,18 @@ export function MasterSettings() {
             Диагностика
           </button>
         </div>
+        {isReasoningModel(aiConnection(settings, apiKey).model) && (
+          <p className="hint proposal-warning" data-testid="reasoning-model-warning">
+            «{aiConnection(settings, apiKey).model}» похожа на рассуждающую модель: перед ответом она долго «думает». Ведущий будет отвечать
+            медленнее и дороже; для игры лучше обычная модель.
+          </p>
+        )}
+        <AiProgress state={task.state} onCancel={task.cancel} />
+        <AiTaskError state={task.state}>
+          <button type="button" className="secondary-button" onClick={() => void check()}>
+            Попробовать ещё раз
+          </button>
+        </AiTaskError>
         {results && (
           <ul className="check-results" aria-live="polite" data-testid="check-results">
             {(Object.keys(CHECK_TITLES) as CheckId[]).map((checkId) => {

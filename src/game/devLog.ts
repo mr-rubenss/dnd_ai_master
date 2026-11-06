@@ -2,6 +2,7 @@
 // сколько токенов пришло из кэша поставщика, когда и сколько сжато. Только в памяти вкладки (до перезагрузки),
 // без текстов сообщений и без ключа. Показывается в «Настройки» → «Ведущий» → «Журнал разработчика».
 import { useSyncExternalStore } from 'react'
+import type { AttemptReport } from '../ai/timed'
 import type { RequestReport } from './masterTurn'
 
 export type DevLogEntry =
@@ -23,6 +24,8 @@ export type DevLogEntry =
   | { kind: 'error'; id: number; at: number; text: string }
   /** Вызов инструмента ведущим и его итог (без аргументов целиком — только итог движка). */
   | { kind: 'tool'; id: number; at: number; name: string; ok: boolean; detail: string }
+  /** Одна попытка запроса к модели: длительность, размеры, «размышления», чем кончилась. */
+  | ({ kind: 'attempt'; id: number; at: number; purpose: string; model: string } & AttemptReport)
   /** Сверка end_turn за ход. */
   | { kind: 'verify'; id: number; at: number; status: 'ok' | 'fixed' | 'unresolved'; problems?: string[] }
 

@@ -19,6 +19,8 @@ interface Props {
   onRewrite?: (messageId: string) => void
   /** Кнопка «Переписать ответ» недоступна (ведущий отвечает). */
   rewriteDisabled?: boolean
+  /** «Отменить» у ответа, который ещё идёт (обрывает запрос к модели). */
+  onCancel?: () => void
 }
 
 /** «Мастер думает…» с бегущими точками (анимация отключается настройкой «Анимации»). */
@@ -36,7 +38,7 @@ export function MasterThinking() {
 }
 
 /** Лента сообщений ведущего и игрока. Новые сообщения появляются снизу. */
-export function NarrationLog({ messages, pending = null, replacingId = null, onRewrite, rewriteDisabled }: Props) {
+export function NarrationLog({ messages, pending = null, replacingId = null, onRewrite, rewriteDisabled, onCancel }: Props) {
   const logRef = useRef<HTMLElement>(null)
   const isFirstRender = useRef(true)
 
@@ -90,6 +92,11 @@ export function NarrationLog({ messages, pending = null, replacingId = null, onR
         >
           <span className="message-author">{AUTHOR_LABELS.master}</span>
           <p className="message-text">{pending || <MasterThinking />}</p>
+          {onCancel && (
+            <button type="button" className="message-rewrite" onClick={onCancel} data-testid="master-cancel">
+              ✕ Отменить
+            </button>
+          )}
         </article>
       )}
     </section>

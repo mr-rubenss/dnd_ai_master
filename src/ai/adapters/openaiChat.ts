@@ -187,6 +187,10 @@ async function parseEvents(events: AsyncIterable<SseEvent>, request: AiRequest, 
       }
       if (choice?.finish_reason) finishReason = toFinish(choice.finish_reason)
     }
+    if (request.onProgress) {
+      const toolArgs = [...calls.values()].map((c) => c.args).join('\n')
+      request.onProgress({ events: parsed, textChars: text.length, reasoningChars: reasoning.length, toolChars: toolArgs.length, toolArgs })
+    }
   }
   if (parsed === 0) {
     throw new AiError('bad-response', {
@@ -222,7 +226,10 @@ async function parseBody(response: Response, request: AiRequest, apiKey: string)
     } catch {
       throw new AiError('bad-response', { stage: `ответ похож на JSON, но не разбирается: «${snippet(trimmed, apiKey)}»` })
     }
-    return parseCompletion(json, contentType, apiKey)
+    const result = parseCompletion(json, contentType, apiKey)
+    const toolArgs = result.toolCalls.map((c) => c.rawArguments).join('\n')
+    request.onProgress?.({ events: 1, textChars: result.text.length, reasoningChars: result.reasoning.length, toolChars: toolArgs.length, toolArgs })
+    return result
   }
   if (/^(data|event|:)/m.test(trimmed)) return parseEvents(sseFromText(text), request, apiKey, contentType || 'не указан')
   throw new AiError('bad-response', {

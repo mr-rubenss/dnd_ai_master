@@ -7,7 +7,10 @@ import { itemCatalog, rulesData } from '../data'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import {
   BACKGROUND_PROMPT,
+  backgroundShopItems,
   backstoryProblem,
+  choicesText,
+  partialName,
   MAX_PROPOSAL_ATTEMPTS,
   parseProposal,
   PROPOSE_TOOL,
@@ -130,6 +133,35 @@ describe('История героя → предыстория (ИИ)', () => {
     expect(second.input.name).toBe('Корабельный навигатор')
     expect(requests[0].messages[1].content).toContain('## Прошлое предложение (игрок просит предложить иначе — выбери заметно другое)')
     expect(requests[0].messages[1].content).toContain('"name":"Беглый матрос"')
+  })
+
+  it('этапы для индикатора: отправка → чтение (пошли куски) → проверка → исправление (попытка 2 из 3) → проверка', async () => {
+    const broken = { ...VALID, abilities: ['str'] }
+    const stages: string[] = []
+    const previews: (string | null)[] = []
+    const { master } = fakeMaster([
+      (req) => {
+        req.onProgress?.({ events: 1, textChars: 0, reasoningChars: 0, toolChars: 20, toolArgs: '{"name":"Беглый ма' })
+        return proposing(broken)()
+      },
+      proposing(VALID),
+    ])
+    await suggestBackground(master, BACKSTORY, rulesData, {
+      onStage: (stage, attempt) => stages.push(`${stage}:${attempt}`),
+      onProgress: (p) => previews.push(partialName(p.toolArgs)),
+    })
+    expect(stages).toEqual(['sending:1', 'reading:1', 'checking:1', 'fixing:2', 'checking:2'])
+    expect(previews).toEqual(['Беглый ма'])
+  })
+
+  it('запрос сокращён: в справочнике только то, что влезает в 50 зм, без доспехов; в схеме нет списка всех предметов', () => {
+    const text = choicesText(rulesData)
+    expect(text).not.toContain('plate-armor')
+    expect(text).not.toContain('chain-mail')
+    expect(text).toContain('rope — ')
+    expect(backgroundShopItems(rulesData).every((i) => i.cost! <= 50 && i.category !== 'armor')).toBe(true)
+    const schema = proposeTool(rulesData).parameters as { properties: { equipment: { items: { properties: { item: { enum?: unknown } } } } } }
+    expect(schema.properties.equipment.items.properties.item.enum).toBeUndefined()
   })
 
   it('дописанных деталей не больше трёх; схема инструмента — только варианты из данных игры', () => {

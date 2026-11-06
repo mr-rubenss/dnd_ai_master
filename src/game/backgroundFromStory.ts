@@ -4,7 +4,7 @@
 // Инструкция модели — src/ai/background-prompt.md. Работает через общий интерфейс src/ai/ (любой поставщик).
 import backgroundPrompt from '../ai/background-prompt.md?raw'
 import { AiError } from '../ai/errors'
-import type { AiMaster, AiMessage, AiTool, AiToolCall } from '../ai/types'
+import type { AiMaster, AiMessage, AiProgress, AiTool, AiToolCall } from '../ai/types'
 import { ABILITIES, ABILITY_NAMES, type Ability } from '../engine/abilities'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import type { RulesData } from '../types/rules'
@@ -85,7 +85,7 @@ export function proposeTool(data: RulesData): AiTool {
           items: {
             type: 'object',
             properties: {
-              item: { type: 'string', enum: purchasableItems(data.catalog).map((i) => i.id) },
+              item: { type: 'string', description: 'id предмета из списка «Предметы для снаряжения».' },
               quantity: { type: 'integer', minimum: 1 },
             },
             required: ['item', 'quantity'],
@@ -108,19 +108,26 @@ export function proposeTool(data: RulesData): AiTool {
   }
 }
 
+const shorten = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…` : text)
+
+/** Предметы, которые можно взять на 50 зм предыстории (без доспехов и того, что дороже бюджета). */
+export const backgroundShopItems = (data: RulesData) =>
+  purchasableItems(data.catalog).filter((i) => i.cost! <= BACKGROUND_TEMPLATE.budget && i.category !== 'armor')
+
 /** Справочник для модели: id и названия того, из чего можно выбирать. */
 export function choicesText(data: RulesData): string {
   const tools = toolIds(data).map((id) => `${id} — ${data.catalog[id].name}`)
-  const feats = originFeats(data).map((f) => `${f.id} — ${f.name}: ${f.description}`)
-  const items = purchasableItems(data.catalog)
+  const feats = originFeats(data).map((f) => `${f.id} — ${f.name}: ${shorten(f.description, 90)}`)
+  // Только то, что влезает в бюджет 50 зм (доспехи и дорогое — мимо), коротко: «id — название, цена».
+  const items = backgroundShopItems(data)
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
-    .map((i) => `${i.id} — ${i.name}, ${formatGold(i.cost!)} зм`)
+    .map((i) => `${i.id} — ${i.name}, ${formatGold(i.cost!)}`)
   return [
     `## Характеристики\n${ABILITIES.map((a) => `${a} — ${ABILITY_NAMES[a]}`).join('\n')}`,
     `## Навыки\n${SKILLS.map((s) => `${s} — ${SKILL_DEFINITIONS[s].name}`).join('\n')}`,
     `## Инструменты\n${tools.join('\n')}`,
     `## Черты происхождения\n${feats.join('\n')}`,
-    `## Предметы для снаряжения (id — название, цена)\n${items.join('\n')}`,
+    `## Предметы для снаряжения (id — название, цена в зм)\n${items.join('\n')}`,
   ].join('\n\n')
 }
 
@@ -175,11 +182,20 @@ function argumentsOf(call: AiToolCall | undefined, text: string): { args: unknow
   }
 }
 
+/** Этапы подбора — для индикатора: отправка, модель пишет, проверка по правилам, исправление (попытка n из N). */
+export type SuggestStage = 'sending' | 'reading' | 'checking' | 'fixing'
+
 export interface SuggestOptions {
   /** Прошлое предложение — для «Предложить иначе». */
   previous?: BackgroundProposal | null
   signal?: AbortSignal
+  onStage?: (stage: SuggestStage, attempt: number) => void
+  /** Куски ответа по мере генерации (для индикатора и показа названия до конца ответа). */
+  onProgress?: (progress: AiProgress) => void
 }
+
+/** Название предыстории из недописанных аргументов (поток) — чтобы показать его до конца ответа. */
+export const partialName = (toolArgs: string) => toolArgs.match(/"name"\s*:\s*"((?:[^"\\]|\\.)*)/)?.[1] ?? null
 
 /** Предложить предысторию по «Истории героя». Ошибка — AiError с понятным текстом (в т. ч. какие правила нарушены). */
 export async function suggestBackground(master: AiMaster, backstory: string, data: RulesData, options: SuggestOptions = {}): Promise<BackgroundProposal> {
@@ -201,7 +217,14 @@ export async function suggestBackground(master: AiMaster, backstory: string, dat
   ]
   let last: string[] = []
   for (let attempt = 0; attempt < MAX_PROPOSAL_ATTEMPTS; attempt++) {
+    options.onStage?.(attempt === 0 ? 'sending' : 'fixing', attempt + 1)
+    let reading = false
     const response = await master.complete({
+      onProgress: (p) => {
+        if (!reading && attempt === 0) options.onStage?.('reading', 1)
+        reading = true
+        options.onProgress?.(p)
+      },
       messages,
       tools: [tool],
       toolChoice: { name: PROPOSE_TOOL },
@@ -209,6 +232,7 @@ export async function suggestBackground(master: AiMaster, backstory: string, dat
       temperature: options.previous ? 1 : 0.7,
       signal: options.signal,
     })
+    options.onStage?.('checking', attempt + 1)
     const call = response.toolCalls.find((c) => c.name === PROPOSE_TOOL) ?? response.toolCalls[0]
     const { args, error } = argumentsOf(call, response.text)
     const parsed = error ? { problems: [error] } : parseProposal(args, data)
