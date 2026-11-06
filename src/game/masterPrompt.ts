@@ -60,13 +60,21 @@ export function masterSystemPrompt(story: StoryState, verbosity: Verbosity, ctx:
     .join('\n\n')
 }
 
+/** Пометки вопроса и ответа вне игры в запросе к модели. */
+export const OOC_QUESTION_MARK = '[Вопрос вне игры]'
+export const OOC_ANSWER_MARK = '[Ответ вне игры]'
+
 /** Сообщение ленты для модели: ведущий — assistant (с подсказками, как он их писал), игрок — user, броски — заметки. */
 export function chatToAi(story: StoryState, m: ChatMessage): AiMessage {
-  if (m.author === 'master') return { role: 'assistant', content: m.suggestions?.length ? `${m.text}\n\nВарианты: ${m.suggestions.join(' | ')}` : m.text }
+  if (m.author === 'master') {
+    if (m.ooc) return { role: 'assistant', content: `${OOC_ANSWER_MARK} ${m.text}` }
+    return { role: 'assistant', content: m.suggestions?.length ? `${m.text}\n\nВарианты: ${m.suggestions.join(' | ')}` : m.text }
+  }
   if (m.author === 'player') {
     const multi = story.party.length > 1
     const name = story.party.find((p) => p.heroId === m.heroId)?.character.name ?? 'Игрок'
-    return { role: 'user', content: multi && m.heroId ? `${name}: ${m.text}` : m.text }
+    const text = multi && m.heroId ? `${name}: ${m.text}` : m.text
+    return { role: 'user', content: m.ooc ? `${OOC_QUESTION_MARK} ${text}` : text }
   }
   return { role: 'user', content: `[Код игры] ${m.text}` }
 }

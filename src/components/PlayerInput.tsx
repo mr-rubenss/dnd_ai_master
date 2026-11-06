@@ -1,7 +1,15 @@
 import { useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 
+/** Что отправляет игрок: действие героя (ход) или вопрос мастеру вне игры (не ход — игра не меняется). */
+export type InputMode = 'action' | 'question'
+
+const MODES: { id: InputMode; label: string; placeholder: string }[] = [
+  { id: 'action', label: 'Действие героя', placeholder: 'Что вы делаете?' },
+  { id: 'question', label: 'Вопрос мастеру', placeholder: 'Вопрос вне игры: правила, что было раньше, что знает герой…' },
+]
+
 interface Props {
-  onSend: (text: string) => void
+  onSend: (text: string, mode: InputMode) => void
   disabled?: boolean
   /** Элемент слева от поля ввода (кнопка игрового стола). */
   leading?: ReactNode
@@ -12,6 +20,8 @@ interface Props {
 /** Поле ответа игрока. Enter — отправить, Shift+Enter — новая строка. */
 export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Props) {
   const [text, setText] = useState('')
+  const [mode, setMode] = useState<InputMode>('action')
+  const current = MODES.find((m) => m.id === mode)!
   const fieldRef = useRef<HTMLTextAreaElement>(null)
 
   const pickSuggestion = (suggestion: string) => {
@@ -26,8 +36,10 @@ export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Pro
   const submit = () => {
     const trimmed = text.trim()
     if (!trimmed || disabled) return
-    onSend(trimmed)
+    onSend(trimmed, mode)
     setText('')
+    // Вопрос вне игры — разовый: дальше снова действие героя.
+    setMode('action')
   }
 
   const handleSubmit = (event: FormEvent) => {
@@ -43,7 +55,22 @@ export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Pro
   }
 
   return (
-    <form className="player-input" onSubmit={handleSubmit}>
+    <form className={`player-input${mode === 'question' ? ' is-question' : ''}`} onSubmit={handleSubmit}>
+      <div className="segmented input-mode" role="radiogroup" aria-label="Что отправить" data-testid="input-mode">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            role="radio"
+            aria-checked={mode === m.id}
+            className={mode === m.id ? 'is-active' : undefined}
+            onClick={() => setMode(m.id)}
+            data-mode={m.id}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
       {leading}
       <textarea
         ref={fieldRef}
@@ -51,14 +78,14 @@ export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Pro
         disabled={disabled}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Что вы делаете?"
-        aria-label="Ваш ответ"
+        placeholder={current.placeholder}
+        aria-label={mode === 'question' ? 'Вопрос мастеру' : 'Ваш ответ'}
         rows={2}
       />
       <button type="submit" disabled={disabled || !text.trim()}>
         Отправить
       </button>
-      {suggestions.length > 0 && !disabled && (
+      {suggestions.length > 0 && !disabled && mode === 'action' && (
         <div className="player-suggestions" role="group" aria-label="Подсказки ведущего" data-testid="suggestions">
           {suggestions.map((suggestion) => (
             <button key={suggestion} type="button" className="suggestion-chip" onClick={() => pickSuggestion(suggestion)}>

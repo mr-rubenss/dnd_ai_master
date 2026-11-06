@@ -168,11 +168,12 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     case 'heroDied':
       return updateMember(state, action.heroId, (m) => ({ ...m, fallen: true, character: { ...m.character, hp: 0 } }))
     case 'playerSpoke': {
-      const message: ChatMessage = { id: action.messageId, author: 'player', text: action.text, heroId: action.heroId }
-      return { ...state, messages: [...state.messages, message] }
+      const message: ChatMessage = { id: action.messageId, author: 'player', text: action.text, heroId: action.heroId, ...(action.ooc ? { ooc: true } : {}) }
+      const { outOfGame: _o, ...rest } = state
+      return { ...rest, ...(action.ooc ? { outOfGame: true } : {}), messages: [...state.messages, message] }
     }
     case 'masterNarrated': {
-      const message: ChatMessage = { id: action.messageId, author: 'master', text: action.text }
+      const message: ChatMessage = { id: action.messageId, author: 'master', text: action.text, ...(action.ooc ? { ooc: true } : {}) }
       if (action.suggestions?.length) message.suggestions = action.suggestions
       return { ...state, messages: [...state.messages, message] }
     }
@@ -265,8 +266,11 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       }))
     case 'spellCast':
       return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, magic: spendCast(m.character.magic, action) } }))
-    case 'restRequested':
-      return { ...state, pendingRest: { kind: action.kind, hitDice: { ...action.hitDice }, requestedAt: action.at } }
+    case 'restRequested': {
+      // Просьба об отдыхе — действие героя в игре: вопрос вне игры закончен.
+      const { outOfGame: _o, ...rest } = state
+      return { ...rest, pendingRest: { kind: action.kind, hitDice: { ...action.hitDice }, requestedAt: action.at } }
+    }
     case 'restInterrupted': {
       const { pendingRest: _p, ...rest } = state
       return { ...rest, messages: [...state.messages, { id: action.messageId, author: 'system', text: `Отдых прерван: ${action.reason}` }] }
@@ -376,6 +380,11 @@ export interface ActionContext {
  * Проверяет действие по правилам и текущему состоянию истории. Возвращает причину отказа или null.
  * Так проверяются и действия игрока, и предложения ведущего, и (в будущем) действия, пришедшие по сети.
  */
+/** Что ведущий и движок могут записать во время вопроса вне игры: только ответ (и его переписывание). */
+const OUT_OF_GAME_ALLOWED = new Set<StoryEvent['type']>(['masterNarrated', 'masterRewritten'])
+export const OUT_OF_GAME_REFUSAL =
+  'Сейчас вопрос вне игры: игра не меняется — ни время, ни отдых, ни броски, ни предметы. Просто ответь игроку как мастер.'
+
 export function checkAction(state: StoryState | null, action: StoryAction, { catalog, rules }: ActionContext): string | null {
   if (action.type === 'storyCreated') {
     if (state) return 'История уже создана.'
@@ -390,6 +399,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
     return epilogueProblem(action.epilogue)
   }
   if (state.status === 'completed') return 'История завершена — в ней больше ничего не происходит.'
+  // Вопрос вне игры — не ход: ведущий и движок не меняют игру (время, отдых, броски, предметы…), только отвечают.
+  if (state.outOfGame && (action.author.kind === 'master' || action.author.kind === 'engine') && !OUT_OF_GAME_ALLOWED.has(action.type))
+    return OUT_OF_GAME_REFUSAL
 
   const member = (heroId: string) => state.party.find((m) => m.heroId === heroId)
   if (action.author.kind === 'player' && !member(action.author.heroId)) return 'Этого героя нет в отряде истории.'
@@ -406,6 +418,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (action.author.kind !== 'player' || action.author.heroId !== action.heroId) return 'Говорить за героя может только его игрок.'
       return isNonEmptyString(action.text) ? null : 'Пустая реплика.'
     case 'masterNarrated':
+      if (Boolean(action.ooc) !== Boolean(state.outOfGame))
+        return action.ooc ? 'Ответ вне игры — только на вопрос игрока вне игры.' : 'Сейчас вопрос вне игры — ответ ведущего тоже вне игры.'
+      if (action.ooc && action.suggestions?.length) return 'У ответа вне игры нет подсказок действий.'
       return isNonEmptyString(action.text) ? suggestionsProblem(action.suggestions) : 'Пустой текст ведущего.'
     case 'masterRewritten': {
       if (action.author.kind !== 'master') return 'Переписать ответ ведущего может только ведущий.'

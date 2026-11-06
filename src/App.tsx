@@ -16,7 +16,7 @@ import { GameClock } from './components/GameClock'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
-import { PlayerInput } from './components/PlayerInput'
+import { PlayerInput, type InputMode } from './components/PlayerInput'
 import { StartMenu } from './components/StartMenu'
 import { StoriesScreen } from './components/StoriesScreen'
 import { AiError } from './ai'
@@ -333,14 +333,16 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       setAiNotice(null)
       setReplacingId(null)
     }
+    // Вопрос вне игры: ответ — тоже вне игры; игра не меняется (ни отдыха, ни строки изменений, ни сжатия памяти).
+    const outOfGame = !rewriteId && Boolean(appStore.getState().active?.outOfGame)
     if (settingsProblems(ai.settings, ai.apiKey).length > 0) {
       timerRef.current = window.setTimeout(() => {
         const event = rewriteId
           ? ({ type: 'masterRewritten', messageId: rewriteId, text: STUB_REPLY } as const)
-          : ({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY } as const)
+          : ({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY, ...(outOfGame ? { ooc: true } : {}) } as const)
         appStore.dispatch(event, MASTER)
         // Без ведущего решать некому: отдых, о котором попросил игрок, просто проходит.
-        if (!rewriteId) completePendingRest()
+        if (!rewriteId && !outOfGame) completePendingRest()
         finish()
       }, 600)
       return
@@ -399,14 +401,16 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
             if (text)
               await appStore.dispatchTo(
                 story.id,
-                { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ...(suggestions.length ? { suggestions } : {}) },
+                outOfGame
+                  ? { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ooc: true }
+                  : { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ...(suggestions.length ? { suggestions } : {}) },
                 MASTER,
               )
             // Строка изменений за ход — после ответа ведущего: игрок видит, что рассказ отразился в листе.
             if (changes.length) await appStore.dispatchTo(story.id, { type: 'turnSummarized', messageId: crypto.randomUUID(), changes }, ENGINE)
             if (verification.status !== 'skipped') devLog.add({ kind: 'verify', ...verification })
-            // Ведущий не разрешил и не прервал отдых — отряд отдыхает.
-            completePendingRest()
+            // Ведущий не разрешил и не прервал отдых — отряд отдыхает (но не после ответа вне игры).
+            if (!outOfGame) completePendingRest()
           }
           ok = true
           break
@@ -428,7 +432,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       if (!controller.signal.aborted || cancelledRef.current) finish()
     }
     // Сжатие памяти — в фоне после ответа, игрок не ждёт.
-    if (ok) void compactNow('budget', session, false)
+    if (ok && !outOfGame) void compactNow('budget', session, false)
   }
 
   /**
@@ -517,8 +521,11 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     return null
   }
 
-  const handleSend = (text: string) => {
-    appStore.dispatch({ type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text }, player(lead.heroId))
+  const handleSend = (text: string, mode: InputMode = 'action') => {
+    appStore.dispatch(
+      { type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text, ...(mode === 'question' ? { ooc: true } : {}) },
+      player(lead.heroId),
+    )
     void askMaster()
   }
 

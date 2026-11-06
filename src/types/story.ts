@@ -107,6 +107,11 @@ export interface StoryState {
   epilogue?: StoryEpilogue
   /** Отдых, который попросил игрок: ждёт решения ведущего (прервать или дать отдохнуть). */
   pendingRest?: PendingRest
+  /**
+   * Последняя реплика игрока — вопрос вне игры: пока так, ведущий и движок не меняют игру (никаких инструментов,
+   * время не идёт). Снимается следующим действием героя (реплика в игре, просьба об отдыхе).
+   */
+  outOfGame?: boolean
   /** Память ведущего (сводка старой части ленты). Нет поля — сжатий ещё не было. */
   memory?: StoryMemory
   /**
@@ -179,9 +184,9 @@ export type StoryEvent =
   | { type: 'epilogueEdited'; epilogue: StoryEpilogue }
   /** Герой погиб. */
   | { type: 'heroDied'; heroId: string }
-  | { type: 'playerSpoke'; heroId: string; messageId: string; text: string }
+  | { type: 'playerSpoke'; heroId: string; messageId: string; text: string; ooc?: boolean }
   /** Ответ ведущего; suggestions — 2–3 подсказки действий для игрока (кнопки под полем ввода). */
-  | { type: 'masterNarrated'; messageId: string; text: string; suggestions?: string[] }
+  | { type: 'masterNarrated'; messageId: string; text: string; suggestions?: string[]; ooc?: boolean }
   /** Игрок попросил переписать последний ответ ведущего: новый текст на месте старого (что случилось — не меняется). */
   | { type: 'masterRewritten'; messageId: string; text: string; suggestions?: string[] }
   | { type: 'diceRolled'; roll: RollRecord }

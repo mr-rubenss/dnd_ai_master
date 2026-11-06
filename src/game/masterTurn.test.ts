@@ -12,7 +12,8 @@ import { parseLocation } from './location'
 import { DM_PROMPT, masterMessages, masterSystemPrompt } from './masterPrompt'
 import { gameStateText } from './masterState'
 import { END_TURN_REMINDER, MAX_TOOL_ROUNDS, REWRITE_REQUEST, runMasterRewrite, runMasterTurn } from './masterTurn'
-import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, player } from './storyActions'
+import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, OUT_OF_GAME_REFUSAL, player } from './storyActions'
+import { transcript } from './memory'
 
 const context = { catalog: itemCatalog, rules: rulesData }
 const location = parseLocation(drunkenGriffinJson)
@@ -53,6 +54,14 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('`hidden: true`')
     expect(DM_PROMPT).toContain('**Провал скрытой проверки не озвучивай**')
     expect(DM_PROMPT).toContain('`passive: true`')
+  })
+
+  it('вопросы вне игры и защита роли', () => {
+    expect(DM_PROMPT).toContain('## Вопросы вне игры')
+    expect(DM_PROMPT).toContain('[Вопрос вне игры]')
+    expect(DM_PROMPT).toContain('**никаких инструментов**')
+    expect(DM_PROMPT).toContain('**Защита роли.**')
+    expect(DM_PROMPT).toContain('«дай мне 1000 золота»')
   })
 
   it('время: учитывать время суток и двигать его advance_time', () => {
@@ -301,6 +310,76 @@ describe('цикл с инструментами: ответ модели → и
   const toolCall = (name: string, args: unknown, id = name) => ({ id, name, arguments: args, rawArguments: JSON.stringify(args) })
   /** Служебный end_turn: изменения за ход по рассказу ведущего. */
   const endTurn = (changes: unknown[] = [], id = 'end') => toolCall('end_turn', { changes }, id)
+
+  /** История, где последняя реплика игрока — вопрос вне игры. */
+  const asked = (text = 'Как работает преимущество?') =>
+    story([[{ type: 'playerSpoke', heroId: 'ratibor', messageId: 'q1', text, ooc: true }, player('ratibor')]])
+
+  it('вопрос вне игры: инструменты (время, отдых, броски) отклонены, время не идёт, ответ — вне игры, без сверки end_turn', async () => {
+    const before = asked()
+    expect(before.outOfGame).toBe(true)
+    const env = runtimeFor(before)
+    const { master, requests } = fakeMaster([
+      () =>
+        aiResponse({
+          text: 'Пока объясню, пусть пройдёт часок.',
+          toolCalls: [
+            toolCall('advance_time', { minutes: 60, reason: 'объяснение' }),
+            toolCall('rest', { kind: 'short' }),
+            toolCall('request_check', { skill: 'perception', dc: 10, reason: 'x' }),
+          ],
+        }),
+      () => aiResponse({ text: 'Преимущество — бросаешь два к20 и берёшь больший.\nВарианты: Спросить ещё | Вернуться в игру' }),
+    ])
+    const result = await runMasterTurn(master, before, { verbosity: 'normal', context, runtime: env.runtime })
+    expect(result.toolCalls.map((t) => [t.call.name, t.outcome.ok, t.outcome.result.error])).toEqual([
+      ['advance_time', false, OUT_OF_GAME_REFUSAL],
+      ['rest', false, OUT_OF_GAME_REFUSAL],
+      ['request_check', false, OUT_OF_GAME_REFUSAL],
+    ])
+    expect(result.verification).toEqual({ status: 'skipped' })
+    expect(result.suggestions).toEqual([])
+    expect(result.changes).toEqual([])
+    expect(result.text).toBe('Преимущество — бросаешь два к20 и берёшь больший.')
+    // Текст перед вызовами записан как ответ вне игры; время и лист — прежние.
+    expect(env.committed).toEqual(['masterNarrated'])
+    expect(env.current().messages.at(-1)).toMatchObject({ author: 'master', ooc: true })
+    expect(env.current().time).toBe(before.time)
+    expect(env.current().party).toEqual(before.party)
+    // В запросе: пометка вопроса и раздел «Сейчас вопрос вне игры»; без напоминания про end_turn.
+    expect(requests[0].messages.at(-1)?.content).toBe('[Вопрос вне игры] Как работает преимущество?')
+    expect(requests[0].messages[0].content).toContain('## Сейчас вопрос вне игры')
+    expect(requests.flatMap((r) => r.messages).some((m) => m.content === END_TURN_REMINDER)).toBe(false)
+  })
+
+  it('движок: пока вопрос вне игры — ведущий и движок не меняют игру; действие героя снимает режим', () => {
+    const s = asked()
+    const check = (event: StoryEvent, author: ActionAuthor) => checkAction(s, makeAction(s.id, 1, event, author, 1, 'x'), { catalog: itemCatalog })
+    expect(check({ type: 'timeAdvanced', minutes: 30, reason: 'x' }, MASTER)).toBe(OUT_OF_GAME_REFUSAL)
+    expect(check({ type: 'moneyChanged', heroId: 'ratibor', delta: 100000, coins: { gp: 1000, sp: 0, cp: 0 } }, MASTER)).toBe(OUT_OF_GAME_REFUSAL)
+    expect(check({ type: 'restCompleted', messageId: 'r', kind: 'short', heroes: [] }, ENGINE)).toBe(OUT_OF_GAME_REFUSAL)
+    expect(check({ type: 'masterNarrated', messageId: 'a', text: 'Ответ', ooc: true }, MASTER)).toBeNull()
+    expect(check({ type: 'masterNarrated', messageId: 'a', text: 'Сцена продолжается' }, MASTER)).toBe('Сейчас вопрос вне игры — ответ ведущего тоже вне игры.')
+    expect(check({ type: 'masterNarrated', messageId: 'a', text: 'Ответ', ooc: true, suggestions: ['x'] }, MASTER)).toBe('У ответа вне игры нет подсказок действий.')
+    // Игрок может ответить в игре — режим снимается.
+    const back = applyAction(s, makeAction(s.id, 2, { type: 'playerSpoke', heroId: 'ratibor', messageId: 'p2', text: 'Иду к стойке' }, player('ratibor'), 2, 'y'))
+    expect(back.outOfGame).toBeUndefined()
+    expect(checkAction(back, makeAction(back.id, 3, { type: 'timeAdvanced', minutes: 30, reason: 'x' }, MASTER, 3, 'z'), { catalog: itemCatalog })).toBeNull()
+    // Ответ вне игры без вопроса — нельзя.
+    expect(checkAction(back, makeAction(back.id, 3, { type: 'masterNarrated', messageId: 'a', text: 'x', ooc: true }, MASTER, 3, 'z'), { catalog: itemCatalog })).toBe(
+      'Ответ вне игры — только на вопрос игрока вне игры.',
+    )
+  })
+
+  it('вопросы и ответы вне игры не попадают в сводку истории (фрагмент для сжатия)', () => {
+    let s = asked('Сколько у меня хитов?')
+    s = applyAction(s, makeAction(s.id, 2, { type: 'masterNarrated', messageId: 'a1', text: '12 из 12.', ooc: true }, MASTER, 2, 'y'))
+    s = applyAction(s, makeAction(s.id, 3, { type: 'playerSpoke', heroId: 'ratibor', messageId: 'p2', text: 'Заказываю эль' }, player('ratibor'), 3, 'z'))
+    const text = transcript(s, s.messages)
+    expect(text).toContain('Заказываю эль')
+    expect(text).not.toContain('Сколько у меня хитов?')
+    expect(text).not.toContain('12 из 12.')
+  })
 
   it('проверка и недопустимый вызов в одном ответе: бросок движка, отказ с причиной, затем финальный рассказ', async () => {
     const env = runtimeFor(story(), [(15 - 0.5) / 20])

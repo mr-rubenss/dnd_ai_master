@@ -58,7 +58,9 @@ export const TASKS = {
 /** Лента для модели сжатия: кто что сказал, одной строкой на сообщение. */
 export function transcript(story: StoryState, messages: readonly ChatMessage[]): string {
   const names = new Map(story.party.map((m) => [m.heroId, m.character.name]))
+  // Вопросы и ответы вне игры — не события истории: в сводку они не попадают.
   return messages
+    .filter((m) => !m.ooc)
     .map((m) => {
       if (m.author === 'master') return `Ведущий: ${m.text}`
       if (m.author === 'player') return `Игрок${m.heroId && names.get(m.heroId) ? ` (${names.get(m.heroId)})` : ''}: ${m.text}`

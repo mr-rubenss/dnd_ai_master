@@ -22,7 +22,7 @@ import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
 import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
 import { recoveryText } from './features'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
-import { applyAction, checkAction, ENGINE, makeAction, MASTER, storyTime } from './storyActions'
+import { applyAction, checkAction, ENGINE, makeAction, MASTER, OUT_OF_GAME_REFUSAL, storyTime } from './storyActions'
 import { advanceProblem, durationText, MAX_ADVANCE_MINUTES, minutesUntilHour, minutesUntilPart, timeText, type PartOfDay } from '../engine/time'
 
 export { DAMAGE_TYPE_NAMES } from './damageTypes'
@@ -1067,6 +1067,8 @@ export function executeTool(state: StoryState, call: AiToolCall, ctx: ToolContex
   if (call.argumentsError || !call.arguments || typeof call.arguments !== 'object' || Array.isArray(call.arguments))
     return fail('Аргументы — некорректный JSON-объект.')
   if (state.status === 'completed') return fail('История завершена — в ней больше ничего не происходит.')
+  // Вопрос вне игры — не ход: ни один инструмент (даже бросок или время) не меняет игру.
+  if (state.outOfGame) return fail(OUT_OF_GAME_REFUSAL)
   try {
     const { events, result } = handler(state, call.arguments as Args, ctx)
     // Последняя линия обороны — те же правила, что для любых действий истории.

@@ -113,6 +113,8 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   let retryPending = false
   /** Раунд после напоминания про end_turn: рассказ уже в ленте — новый текст не дописываем (без повторов). */
   let afterReminder = false
+  /** Вопрос вне игры: не ход — инструменты движок отклонит, сверки end_turn и напоминаний нет, подсказок тоже. */
+  const outOfGame = Boolean(story.outOfGame)
 
   const finish = (text: string, suggestions: string[], response: AiResponse): MasterTurnResult => {
     if (!text && !narrated) emptyAnswer(response)
@@ -126,7 +128,9 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   const narrate = async (text: string, suggestions: string[]) => {
     if (!text) return
     const reason = await runtime!.commit(
-      { type: 'masterNarrated', messageId: runtime!.tools.newId(), text, ...(suggestions.length ? { suggestions } : {}) },
+      outOfGame
+        ? { type: 'masterNarrated', messageId: runtime!.tools.newId(), text, ooc: true }
+        : { type: 'masterNarrated', messageId: runtime!.tools.newId(), text, ...(suggestions.length ? { suggestions } : {}) },
       MASTER,
     )
     if (!reason) narrated = true
@@ -158,7 +162,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     })
     options.onRequest?.({ purpose: 'turn', parts: partsReport(plan.parts), rawTokens: plan.rawTokens, estimatedTokens: plan.estimatedTokens, dropped: plan.dropped, usage: response.usage })
     const split = splitSuggestions(response.text)
-    const { suggestions } = split
+    const suggestions = outOfGame ? [] : split.suggestions
     const text = afterReminder ? '' : split.text
     afterReminder = false
     const calls = toolsAllowed ? response.toolCalls : []
@@ -192,6 +196,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       results.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
     }
 
+    if (endCall && outOfGame) return finish(others.length ? '' : text, suggestions, response)
     if (endCall) {
       // Сверка: всё ли заявленное в end_turn сделано инструментами.
       const problems = verifyEndTurn(endCall.arguments, turnDelta(ledger!, ledgerOf(current(), catalog!)), current(), catalog!)
@@ -228,8 +233,8 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       continue
     }
 
-    // Ответ без вызовов. end_turn нет: один раз напоминаем (если инструменты ещё доступны).
-    if (!toolsAllowed || retried) {
+    // Ответ без вызовов. end_turn нет: один раз напоминаем (если инструменты ещё доступны; вне игры — не нужно).
+    if (!toolsAllowed || retried || outOfGame) {
       if (verification.status === 'skipped' && retried) verification = { status: 'unresolved', problems: retried }
       return finish(text, suggestions, response)
     }

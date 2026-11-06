@@ -210,6 +210,14 @@ export function locationText(story: StoryState): string {
     .join('\n')
 }
 
+/** Раздел состояния игры, пока игрок задаёт вопрос вне игры. */
+export const OUT_OF_GAME_SECTION = [
+  '## Сейчас вопрос вне игры',
+  'Последняя реплика игрока — вопрос тебе как мастеру ([Вопрос вне игры]): о правилах, о том, что было раньше, что знает герой.',
+  'Это не ход: ответь коротко и по делу от себя, как мастер за столом, без художественного рассказа и без продолжения сцены.',
+  'Игра не меняется: инструменты не вызывай (движок их отклонит), время не идёт. Не выдавай того, чего герой не знает.',
+].join('\n')
+
 /** Что обычно бывает в это время суток — подсказка ведущему. */
 const PART_OF_DAY_HINTS: Record<PartOfDay, string> = {
   morning: 'утро: лавки и рынки открываются, люди идут на работу, в тавернах завтракают',
@@ -236,6 +244,7 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
   const quests = story.world.quests.map((q) => `- ${q.title} — ${q.status === 'active' ? 'в работе' : q.status === 'completed' ? 'выполнено' : 'провалено'}`)
   return [
     '## Состояние игры (ведёт код; это главнее твоей памяти)',
+    story.outOfGame ? OUT_OF_GAME_SECTION : '',
     timeSectionText(story),
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,

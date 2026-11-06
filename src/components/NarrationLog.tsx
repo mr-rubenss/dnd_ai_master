@@ -67,8 +67,15 @@ export function NarrationLog({ messages, pending = null, replacingId = null, onR
         ) : message.check ? (
           <CheckCardView key={message.id} card={message.check} />
         ) : (
-          <article key={message.id} className={`message message--${message.author}`}>
-            <span className="message-author">{AUTHOR_LABELS[message.author]}</span>
+          <article key={message.id} className={`message message--${message.author}${message.ooc ? ' message--ooc' : ''}`} data-ooc={message.ooc ? 'true' : undefined}>
+            <span className="message-author">
+              {AUTHOR_LABELS[message.author]}
+              {message.ooc && (
+                <span className="ooc-badge" data-testid="ooc-badge">
+                  вне игры
+                </span>
+              )}
+            </span>
             <p className="message-text">{message.text}</p>
             {message.id === rewritableId && pending === null && (
               <button

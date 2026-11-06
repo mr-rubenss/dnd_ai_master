@@ -4619,3 +4619,51 @@ textarea {
   font-style: italic;
   color: var(--color-muted);
 }
+
+/* Режим «Вне игры»: переключатель у поля ввода и приглушённые вопросы и ответы в ленте. */
+.player-input .input-mode {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.player-input .input-mode button {
+  flex: 0 0 auto;
+  padding: var(--space-4) var(--space-10);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  font-size: var(--text-78);
+}
+
+.player-input.is-question textarea {
+  border-style: dashed;
+}
+
+.message--ooc {
+  background: var(--color-surface-tint);
+  border-left: 3px dashed var(--color-border-bright);
+}
+
+.message--ooc .message-author {
+  color: var(--color-muted);
+}
+
+.message--ooc .message-text {
+  font-family: var(--font-ui);
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.ooc-badge {
+  margin-left: var(--space-6);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-68);
+  font-style: normal;
+  text-transform: none;
+}
