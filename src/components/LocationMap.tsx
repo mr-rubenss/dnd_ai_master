@@ -33,6 +33,8 @@ interface MapEntity {
   name: string
   kindLabel: string
   description?: string
+  /** Чем занят прямо сейчас (НПС) — то, что видно глазами; остальная личность — только ведущему. */
+  activity?: string
   x: number
   y: number
   w: number
@@ -94,6 +96,7 @@ export function LocationMap({ location, player, doors = {} }: Props) {
         name: npc.name,
         kindLabel: `НПС · ${ATTITUDE_LABELS[npc.attitude ?? 'neutral']}`,
         description: npc.description,
+        activity: npc.activity,
         x: npc.x,
         y: npc.y,
         w: 1,
@@ -213,7 +216,7 @@ export function LocationMap({ location, player, doors = {} }: Props) {
 
           <g>
             {location.npcs.map((npc) => (
-              <g key={npc.id} {...interactiveProps(`npc:${npc.id}`)}>
+              <g key={npc.id} {...interactiveProps(`npc:${npc.id}`)} data-testid={`npc-${npc.id}`}>
                 <rect x={npc.x} y={npc.y} width={1} height={1} className="hit-area" />
                 <circle cx={npc.x + 0.5} cy={npc.y + 0.5} r={0.4} className={`npc-token npc-token--${npc.attitude ?? 'neutral'}`} />
                 <text x={npc.x + 0.5} y={npc.y + 0.52} className="npc-initial">
@@ -273,6 +276,11 @@ function MapTooltip({ entity, mapWidth, mapHeight }: TooltipProps) {
       {entity.kindLabel !== entity.name && <span className="map-tooltip-kind">{entity.kindLabel}</span>}
       <strong className="map-tooltip-name">{entity.name}</strong>
       {entity.description && <p className="map-tooltip-text">{entity.description}</p>}
+      {entity.activity && (
+        <p className="map-tooltip-text map-tooltip-activity" data-testid="npc-activity">
+          Сейчас: {entity.activity}
+        </p>
+      )}
     </div>
   )
 }

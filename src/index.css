@@ -4613,3 +4613,9 @@ textarea {
     font-size: var(--text-78);
   }
 }
+
+/* Чем занят НПС — в подсказке на карте. */
+.map-tooltip-activity {
+  font-style: italic;
+  color: var(--color-muted);
+}

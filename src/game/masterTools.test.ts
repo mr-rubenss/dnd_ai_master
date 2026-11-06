@@ -62,6 +62,7 @@ describe('описания инструментов', () => {
       'change_hp',
       'move_npc',
       'add_npc',
+      'update_npc',
       'remove_npc',
       'add_condition',
       'remove_condition',
@@ -446,5 +447,68 @@ describe('скрытые и пассивные проверки', () => {
     expect(miss.outcome.result.message).toMatch(/не говори об этом игроку/)
     expect(rejected(s, 'request_check', { ability: 'dex', saving_throw: true, dc: 12, reason: 'x', passive: true })).toMatch(/Спасбросок пассивным не бывает/)
     expect(rejected(s, 'request_check', { skill: 'perception', dc: 40, reason: 'x', passive: true })).toMatch(/Сл/)
+  })
+})
+
+describe('живые НПС: личность', () => {
+  const tavern = (state: StoryState) => state.world.locations[state.world.currentLocationId]
+
+  it('add_npc с личностью: поля сохраняются и попадают в выжимку ведущему', () => {
+    const { outcome, state } = run(fresh(), 'add_npc', {
+      name: 'Ведьма Марта',
+      x: 10,
+      y: 10,
+      attitude: 'neutral',
+      description: 'Сгорбленная старуха с корзиной трав.',
+      backstory: 'Лечила деревню, пока её не выгнали за неудачные роды. Теперь торгует травами по трактирам.',
+      goal: 'Продать корень мандрагоры подороже.',
+      fear: 'Охотники на ведьм.',
+      speech: 'Скрипучий голос, зовёт всех «милок», отвечает поговорками.',
+      activity: 'Раскладывает пучки трав на столе.',
+    })
+    expect(outcome.ok).toBe(true)
+    const npc = tavern(state).npcs.find((n) => n.name === 'Ведьма Марта')!
+    expect(npc).toMatchObject({ goal: 'Продать корень мандрагоры подороже.', speech: 'Скрипучий голос, зовёт всех «милок», отвечает поговорками.' })
+    const text = gameStateText(state, { catalog: itemCatalog, rules: rulesData })
+    expect(text).toContain('- Ведьма Марта (10, 10), отношение: нейтральное: Сгорбленная старуха с корзиной трав.\n  сейчас: Раскладывает пучки трав на столе. | цель: Продать корень мандрагоры подороже. | страх/слабость: Охотники на ведьм. | речь: Скрипучий голос')
+    expect(text).toContain('не выдавай сразу, раскрывай по крупицам')
+  })
+
+  it('слишком длинная личность отклоняется с просьбой сократить', () => {
+    expect(rejected(fresh(), 'add_npc', { name: 'Болтун', x: 10, y: 10, backstory: 'а'.repeat(401) })).toBe('«backstory» слишком длинное (401 симв., можно до 400) — сократи до сути.')
+  })
+
+  it('update_npc: занятие и отношение меняются, пустая строка убирает поле; нечего менять — отказ', () => {
+    let state = fresh()
+    state = run(state, 'update_npc', { npc: 'Гуннар', activity: 'Ушёл в погреб за бочонком.', attitude: 'neutral' }).state
+    const gunnar = tavern(state).npcs.find((n) => n.id === 'gunnar')!
+    expect(gunnar).toMatchObject({ activity: 'Ушёл в погреб за бочонком.', attitude: 'neutral' })
+    state = run(state, 'update_npc', { npc: 'gunnar', fear: '' }).state
+    expect(tavern(state).npcs.find((n) => n.id === 'gunnar')!.fear).toBeUndefined()
+    expect(rejected(state, 'update_npc', { npc: 'Гуннар' })).toBe('Нечего менять: укажи хотя бы одно поле.')
+    expect(rejected(state, 'update_npc', { npc: 'Никто', goal: 'x' })).toMatch(/НПС/)
+  })
+
+  it('старый НПС без личности — выжимка как раньше; в запрос идут только НПС текущей локации', () => {
+    const state = fresh()
+    const loc = tavern(state)
+    const plain = { ...loc.npcs[0], backstory: undefined, goal: undefined, fear: undefined, speech: undefined, activity: undefined }
+    const old: StoryState = { ...state, world: { ...state.world, locations: { ...state.world.locations, [loc.id]: { ...loc, npcs: [plain] } } } }
+    const text = gameStateText(old, { catalog: itemCatalog, rules: rulesData })
+    expect(text).toContain(`- ${plain.name} (${plain.x}, ${plain.y}), отношение: дружелюбное: ${plain.description}`)
+    expect(text).not.toContain('цель:')
+    // Другая локация мира с НПС — в запрос не попадает.
+    const elsewhere = { ...loc, id: 'far-away', name: 'Далёкая башня', npcs: [{ ...loc.npcs[1], id: 'hermit', name: 'Отшельник', goal: 'Секретная цель отшельника' }] }
+    const two: StoryState = { ...state, world: { ...state.world, locations: { ...state.world.locations, [elsewhere.id]: elsewhere } } }
+    expect(gameStateText(two, { catalog: itemCatalog, rules: rulesData })).not.toContain('Секретная цель отшельника')
+  })
+
+  it('событие npcUpdated проверяется: неизвестный НПС и неверное отношение — отказ', () => {
+    const s = fresh()
+    const loc = tavern(s)
+    const check = (event: StoryEvent) => checkAction(s, makeAction(s.id, 1, event, MASTER, 1, 'x'), { catalog: itemCatalog })
+    expect(check({ type: 'npcUpdated', locationId: loc.id, npcId: 'gunnar', changes: { goal: 'Новая цель' } })).toBeNull()
+    expect(check({ type: 'npcUpdated', locationId: loc.id, npcId: 'nobody', changes: { goal: 'x' } })).toBe('В этой локации нет такого НПС.')
+    expect(check({ type: 'npcUpdated', locationId: loc.id, npcId: 'gunnar', changes: { attitude: 'angry' as never } })).toMatch(/attitude/)
   })
 })

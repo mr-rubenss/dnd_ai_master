@@ -13,6 +13,7 @@ import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
 import { armorClass } from './character'
 import { currentLocation, storyTime } from './storyActions'
+import { npcDigest } from './npcs'
 import { outdoorLight, partOfDay, timeText, type PartOfDay } from '../engine/time'
 import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
@@ -30,7 +31,6 @@ export interface MasterStateContext {
   prices?: PriceList
 }
 
-const ATTITUDE: Record<string, string> = { friendly: 'дружелюбное', neutral: 'нейтральное', hostile: 'враждебное' }
 const DOOR_STATE: Record<DoorState, string> = { open: 'открыта', closed: 'закрыта', locked: 'заперта' }
 const cell = (p: { x: number; y: number }) => `(${p.x}, ${p.y})`
 
@@ -194,9 +194,7 @@ export function locationText(story: StoryState): string {
     ...[...plain].map(([name, n]) => `- ${name}${n > 1 ? ` ×${n}` : ''}`),
   ]
   const doors = location.doors.map((d) => `- ${d.name} — ${DOOR_STATE[doorStates[d.id] ?? d.state]}${d.description ? `: ${d.description}` : ''}`)
-  const npcs = location.npcs.map(
-    (n) => `- ${n.name} ${cell(n)}${n.attitude ? `, отношение: ${ATTITUDE[n.attitude] ?? n.attitude}` : ''}${n.description ? `: ${n.description}` : ''}`,
-  )
+  const npcs = location.npcs.map(npcDigest)
   return [
     `### ${location.name}`,
     location.description,
@@ -204,7 +202,9 @@ export function locationText(story: StoryState): string {
     rooms.length ? `Помещения: ${rooms.join('; ')}.` : '',
     objects.length ? `Объекты:\n${objects.join('\n')}` : '',
     doors.length ? `Двери:\n${doors.join('\n')}` : '',
-    npcs.length ? `НПС:\n${npcs.join('\n')}` : 'НПС: никого.',
+    npcs.length
+      ? `НПС (личность — твои заметки: не выдавай сразу, раскрывай по крупицам; реплики — из цели и манеры речи):\n${npcs.join('\n')}`
+      : 'НПС: никого.',
   ]
     .filter(Boolean)
     .join('\n')

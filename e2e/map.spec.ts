@@ -61,3 +61,20 @@ test('открытая дверь выглядит иначе, чем закры
   expect(openShot.equals(closedShot)).toBe(false)
   await testInfo.attach('открытая дверь', { body: openShot, contentType: 'image/png' })
 })
+
+test('подсказка НПС: видно, чем он занят сейчас, — а цель и страх только ведущему; занятие меняется', async ({ page, isMobile }) => {
+  const gunnar = page.getByTestId('npc-gunnar')
+  const show = async () => (isMobile ? gunnar.tap() : gunnar.hover())
+  await show()
+  const tooltip = page.locator('.map-tooltip')
+  await expect(tooltip).toContainText('Гуннар')
+  await expect(tooltip.getByTestId('npc-activity')).toHaveText('Сейчас: Протирает кружки за стойкой и краем глаза следит за человеком в капюшоне.')
+  await expect(tooltip).not.toContainText('долг гильдии')
+  await expect(tooltip).not.toContainText('наёмник')
+  await expectNoHorizontalScroll(page)
+
+  const location = await page.evaluate(() => (window as unknown as { __aiMaster: { getState(): { active: { world: { currentLocationId: string } } } } }).__aiMaster.getState().active.world.currentLocationId)
+  await act(page, { type: 'npcUpdated', locationId: location, npcId: 'gunnar', changes: { activity: 'Спустился в погреб за бочонком.' } }, MASTER)
+  // Подсказка открыта — занятие обновляется сразу.
+  await expect(page.locator('.map-tooltip').getByTestId('npc-activity')).toHaveText('Сейчас: Спустился в погреб за бочонком.')
+})

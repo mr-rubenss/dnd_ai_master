@@ -8,7 +8,10 @@ import type { Coins } from '../game/coins'
 import type { CharacterMagic } from './spells'
 import type { ArmorType } from './items'
 import type { ChatMessage, CheckCard, RollRecord, TurnChange } from './game'
-import type { CellPosition, DoorState, LocationData, MapObject, Npc } from './location'
+import type { CellPosition, DoorState, LocationData, MapObject, Npc, NpcAttitude, NpcPersonality } from './location'
+
+/** Что меняет npcUpdated: поля личности, описание, отношение. Пустая строка в текстовом поле — убрать его. */
+export type NpcChanges = Partial<NpcPersonality & { description: string; attitude: NpcAttitude }>
 
 export const STORY_TONES = ['dark-fantasy', 'light-adventure', 'detective', 'horror'] as const
 /** Тон истории — попадёт в системный промт ведущего. */
@@ -232,6 +235,8 @@ export type StoryEvent =
   /** Изменение объекта: название, описание, вид, положение, размер. */
   | { type: 'objectUpdated'; locationId: string; objectId: string; changes: Partial<Omit<MapObject, 'id'>> }
   | { type: 'npcMoved'; locationId: string; npcId: string; to: CellPosition }
+  /** Ведущий обновил НПС: занятие, цель, отношение и т. п. (пустая строка — убрать поле). */
+  | { type: 'npcUpdated'; locationId: string; npcId: string; changes: NpcChanges }
   | { type: 'doorChanged'; locationId: string; doorId: string; state: DoorState }
   | { type: 'factRecorded'; fact: WorldFact }
   /** Факт повторял уже записанный — старая запись обновлена новым текстом. */

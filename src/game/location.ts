@@ -12,6 +12,8 @@ import {
   DOOR_STATES,
   FLOOR_TYPES,
   NPC_ATTITUDES,
+  NPC_PERSONALITY_FIELDS,
+  NPC_PERSONALITY_LIMITS,
   OBJECT_TYPES,
   TILE_FLOOR,
   TILE_VOID,
@@ -320,6 +322,10 @@ export function parseLocation(raw: unknown): LocationData {
     checkId(npc.id, where)
     if (!isNonEmptyString(npc.name)) fail(`${where}: "name" должно быть непустой строкой`)
     checkOptionalText(npc, 'description', where)
+    for (const key of NPC_PERSONALITY_FIELDS) {
+      checkOptionalText(npc, key, where)
+      if (typeof npc[key] === 'string' && (npc[key] as string).length > NPC_PERSONALITY_LIMITS[key]) fail(`${where}: "${key}" — не длиннее ${NPC_PERSONALITY_LIMITS[key]} символов`)
+    }
     if (npc.attitude !== undefined && !isOneOf(NPC_ATTITUDES, npc.attitude)) {
       fail(`${where}: "attitude" должно быть одним из: ${NPC_ATTITUDES.join(', ')}`)
     }

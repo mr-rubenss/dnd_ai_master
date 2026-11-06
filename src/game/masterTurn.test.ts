@@ -40,6 +40,15 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('«ты входишь в таверну»')
   })
 
+  it('живые НПС: не как справочник, по крупицам, из цели и манеры речи; примеры «плоско» и «живо»', () => {
+    expect(DM_PROMPT).toContain('## Живые НПС')
+    expect(DM_PROMPT).toContain('НПС говорит не как справочник')
+    expect(DM_PROMPT).toContain('прошлое\n  открывает по крупицам')
+    expect(DM_PROMPT).toContain('**Плоско:**')
+    expect(DM_PROMPT).toContain('**Живо:**')
+    expect(DM_PROMPT).toContain('`update_npc`')
+  })
+
   it('скрытые и пассивные проверки: провал не озвучивать', () => {
     expect(DM_PROMPT).toContain('`hidden: true`')
     expect(DM_PROMPT).toContain('**Провал скрытой проверки не озвучивай**')

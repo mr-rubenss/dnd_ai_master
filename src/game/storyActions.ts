@@ -35,6 +35,7 @@ import { applyRestResult, featureResources, restRequestProblem, restResultProble
 import { castProblem, emptyMagic, magicProblems, needsSpellChoice, preparedProblems, spendCast, type MagicRules } from './magic'
 import { changeCoins, coinsFromCp, coinsValue, formatCoins, formatCp, gpToCp, isCoins } from './coins'
 import { isNonEmptyString } from './validation'
+import { applyNpcChanges, npcChangesProblem } from './npcs'
 import { advanceProblem, gameTime, LONG_REST_MINUTES, SHORT_REST_MINUTES, type GameTime } from '../engine/time'
 
 export const TONE_LABELS: Record<StoryTone, string> = {
@@ -322,6 +323,8 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         ...l,
         objects: l.objects.map((o) => (o.id === action.objectId ? { ...o, ...action.changes, id: o.id } : o)),
       }))
+    case 'npcUpdated':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, npcs: l.npcs.map((n) => (n.id === action.npcId ? applyNpcChanges(n, action.changes) : n)) }))
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]
       const npcs = location.npcs.map((n) => (n.id === action.npcId ? { ...n, x: action.to.x, y: action.to.y } : n))
@@ -592,13 +595,6 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
     case 'checkRolled':
       if (action.author.kind !== 'engine') return 'Кубики бросает только движок.'
       return needMember(action.check.heroId)
-    case 'npcAdded': {
-      const location = state.world.locations[action.locationId]
-      if (!location) return 'В мире этой истории нет такой локации.'
-      if (!isNonEmptyString(action.npc.id) || !isNonEmptyString(action.npc.name)) return 'У НПС нужны id и имя.'
-      if (location.npcs.some((n) => n.id === action.npc.id)) return `НПС с id «${action.npc.id}» уже есть.`
-      return isFloor(location, action.npc.x, action.npc.y) ? null : 'НПС может стоять только на полу.'
-    }
     case 'npcRemoved': {
       const location = state.world.locations[action.locationId]
       if (!location) return 'В мире этой истории нет такой локации.'
@@ -627,6 +623,21 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!isNonEmptyString(next.name)) return 'У объекта нужно название.'
       if (!(OBJECT_TYPES as readonly string[]).includes(next.type)) return `Неизвестный вид объекта «${next.type}».`
       return placementProblem(location, [], next, { objectId: o.id })
+    }
+    case 'npcUpdated': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      if (!location.npcs.some((n) => n.id === action.npcId)) return 'В этой локации нет такого НПС.'
+      return npcChangesProblem(action.changes)
+    }
+    case 'npcAdded': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      const personality = npcChangesProblem(action.npc)
+      if (personality) return personality
+      if (!isNonEmptyString(action.npc.id) || !isNonEmptyString(action.npc.name)) return 'У НПС нужны id и имя.'
+      if (location.npcs.some((n) => n.id === action.npc.id)) return `НПС с id «${action.npc.id}» уже есть.`
+      return isFloor(location, action.npc.x, action.npc.y) ? null : 'НПС может стоять только на полу.'
     }
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]

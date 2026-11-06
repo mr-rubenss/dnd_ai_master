@@ -9,8 +9,9 @@ import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition
 import { roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
-import { DOOR_STATES, NPC_ATTITUDES, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
-import type { ActionAuthor, PartyMember, StoryEvent, StoryState } from '../types/story'
+import { DOOR_STATES, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
+import { npcChangesProblem } from './npcs'
+import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
@@ -209,16 +210,42 @@ export const MASTER_TOOLS: AiTool[] = [
   },
   {
     name: 'add_npc',
-    description: 'Добавить на текущую карту нового НПС (вошёл в таверну, вылез из погреба) в свободную клетку пола.',
+    description:
+      'Добавить на текущую карту нового НПС (вошёл в таверну, вылез из погреба) в свободную клетку пола. ' +
+      'Сразу задай ему личность коротко: предыстория, цель, страх или слабость, манера речи, чем занят — так он будет живым, а не справочником.',
     parameters: object(
       {
         name: str('Имя.'),
         x: int('Столбец клетки.', 0),
         y: int('Строка клетки.', 0),
         attitude: oneOf(NPC_ATTITUDES, 'Отношение к героям.'),
-        description: str('Кто это, как выглядит.'),
+        description: str('Кто это, как выглядит — то, что герой видит с первого взгляда.'),
+        backstory: str('Предыстория, 2–3 коротких предложения: откуда, что пережил, почему здесь (до 400 символов).'),
+        goal: str('Чего хочет прямо сейчас — одной фразой (до 160 символов).'),
+        fear: str('Страх или слабость — одной фразой (до 160 символов).'),
+        speech: str('Манера речи: 2–3 черты — словечки, темп, как обращается к героям (до 200 символов).'),
+        activity: str('Чем занят прямо сейчас (до 160 символов) — это видно и игроку.'),
       },
       ['name', 'x', 'y'],
+    ),
+  },
+  {
+    name: 'update_npc',
+    description:
+      'Обновить НПС текущей локации, когда он изменился: занялся другим делом, добился цели или получил новую, сменил отношение к героям, ' +
+      'герой узнал о нём важное. Указывай только то, что меняется; пустая строка — убрать поле.',
+    parameters: object(
+      {
+        npc: str('id или имя НПС.'),
+        attitude: oneOf(NPC_ATTITUDES, 'Новое отношение к героям.'),
+        description: str('Новое описание внешности.'),
+        backstory: str('Предыстория, 2–3 коротких предложения: откуда, что пережил, почему здесь (до 400 символов).'),
+        goal: str('Чего хочет прямо сейчас — одной фразой (до 160 символов).'),
+        fear: str('Страх или слабость — одной фразой (до 160 символов).'),
+        speech: str('Манера речи: 2–3 черты — словечки, темп, как обращается к героям (до 200 символов).'),
+        activity: str('Чем занят прямо сейчас (до 160 символов) — это видно и игроку.'),
+      },
+      ['npc'],
     ),
   },
   {
@@ -358,6 +385,16 @@ const choice = <T extends string>(args: Args, key: string, values: readonly T[],
   const v = text(args, key, required)
   if (v === undefined) return undefined
   return (values as readonly string[]).includes(v) ? (v as T) : reject(`«${key}»: «${v}» — не из списка: ${values.join(', ')}.`)
+}
+/** Поля личности НПС из аргументов (с пустыми строками — для update_npc, где пустая строка убирает поле). */
+function personalityArgs(args: Args, keepEmpty = false): NpcPersonality {
+  const out: NpcPersonality = {}
+  for (const key of NPC_PERSONALITY_FIELDS) {
+    const v = args[key]
+    if (typeof v !== 'string') continue
+    if (v.trim() || keepEmpty) out[key] = v.trim()
+  }
+  return out
 }
 const norm = (s: string) => s.trim().toLowerCase().replace(/ё/g, 'е')
 
@@ -849,6 +886,9 @@ const HANDLERS: Record<string, Handler> = {
     const y = integer(args, 'y', true)!
     const attitude = choice<NpcAttitude>(args, 'attitude', NPC_ATTITUDES)
     const description = text(args, 'description')
+    const personality = personalityArgs(args)
+    const tooLong = npcChangesProblem(personality)
+    if (tooLong) reject(tooLong)
     const problem = placementProblem(location, heroesOnMap(state), { x, y }, { creature: true })
     if (problem) reject(problem)
     const id = slugId('npc', location.npcs, ctx.newId)
@@ -858,12 +898,28 @@ const HANDLERS: Record<string, Handler> = {
           event: {
             type: 'npcAdded',
             locationId: location.id,
-            npc: { id, name, x, y, ...(attitude ? { attitude } : {}), ...(description ? { description } : {}) },
+            npc: { id, name, x, y, ...(attitude ? { attitude } : {}), ...(description ? { description } : {}), ...personality },
           },
           author: MASTER,
         },
       ],
       result: { id, message: `${name} появляется в клетке (${x}, ${y}).` },
+    }
+  },
+
+  update_npc(state, args) {
+    const location = currentLocationOf(state)
+    const npc = findByName(location.npcs, text(args, 'npc', true)!, 'НПС')
+    const changes: NpcChanges = { ...personalityArgs(args, true) }
+    const attitude = choice<NpcAttitude>(args, 'attitude', NPC_ATTITUDES)
+    if (attitude) changes.attitude = attitude
+    if (typeof args.description === 'string') changes.description = args.description
+    if (Object.keys(changes).length === 0) reject('Нечего менять: укажи хотя бы одно поле.')
+    const problem = npcChangesProblem(changes)
+    if (problem) reject(problem)
+    return {
+      events: [{ event: { type: 'npcUpdated', locationId: location.id, npcId: npc.id, changes }, author: MASTER }],
+      result: { message: `${npc.name}: обновлено — ${Object.keys(changes).join(', ')}.` },
     }
   },
 

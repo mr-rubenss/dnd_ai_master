@@ -266,7 +266,7 @@ describe('сжатие памяти (подменённый ответ ИИ)', (
   })
 
   it('ошибка на втором фрагменте: уже сжатое остаётся', async () => {
-    const story = longStory(60)
+    const story = longStory(150)
     const env = runtimeFor(story)
     let fragments = 0
     const flaky = scriptedMaster((req) => {

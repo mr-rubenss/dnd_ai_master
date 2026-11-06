@@ -79,12 +79,39 @@ export interface MapObject extends CellPosition {
   h?: number
 }
 
-export interface Npc extends CellPosition {
+export interface Npc extends CellPosition, NpcPersonality {
   id: string
   name: string
   description?: string
   attitude?: NpcAttitude
 }
+
+/**
+ * Личность НПС — заметки ведущего, коротко (поля необязательны; у старых НПС их нет). В запрос ведущему идут только
+ * у НПС текущей локации. Игроку на карте виден лишь `activity` (чем занят) — остальное он узнаёт из разговоров.
+ */
+export interface NpcPersonality {
+  /** Предыстория: 2–3 предложения — откуда, что пережил, почему здесь. */
+  backstory?: string
+  /** Чего хочет прямо сейчас. */
+  goal?: string
+  /** Страх или слабость. */
+  fear?: string
+  /** Манера речи: 2–3 черты — словечки, темп, как обращается к героям. */
+  speech?: string
+  /** Чем занят прямо сейчас. */
+  activity?: string
+}
+
+/** Поля личности НПС и предельная длина каждого (чтобы не раздувать запрос). */
+export const NPC_PERSONALITY_LIMITS: Record<keyof NpcPersonality, number> = {
+  backstory: 400,
+  goal: 160,
+  fear: 160,
+  speech: 200,
+  activity: 160,
+}
+export const NPC_PERSONALITY_FIELDS = Object.keys(NPC_PERSONALITY_LIMITS) as (keyof NpcPersonality)[]
 
 /** Единичный отрезок стены: `h` — верхняя граница клетки (x, y), `v` — левая граница клетки (x, y). */
 export interface WallEdge {

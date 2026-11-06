@@ -261,3 +261,15 @@ describe('parseLocation: объекты и НПС на полу', () => {
     expect(() => parseLocation(room)).toThrow(/Некорректная локация:\n- doors\[0\] "door"/)
   })
 })
+
+describe('личность НПС', () => {
+  it('поля личности необязательны, строки с пределом длины; у таверны они заполнены', () => {
+    const npc = { id: 'old', name: 'Старик', x: 1, y: 1 }
+    expect(problemsOf(makeRoom({ npcs: [npc] }))).toEqual([])
+    expect(problemsOf(makeRoom({ npcs: [{ ...npc, goal: 'Найти внука', speech: 'Шамкает', activity: 'Дремлет' }] }))).toEqual([])
+    expect(problemsOf(makeRoom({ npcs: [{ ...npc, fear: 42 }] }))).toEqual(['npcs[0] "old": "fear" должно быть строкой'])
+    expect(problemsOf(makeRoom({ npcs: [{ ...npc, backstory: 'а'.repeat(401) }] }))).toEqual(['npcs[0] "old": "backstory" — не длиннее 400 символов'])
+    const tavern = parseLocation(drunkenGriffinJson)
+    for (const n of tavern.npcs) for (const key of ['backstory', 'goal', 'fear', 'speech', 'activity'] as const) expect(n[key], `${n.id}.${key}`).toBeTruthy()
+  })
+})
