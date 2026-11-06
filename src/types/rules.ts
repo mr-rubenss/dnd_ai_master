@@ -55,8 +55,25 @@ export interface ClassDefinition {
   fightingStyle?: boolean
   features: NamedText[]
   equipment: EquipmentOption[]
+  /** Умения с ограниченным числом применений («Второе дыхание», «Ярость»), восстанавливаются отдыхом. */
+  resources?: ClassResource[]
   /** Использование заклинаний (нет — класс без магии на 1-м уровне). */
   spellcasting?: ClassSpellcasting
+}
+
+/**
+ * Умение с применениями: число по уровням 1–20 (uses) или по модификатору характеристики (usesAbility, минимум 1).
+ * Короткий отдых возвращает shortRest применений (нет — только долгий), долгий — все.
+ * effect.healing — лечение броском движка (+ уровень класса при addLevel).
+ */
+export interface ClassResource {
+  id: string
+  name: string
+  description: string
+  uses?: number[]
+  usesAbility?: Ability
+  shortRest?: number
+  effect?: { healing: string; addLevel?: boolean }
 }
 
 /** Воинское оружие: всё, никакое, только лёгкое (Монах), фехтовальное или лёгкое (Плут). */

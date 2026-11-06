@@ -13,6 +13,7 @@ import { executeTool, TURN_TOOLS, type ToolContext, type ToolOutcome } from './m
 import { changeList, END_TURN, ledgerOf, turnDelta, verifyEndTurn } from './turnChanges'
 import { isObject } from './validation'
 import { MASTER } from './storyActions'
+import { changeNames } from './rest'
 
 /** Сколько раундов «вызовы инструментов → результаты» за один ход; последний раунд — уже без инструментов. */
 export const MAX_TOOL_ROUNDS = 4
@@ -116,8 +117,8 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   const finish = (text: string, suggestions: string[], response: AiResponse): MasterTurnResult => {
     if (!text && !narrated) emptyAnswer(response)
     const delta = ledger ? turnDelta(ledger, ledgerOf(current(), catalog!)) : null
-    const spellNames = runtime?.tools.rules ? Object.fromEntries(Object.values(runtime.tools.rules.spells).map((sp) => [sp.id, sp.name])) : undefined
-    const changes = delta ? changeList(delta, current(), catalog!, reasons, spellNames) : []
+    const names = runtime?.tools.rules ? changeNames(runtime.tools.rules) : undefined
+    const changes = delta ? changeList(delta, current(), catalog!, reasons, names?.spells, names?.features) : []
     return { text, suggestions, truncated: response.finishReason === 'length', toolCalls, changes, verification }
   }
 

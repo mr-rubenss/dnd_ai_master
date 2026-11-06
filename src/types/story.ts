@@ -101,8 +101,38 @@ export interface StoryState {
   finds?: StoryFind[]
   /** Итог — у завершённой истории. */
   epilogue?: StoryEpilogue
+  /** Отдых, который попросил игрок: ждёт решения ведущего (прервать или дать отдохнуть). */
+  pendingRest?: PendingRest
   /** Память ведущего (сводка старой части ленты). Нет поля — сжатий ещё не было. */
   memory?: StoryMemory
+}
+
+export type RestKind = 'short' | 'long'
+
+export interface PendingRest {
+  kind: RestKind
+  /** Сколько костей хитов тратит каждый герой (короткий отдых). */
+  hitDice: Record<string, number>
+  requestedAt: number
+}
+
+/** Что дал отдых одному герою — всё посчитано движком заранее, применение детерминировано. */
+export interface RestHeroResult {
+  heroId: string
+  /** Хиты: прибавка (не выше максимума). */
+  hpGained: number
+  /** Короткий отдых: броски костей хитов (итог каждой, с модификатором Тел). */
+  hitDiceRolls: number[]
+  /** Долгий отдых: возвращено костей хитов. */
+  hitDiceRegained: number
+  /** Ячейки: все (долгий) или магии договора (короткий у Колдуна). */
+  restoreSlots: boolean
+  /** Бесплатные сотворения врождённых заклинаний (долгий). */
+  restoreFreeCasts: boolean
+  /** Возвращено применений умений: id → сколько. */
+  resources: Record<string, number>
+  /** Снят уровень Истощения (долгий). */
+  exhaustionRemoved: boolean
 }
 
 /**
@@ -160,6 +190,14 @@ export type StoryEvent =
   | { type: 'preparedSpellsChanged'; heroId: string; prepared: string[] }
   /** Герой сотворил заклинание: потрачена ячейка (slotLevel), бесплатное сотворение (freeKey) или ритуал; у заговора — ничего. */
   | { type: 'spellCast'; heroId: string; spellId: string; slotLevel: number | null; freeKey: string | null; ritual: boolean }
+  /** Игрок попросил отдых; ведущий решает, безопасно ли (interrupt_rest — прервать). */
+  | { type: 'restRequested'; kind: RestKind; hitDice: Record<string, number> }
+  /** Отдых прерван ведущим (засада, шум, стража) — ничего не восстановлено. */
+  | { type: 'restInterrupted'; messageId: string; reason: string }
+  /** Отдых окончен: что восстановилось у каждого героя (броски — в diceRolled перед этим). */
+  | { type: 'restCompleted'; messageId: string; kind: RestKind; heroes: RestHeroResult[] }
+  /** Герой применил умение класса («Второе дыхание»). */
+  | { type: 'featureUsed'; heroId: string; featureId: string }
   /** Строка изменений за ход ведущего — системное сообщение в ленте. */
   | { type: 'turnSummarized'; messageId: string; changes: TurnChange[] }
   /** Урон (с типом) или лечение; хиты не уходят ниже 0 и выше максимума. */

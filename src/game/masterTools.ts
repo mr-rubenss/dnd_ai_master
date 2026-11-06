@@ -17,6 +17,7 @@ import { placementProblem } from './mapPlacement'
 import type { PriceList } from './prices'
 import { END_TURN_TOOL } from './turnChanges'
 import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
+import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER } from './storyActions'
 
@@ -122,6 +123,35 @@ export const MASTER_TOOLS: AiTool[] = [
       },
       ['spell'],
     ),
+  },
+  {
+    name: 'rest',
+    description:
+      'Отдых отряда: short — короткий (1 час), long — долгий (8 часов). Вызывай, когда игрок просит отдохнуть или отряд ложится спать, ' +
+      'и это место достаточно безопасно. Если игрок уже нажал «Отдых» — этим вызовом ты разрешаешь его отдых. Что восстановилось ' +
+      '(хиты, кости хитов, ячейки, умения), посчитает движок. Помешал кто-то — вызови interrupt_rest вместо этого.',
+    parameters: object(
+      {
+        kind: oneOf(['short', 'long'], 'short — короткий (1 час), long — долгий (8 часов).'),
+        hit_dice: int('Короткий отдых: сколько костей хитов тратит герой игрока (по умолчанию — сколько выбрал игрок, иначе 0).', 0, 20),
+        reason: str('Где и как отдыхают, коротко.'),
+      },
+      ['kind'],
+    ),
+  },
+  {
+    name: 'interrupt_rest',
+    description:
+      'Прервать отдых, который попросил игрок: засада, шум, стража, непогода — опасное место. Ничего не восстановится. ' +
+      'Укажи причину и опиши её в рассказе.',
+    parameters: object({ reason: str('Что помешало, коротко: «в дверь ломятся стражники».') }, ['reason']),
+  },
+  {
+    name: 'use_feature',
+    description:
+      'Герой применил умение класса с ограниченным числом применений («Второе дыхание», «Ярость», «Бардовское вдохновение» — список в листе героя). ' +
+      'Движок спишет применение и, если умение лечит, сам бросит лечение. Применений нет — откажет.',
+    parameters: object({ hero: HERO, feature: str('id или название умения.'), reason: str('Зачем.') }, ['feature']),
   },
   {
     name: 'change_hp',
@@ -607,6 +637,62 @@ const HANDLERS: Record<string, Handler> = {
     result.slots_left = after.map((s) => `${s.level}-й круг: ${s.left}/${s.total}`).join(', ') || 'нет ячеек'
     result.message = `${c.name} творит «${spell!.name}» (${result.spent}). ${notes.join(' ')}`
     return { events, result }
+  },
+
+  rest(state, args, ctx) {
+    const rules = ctx.rules ?? reject('Отдых недоступен: нет данных правил.')
+    const pending = state.pendingRest
+    const kind = choice<'short' | 'long'>(args, 'kind', ['short', 'long']) ?? pending?.kind ?? reject('Нужен параметр «kind».')
+    if (pending && pending.kind !== kind)
+      reject(`Игрок попросил ${REST_NAMES[pending.kind].toLowerCase()}, а не ${REST_NAMES[kind!].toLowerCase()}: разреши его (kind: ${pending.kind}) или прерви (interrupt_rest).`)
+    const lead = state.party.find((m) => !m.fallen)
+    const hitDice = { ...(pending?.hitDice ?? {}) }
+    const asked = integer(args, 'hit_dice')
+    if (asked !== undefined && lead && kind === 'short') hitDice[lead.heroId] = asked
+    if (!pending) {
+      const problem = restRequestProblem(state, kind!, hitDice, rules)
+      if (problem) reject(problem)
+    }
+    const events = restEvents(state, kind!, hitDice, { rules, rng: ctx.rng, now: ctx.now, newId: ctx.newId }).map((event) => ({ event, author: ENGINE }))
+    const done = events.at(-1)!.event as Extract<StoryEvent, { type: 'restCompleted' }>
+    const lines = done.heroes.map((r) => {
+      const m = state.party.find((x) => x.heroId === r.heroId)!
+      const hd = hitDiceOf(m.character, rules)
+      return `${m.character.name}: +${r.hpGained} хитов${r.hitDiceRolls.length ? ` (кости хитов: ${r.hitDiceRolls.join(' + ')}; осталось ${hd.left - r.hitDiceRolls.length}/${hd.total})` : ''}${r.restoreSlots && Object.keys(m.character.magic?.slotsUsed ?? {}).length ? ', ячейки восстановлены' : ''}${Object.keys(r.resources).length ? ', умения восстановлены' : ''}${r.exhaustionRemoved ? ', Истощение −1' : ''}`
+    })
+    return { events, result: { kind, message: `${REST_NAMES[kind!]} окончен. ${lines.join('; ')}. Опиши отдых и что было потом.` } }
+  },
+
+  interrupt_rest(state, args, ctx) {
+    if (!state.pendingRest) reject('Сейчас никто не отдыхает — прерывать нечего.')
+    const reason = text(args, 'reason', true)!
+    return {
+      events: [{ event: { type: 'restInterrupted', messageId: ctx.newId(), reason }, author: MASTER }],
+      result: { message: `Отдых прерван: ${reason}. Ничего не восстановлено — опиши, что случилось.` },
+    }
+  },
+
+  use_feature(state, args, ctx) {
+    const rules = ctx.rules ?? reject('Умения недоступны: нет данных правил.')
+    const member = heroOf(state, args)
+    const query = text(args, 'feature', true)!
+    const states = featureResources(member.character, rules)
+    const found = states.find((r) => r.resource.id === query || norm(r.resource.name) === norm(query))
+    if (!found)
+      reject(`У ${member.character.name} нет умения «${query}» с применениями.${states.length ? ` Есть: ${states.map((r) => `${r.resource.name} (${r.resource.id})`).join(', ')}.` : ''}`)
+    const { resource, left, max } = found!
+    if (left <= 0) reject(`«${resource.name}» у ${member.character.name} потрачено (0/${max}) — восстанавливается ${resource.shortRest ? 'коротким или долгим' : 'долгим'} отдыхом.`)
+    const events: ToolEvent[] = [{ event: { type: 'featureUsed', heroId: member.heroId, featureId: resource.id }, author: MASTER }]
+    let healing = ''
+    if (resource.effect?.healing) {
+      const lvl = member.character.level
+      const r = roll(`${resource.effect.healing}${resource.effect.addLevel ? `+${lvl}` : ''}`, { rng: ctx.rng })
+      events.push({ event: { type: 'diceRolled', roll: { id: `roll-${ctx.newId()}`, label: `${resource.name}: лечение`, timestamp: ctx.now(), result: r } }, author: ENGINE })
+      const hp = hpEvents(member, 'healing', r.total, undefined, ENGINE)
+      events.push(...hp.events)
+      healing = ` Лечение ${r.total}, хиты ${hp.hp}/${member.character.maxHp}.`
+    }
+    return { events, result: { left: left - 1, max, message: `${member.character.name} применяет «${resource.name}» (осталось ${left - 1}/${max}).${healing}` } }
   },
 
   change_hp(state, args) {

@@ -142,6 +142,8 @@ export function parseCharacterSheet(input: unknown, catalog: ItemCatalog): Chara
       }
     }
 
+    if (ch.hitDiceUsed !== undefined && (!isInt(ch.hitDiceUsed) || ch.hitDiceUsed < 0)) fail('character.hitDiceUsed: целое не меньше 0')
+    if (ch.featureUses !== undefined && !isCounter(ch.featureUses)) fail('character.featureUses: { умение: потрачено }')
     if (ch.magic !== undefined) for (const problem of magicShapeProblems(ch.magic)) fail(`character.magic: ${problem}`)
 
     const prof = ch.proficiencies

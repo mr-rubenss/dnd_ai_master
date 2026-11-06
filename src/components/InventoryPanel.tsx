@@ -10,6 +10,7 @@ import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types
 import type { StoryMemory, WorldFact } from '../types/story'
 import { AdventureJournal } from './AdventureJournal'
 import { MagicPanel } from './MagicPanel'
+import { ResourcesSection } from './RestPanel'
 import { hasMagic, needsSpellChoice } from '../game/magic'
 import { CharacterStats } from './CharacterStats'
 import { Flash } from './Flash'
@@ -206,7 +207,12 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
         </div>
 
         <div id="sheet-panel-stats" role="tabpanel" aria-labelledby="sheet-tab-stats" hidden={tab !== 'stats'}>
-          {tab === 'stats' && <CharacterStats character={character} />}
+          {tab === 'stats' && (
+            <>
+              <ResourcesSection character={character} />
+              <CharacterStats character={character} />
+            </>
+          )}
         </div>
 
         <div id="sheet-panel-equipment" role="tabpanel" aria-labelledby="sheet-tab-equipment" hidden={tab !== 'equipment'}>

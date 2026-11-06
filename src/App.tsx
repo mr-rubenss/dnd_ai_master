@@ -7,6 +7,10 @@ import { EpilogueDialog } from './components/EpilogueDialog'
 import { HeroesScreen } from './components/HeroesScreen'
 import { InventoryPanel } from './components/InventoryPanel'
 import { SpellChoiceDialog } from './components/MagicPanel'
+import { RestButton, RestDialog } from './components/RestPanel'
+import { changeNames, REST_NAMES, restBlocker, restEvents } from './game/rest'
+import { changeList, ledgerOf, turnDelta } from './game/turnChanges'
+import type { RestKind } from './types/story'
 import { needsSpellChoice } from './game/magic'
 import type { CharacterMagic } from './types/spells'
 import { MapPanel } from './components/MapPanel'
@@ -334,6 +338,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
           ? ({ type: 'masterRewritten', messageId: rewriteId, text: STUB_REPLY } as const)
           : ({ type: 'masterNarrated', messageId: crypto.randomUUID(), text: STUB_REPLY } as const)
         appStore.dispatch(event, MASTER)
+        // Без ведущего решать некому: отдых, о котором попросил игрок, просто проходит.
+        if (!rewriteId) completePendingRest()
         finish()
       }, 600)
       return
@@ -398,6 +404,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
             // Строка изменений за ход — после ответа ведущего: игрок видит, что рассказ отразился в листе.
             if (changes.length) await appStore.dispatchTo(story.id, { type: 'turnSummarized', messageId: crypto.randomUUID(), changes }, ENGINE)
             if (verification.status !== 'skipped') devLog.add({ kind: 'verify', ...verification })
+            // Ведущий не разрешил и не прервал отдых — отряд отдыхает.
+            completePendingRest()
           }
           ok = true
           break
@@ -476,6 +484,38 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   const lastMessage = lastNarrative(story.messages)
   const suggestions = lastMessage?.author === 'master' && !waiting ? (lastMessage.suggestions ?? []) : []
 
+  /** Окно «Отдых». */
+  const [restOpen, setRestOpen] = useState(false)
+
+  /** Завершить отдых, о котором попросил игрок: броски движка, итог и строка изменений «что восстановилось». */
+  const completePendingRest = () => {
+    const current = appStore.getState().active
+    if (!current || current.id !== story.id || !current.pendingRest) return
+    const { kind, hitDice } = current.pendingRest
+    const events = restEvents(current, kind, hitDice, { rules: rulesData, now: () => Date.now(), newId: () => crypto.randomUUID() })
+    for (const event of events) {
+      const reason = appStore.dispatch(event, ENGINE)
+      if (reason) {
+        setAiError(`Отдых не удался: ${reason}`)
+        return
+      }
+    }
+    const after = appStore.getState().active!
+    const names = changeNames(rulesData)
+    const changes = changeList(turnDelta(ledgerOf(current, itemCatalog), ledgerOf(after, itemCatalog)), after, itemCatalog, new Map(), names.spells, names.features)
+    if (changes.length) appStore.dispatch({ type: 'turnSummarized', messageId: crypto.randomUUID(), changes }, ENGINE)
+  }
+
+  /** Игрок просит отдых: реплика в ленте, просьба (pendingRest) — и ведущий решает, безопасно ли здесь. */
+  const handleRest = (kind: RestKind, hitDice: number): string | null => {
+    const reason = appStore.dispatch({ type: 'restRequested', kind, hitDice: hitDice > 0 ? { [lead.heroId]: hitDice } : {} }, player(lead.heroId))
+    if (reason) return reason
+    const text = `Отдыхаем: ${REST_NAMES[kind].toLowerCase()}${hitDice > 0 ? `, трачу костей хитов: ${hitDice}` : ''}.`
+    appStore.dispatch({ type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text }, player(lead.heroId))
+    void askMaster()
+    return null
+  }
+
   const handleSend = (text: string) => {
     appStore.dispatch({ type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text }, player(lead.heroId))
     void askMaster()
@@ -545,7 +585,21 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
                 </button>
               </div>
             ) : (
-              <PlayerInput onSend={handleSend} disabled={waiting} suggestions={suggestions} leading={<DiceTray rolls={story.rolls} onRoll={handleRoll} />} />
+              <PlayerInput
+                onSend={handleSend}
+                disabled={waiting}
+                suggestions={suggestions}
+                leading={
+                  <>
+                    <DiceTray rolls={story.rolls} onRoll={handleRoll} />
+                    <RestButton
+                      pending={Boolean(story.pendingRest)}
+                      disabled={waiting || Boolean(story.pendingRest) || story.party.every((m) => restBlocker(m))}
+                      onClick={() => setRestOpen(true)}
+                    />
+                  </>
+                }
+              />
             )}
           </section>
         </main>
@@ -559,6 +613,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
           onChooseSpells={readOnly ? undefined : () => setSpellDialog(true)}
         />
       </div>
+      {restOpen && !readOnly && <RestDialog character={lead.character} onRest={handleRest} onClose={() => setRestOpen(false)} />}
       {spellDialog && !readOnly && needsSpellChoice(lead.character, rulesData) && (
         <SpellChoiceDialog character={lead.character} onSubmit={chooseSpells} onClose={() => setSpellDialog(false)} />
       )}

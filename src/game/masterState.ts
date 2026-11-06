@@ -13,6 +13,7 @@ import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
 import { armorClass } from './character'
 import { currentLocation } from './storyActions'
+import { featureResources, hitDiceOf, REST_NAMES } from './rest'
 import { classSpellcasting, hasMagic, knownSpells, needsSpellChoice, spellcastingStats, spellSlots } from './magic'
 
 export interface MasterStateContext {
@@ -57,6 +58,7 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
     `Экипировка: основная рука — ${name(inv.equipped.mainHand)}, вторая рука — ${name(inv.equipped.offHand)}, доспех — ${name(inv.equipped.armor)}.`,
     attacks.length ? `Атаки: ${attacks.join('; ')}.` : '',
     `Инвентарь: ${items.length ? items.join(', ') : 'пусто'}.`,
+    ...restText(member, ctx),
     ...magicText(member, ctx),
     `Кошелёк: ${formatCoins(inv.coins)} (всего ${coinsValue(inv.coins)} мм; 1 зм = 10 см = 100 мм).`,
     `Положение на карте: клетка ${cell(member.position)}.`,
@@ -109,6 +111,17 @@ export function magicText(member: PartyMember, ctx: MasterStateContext): string[
         .join(', ')}.`,
     )
   return lines
+}
+
+/** Кости хитов и умения с применениями — для отдыха и use_feature. */
+export function restText(member: PartyMember, ctx: MasterStateContext): string[] {
+  const c = member.character
+  const hd = hitDiceOf(c, ctx.rules)
+  const features = featureResources(c, ctx.rules)
+  return [
+    `Кости хитов: ${hd.left}/${hd.total} (к${hd.die}).`,
+    features.length ? `Умения с применениями: ${features.map((f) => `${f.resource.name} (${f.resource.id}) ${f.left}/${f.max}`).join(', ')}.` : '',
+  ]
 }
 
 /** Сколько последних записей «Летописи» идёт в запрос. */
@@ -169,6 +182,9 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
     quests.length ? `## Задания\n${quests.join('\n')}` : '',
+    story.pendingRest
+      ? `## Отдых\nИгрок просит: ${REST_NAMES[story.pendingRest.kind].toLowerCase()}. Реши, безопасно ли здесь отдыхать: можно — вызови rest (kind: ${story.pendingRest.kind}), опасно — interrupt_rest с причиной. Если не вызовешь ни то ни другое, отряд отдохнёт.`
+      : '',
   ]
     .filter(Boolean)
     .join('\n\n')

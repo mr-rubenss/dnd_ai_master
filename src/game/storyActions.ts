@@ -27,6 +27,7 @@ import { placementProblem } from './mapPlacement'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { magicShapeProblems, migrateInventory } from './character'
+import { applyRestResult, featureResources, restRequestProblem, restResultProblem, restSummaryText } from './rest'
 import { castProblem, emptyMagic, magicProblems, needsSpellChoice, preparedProblems, spendCast, type MagicRules } from './magic'
 import { changeCoins, coinsFromCp, coinsValue, formatCoins, formatCp, gpToCp, isCoins } from './coins'
 import { isNonEmptyString } from './validation'
@@ -237,6 +238,25 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       }))
     case 'spellCast':
       return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, magic: spendCast(m.character.magic, action) } }))
+    case 'restRequested':
+      return { ...state, pendingRest: { kind: action.kind, hitDice: { ...action.hitDice }, requestedAt: action.at } }
+    case 'restInterrupted': {
+      const { pendingRest: _p, ...rest } = state
+      return { ...rest, messages: [...state.messages, { id: action.messageId, author: 'system', text: `Отдых прерван: ${action.reason}` }] }
+    }
+    case 'restCompleted': {
+      const { pendingRest: _p, ...rest } = state
+      const party = state.party.map((m) => {
+        const r = action.heroes.find((h) => h.heroId === m.heroId)
+        return r ? { ...m, character: applyRestResult(m.character, r) } : m
+      })
+      return { ...rest, party, messages: [...state.messages, { id: action.messageId, author: 'system', text: restSummaryText(action.kind) }] }
+    }
+    case 'featureUsed':
+      return updateMember(state, action.heroId, (m) => ({
+        ...m,
+        character: { ...m.character, featureUses: { ...m.character.featureUses, [action.featureId]: (m.character.featureUses?.[action.featureId] ?? 0) + 1 } },
+      }))
     case 'turnSummarized': {
       const text = `Изменения: ${action.changes.map((c) => c.text).join(', ')}`
       return { ...state, messages: [...state.messages, { id: action.messageId, author: 'system', text, changes: action.changes }] }
@@ -307,7 +327,7 @@ export function replay(actions: readonly StoryAction[], from: StoryState | null 
 
 export interface ActionContext {
   catalog: ItemCatalog
-  /** Правила магии (классы, виды, заклинания) — для событий заклинаний; нет — такие события отклоняются. */
+  /** Правила (классы, виды, заклинания) — для событий заклинаний, отдыха и умений; нет — такие события отклоняются. */
   rules?: MagicRules
 }
 
@@ -436,6 +456,37 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!rules) return 'Нет данных правил магии.'
       if (hero.fallen) return 'Герой погиб.'
       return castProblem({ ...hero.character }, action, rules)
+    }
+    case 'restRequested':
+      if (action.author.kind !== 'player') return 'Отдых просит игрок.'
+      if (!rules) return 'Нет данных правил.'
+      return restRequestProblem(state, action.kind, action.hitDice ?? {}, rules)
+    case 'restInterrupted':
+      if (action.author.kind !== 'master' && action.author.kind !== 'system') return 'Прервать отдых может ведущий.'
+      if (!state.pendingRest) return 'Сейчас никто не отдыхает.'
+      return isNonEmptyString(action.reason) ? null : 'Нужна причина, почему отдых прерван.'
+    case 'restCompleted': {
+      if (action.author.kind !== 'engine') return 'Итог отдыха считает движок.'
+      if (!rules) return 'Нет данных правил.'
+      if (action.kind !== 'short' && action.kind !== 'long') return 'Отдых — короткий или долгий.'
+      if (state.pendingRest && state.pendingRest.kind !== action.kind) return 'Вид отдыха не совпадает с начатым.'
+      if (!Array.isArray(action.heroes) || action.heroes.length === 0) return 'Отдыхать некому.'
+      for (const r of action.heroes) {
+        const hero = member(r.heroId)
+        if (!hero) return 'Этого героя нет в отряде истории.'
+        const problem = restResultProblem(hero, action.kind, r, rules)
+        if (problem) return problem
+      }
+      return null
+    }
+    case 'featureUsed': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил.'
+      if (hero.fallen) return 'Герой погиб.'
+      const r = featureResources(hero.character, rules).find((x) => x.resource.id === action.featureId)
+      if (!r) return `У ${hero.character.name} нет умения «${action.featureId}».`
+      return r.left > 0 ? null : `«${r.resource.name}» уже потрачено — восстанавливается отдыхом.`
     }
     case 'turnSummarized':
       if (action.author.kind !== 'engine') return 'Итог хода записывает движок.'

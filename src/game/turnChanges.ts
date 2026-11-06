@@ -23,6 +23,10 @@ interface HeroLedger {
   /** Потрачено ячеек по кругам и бесплатных сотворений (ключ «источник:заклинание»). */
   slots: Map<string, number>
   free: Map<string, number>
+  /** Потрачено костей хитов и применений умений; уровень Истощения. */
+  hitDiceUsed: number
+  features: Map<string, number>
+  exhaustion: number
 }
 
 export type TurnLedger = Map<string, HeroLedger>
@@ -39,6 +43,9 @@ function heroLedger(m: PartyMember, catalog: ItemCatalog): HeroLedger {
     conditions: new Set(m.character.conditions.map((c) => c.id)),
     slots: new Map(Object.entries(m.character.magic?.slotsUsed ?? {})),
     free: new Map(Object.entries(m.character.magic?.freeUsed ?? {})),
+    hitDiceUsed: m.character.hitDiceUsed ?? 0,
+    features: new Map(Object.entries(m.character.featureUses ?? {})),
+    exhaustion: m.character.conditions.find((c) => c.id === 'exhaustion')?.level ?? 0,
   }
 }
 
@@ -55,6 +62,10 @@ export interface TurnDelta {
   slots: Map<string, Map<string, number>>
   /** Бесплатные сотворения врождённых заклинаний за ход. */
   free: Map<string, Map<string, number>>
+  /** Потрачено (плюс) или возвращено (минус) костей хитов и применений умений; изменение уровня Истощения. */
+  hitDice: Map<string, number>
+  features: Map<string, Map<string, number>>
+  exhaustion: Map<string, number>
 }
 
 const counterDiff = (a: Map<string, number>, b: Map<string, number>) => {
@@ -68,7 +79,7 @@ const counterDiff = (a: Map<string, number>, b: Map<string, number>) => {
 
 /** Что изменилось между двумя снимками. */
 export function turnDelta(before: TurnLedger, after: TurnLedger): TurnDelta {
-  const d: TurnDelta = { money: new Map(), items: new Map(), hp: new Map(), added: new Map(), removed: new Map(), slots: new Map(), free: new Map() }
+  const d: TurnDelta = { money: new Map(), items: new Map(), hp: new Map(), added: new Map(), removed: new Map(), slots: new Map(), free: new Map(), hitDice: new Map(), features: new Map(), exhaustion: new Map() }
   for (const [heroId, a] of after) {
     const b = before.get(heroId)
     if (!b) continue
@@ -88,6 +99,11 @@ export function turnDelta(before: TurnLedger, after: TurnLedger): TurnDelta {
     const free = counterDiff(a.free ?? new Map(), b.free ?? new Map())
     if (slots.size) d.slots.set(heroId, slots)
     if (free.size) d.free.set(heroId, free)
+    if ((a.hitDiceUsed ?? 0) !== (b.hitDiceUsed ?? 0)) d.hitDice.set(heroId, (a.hitDiceUsed ?? 0) - (b.hitDiceUsed ?? 0))
+    const features = counterDiff(a.features ?? new Map(), b.features ?? new Map())
+    if (features.size) d.features.set(heroId, features)
+    // Истощение 2 → 1 — то же состояние, но уровень другой; появление и снятие уже в added/removed.
+    if (a.exhaustion && b.exhaustion && a.exhaustion !== b.exhaustion) d.exhaustion.set(heroId, a.exhaustion - b.exhaustion)
   }
   return d
 }
@@ -113,6 +129,8 @@ export function changeList(
   reasons: Map<string, string[]> = new Map(),
   /** Названия заклинаний по id — для строки о бесплатном сотворении. */
   spellNames?: Record<string, string>,
+  /** Названия умений класса по id («Второе дыхание»). */
+  featureNames?: Record<string, string>,
 ): TurnChange[] {
   const multi = story.party.length > 1
   const changes: TurnChange[] = []
@@ -135,6 +153,14 @@ export function changeList(
     for (const c of delta.removed.get(m.heroId) ?? []) push('condition', `снято: ${CONDITION_DEFINITIONS[c].name}`, true)
     for (const [level, n] of delta.slots.get(m.heroId) ?? [])
       push('spell', `${signed(-n)} ${plural(n, ['ячейка', 'ячейки', 'ячеек'])} ${level}-го круга`, n < 0)
+    const hd = delta.hitDice.get(m.heroId)
+    if (hd) push('rest', `${signed(-hd)} ${plural(hd, ['кость хитов', 'кости хитов', 'костей хитов'])}`, hd < 0)
+    for (const [id, n] of delta.features.get(m.heroId) ?? []) {
+      const name = featureNames?.[id] ?? id
+      push('rest', `${signed(-n)} ${plural(n, ['применение', 'применения', 'применений'])} («${name}»)`, n < 0)
+    }
+    const ex = delta.exhaustion.get(m.heroId)
+    if (ex) push('condition', `Истощение ${ex < 0 ? '−' : '+'}${Math.abs(ex)} ур.`, ex < 0)
     for (const [key, n] of delta.free.get(m.heroId) ?? []) {
       const spellName = spellNames?.[key.split(':')[1] ?? ''] ?? key
       push('spell', `${signed(-n)} ${plural(n, ['бесплатное сотворение', 'бесплатных сотворения', 'бесплатных сотворений'])} («${spellName}»)`, n < 0)

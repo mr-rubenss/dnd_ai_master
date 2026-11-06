@@ -22,7 +22,7 @@ export interface ChatMessage {
 /** Одно изменение в листе героя за ход. */
 export interface TurnChange {
   heroId: string
-  kind: 'money' | 'item' | 'hp' | 'condition' | 'spell'
+  kind: 'money' | 'item' | 'hp' | 'condition' | 'spell' | 'rest'
   /** Коротко для игрока: «−4 мм (эль)». */
   text: string
   /** Прибыло или убыло — для цвета в ленте. */
