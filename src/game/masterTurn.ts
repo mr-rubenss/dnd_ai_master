@@ -4,11 +4,14 @@
 import { AiError } from '../ai/errors'
 import { VERBOSITY, type ContextBudget, type Verbosity } from '../ai/settings'
 import type { AiMaster, AiMessage, AiRequest, AiResponse, AiToolCall, AiUsage } from '../ai/types'
+import type { TurnChange } from '../types/game'
 import type { ActionAuthor, StoryEvent, StoryState } from '../types/story'
 import { buildMasterRequest, type PromptPart } from './masterPrompt'
 import { rewritableMessageId, splitSuggestions } from './masterSuggestions'
 import type { MasterStateContext } from './masterState'
-import { executeTool, MASTER_TOOLS, type ToolContext, type ToolOutcome } from './masterTools'
+import { executeTool, TURN_TOOLS, type ToolContext, type ToolOutcome } from './masterTools'
+import { changeList, END_TURN, ledgerOf, turnDelta, verifyEndTurn } from './turnChanges'
+import { isObject } from './validation'
 import { MASTER } from './storyActions'
 
 /** Сколько раундов «вызовы инструментов → результаты» за один ход; последний раунд — уже без инструментов. */
@@ -62,6 +65,10 @@ export interface MasterTurnResult {
   /** Подсказки действий из конца ответа (строка «Варианты: …» — из текста вырезана). */
   suggestions: string[]
   truncated: boolean
+  /** Что изменилось в листах за ход — для строки изменений в ленте (turnSummarized). */
+  changes: TurnChange[]
+  /** Сверка end_turn: сошлось, исправлено довызовом, не исправлено или не проводилась. */
+  verification: TurnVerification
   /** Все вызовы инструментов за ход и их итог. */
   toolCalls: { call: AiToolCall; outcome: ToolOutcome }[]
 }
@@ -75,22 +82,64 @@ function emptyAnswer(response: AiResponse): never {
   throw new AiError('bad-response', { message: 'Ведущий прислал пустой ответ. Попробуйте ещё раз.' })
 }
 
+/** Напоминание, если модель закончила ответ без end_turn (один раз за ход). */
+export const END_TURN_REMINDER =
+  '[Код игры] Ты не вызвал end_turn. Если по твоему рассказу изменились деньги, предметы, хиты или состояния героя — ' +
+  'сначала вызови нужные инструменты (change_gold, use_item, remove_item, give_item, change_hp, add_condition…), ' +
+  'затем end_turn со списком изменений (или пустым списком). Новый текст не пиши.'
+
+/** Итог сверки end_turn за ход — для журнала разработчика и тестов. */
+export type TurnVerification =
+  | { status: 'ok' }
+  | { status: 'fixed'; problems: string[] }
+  | { status: 'unresolved'; problems: string[] }
+  | { status: 'skipped' }
+
 export async function runMasterTurn(master: AiMaster, story: StoryState, options: MasterTurnOptions): Promise<MasterTurnResult> {
   const { runtime } = options
   const current = () => runtime?.getStory() ?? story
   const historyEnd = story.messages.length
   const turn: AiMessage[] = []
   const toolCalls: MasterTurnResult['toolCalls'] = []
+  const catalog = runtime?.tools.catalog
+  const ledger = runtime ? ledgerOf(story, runtime.tools.catalog) : null
+  const reasons = new Map<string, string[]>()
   let narrated = false
+  /** Один повтор за ход: ведущий не вызвал end_turn или заявил то, чего не сделал. */
+  let retried: string[] | null = null
+  let verification: TurnVerification = { status: 'skipped' }
+  /** Следующий раунд — повтор: инструменты разрешены даже после лимита раундов. */
+  let retryPending = false
+  /** Раунд после напоминания про end_turn: рассказ уже в ленте — новый текст не дописываем (без повторов). */
+  let afterReminder = false
+
+  const finish = (text: string, suggestions: string[], response: AiResponse): MasterTurnResult => {
+    if (!text && !narrated) emptyAnswer(response)
+    const delta = ledger ? turnDelta(ledger, ledgerOf(current(), catalog!)) : null
+    const changes = delta ? changeList(delta, current(), catalog!, reasons) : []
+    return { text, suggestions, truncated: response.finishReason === 'length', toolCalls, changes, verification }
+  }
+
+  /** Текст ответа — в ленту сразу (перед карточками бросков и повтором проверки). */
+  const narrate = async (text: string, suggestions: string[]) => {
+    if (!text) return
+    const reason = await runtime!.commit(
+      { type: 'masterNarrated', messageId: runtime!.tools.newId(), text, ...(suggestions.length ? { suggestions } : {}) },
+      MASTER,
+    )
+    if (!reason) narrated = true
+  }
 
   for (let round = 0; ; round++) {
-    const toolsAllowed = !!runtime && round < MAX_TOOL_ROUNDS
+    // Раунд повтора (довызов инструментов) разрешает инструменты даже после лимита раундов.
+    const toolsAllowed = !!runtime && (round < MAX_TOOL_ROUNDS || retryPending)
+    retryPending = false
     // Запрос собирается заново на каждый раунд: состояние и факты — свежие (после уже выполненных инструментов),
     // лента — на начало хода, дальше — сообщения этого хода.
     const plan = buildMasterRequest(current(), {
       verbosity: options.verbosity,
       context: options.context,
-      tools: runtime ? MASTER_TOOLS : undefined,
+      tools: runtime ? TURN_TOOLS : undefined,
       budget: options.budget,
       factor: options.factor?.(),
       historyEnd,
@@ -98,7 +147,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     })
     const response = await master.complete({
       messages: plan.messages,
-      ...(runtime ? { tools: MASTER_TOOLS, toolChoice: toolsAllowed ? ('auto' as const) : ('none' as const) } : {}),
+      ...(runtime ? { tools: TURN_TOOLS, toolChoice: toolsAllowed ? ('auto' as const) : ('none' as const) } : {}),
       maxTokens: VERBOSITY[options.verbosity].maxTokens,
       temperature: 0.9,
       onText: options.onText,
@@ -106,34 +155,89 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       signal: options.signal,
     })
     options.onRequest?.({ purpose: 'turn', parts: partsReport(plan.parts), rawTokens: plan.rawTokens, estimatedTokens: plan.estimatedTokens, dropped: plan.dropped, usage: response.usage })
-    const { text, suggestions } = splitSuggestions(response.text)
+    const split = splitSuggestions(response.text)
+    const { suggestions } = split
+    const text = afterReminder ? '' : split.text
+    afterReminder = false
     const calls = toolsAllowed ? response.toolCalls : []
+    if (!runtime) return finish(text, suggestions, response)
 
-    if (calls.length === 0) {
-      if (!text && !narrated) emptyAnswer(response)
-      return { text, suggestions, truncated: response.finishReason === 'length', toolCalls }
-    }
+    const endCall = calls.find((c) => c.name === END_TURN)
+    const others = calls.filter((c) => c.name !== END_TURN)
 
-    // Текст перед вызовами («Ты пытаешься…») — в ленту сразу, перед карточками бросков.
-    if (text) {
-      const reason = await runtime!.commit({ type: 'masterNarrated', messageId: runtime!.tools.newId(), text }, MASTER)
-      if (!reason) narrated = true
+    if (others.length > 0) {
+      // Текст перед вызовами («Ты пытаешься…») — в ленту сразу, перед карточками бросков.
+      await narrate(text, suggestions)
+      runtime.onRound?.()
     }
-    turn.push({ role: 'assistant', content: response.text || null, toolCalls: calls })
-    runtime!.onRound?.()
-    for (const call of calls) {
-      let outcome = executeTool(current(), call, runtime!.tools)
+    const results: AiMessage[] = []
+    for (const call of others) {
+      let outcome = executeTool(current(), call, runtime.tools)
       for (const { event, author } of outcome.events) {
-        const reason = await runtime!.commit(event, author)
+        const reason = await runtime.commit(event, author)
         if (reason) {
           outcome = { ok: false, result: { ok: false, error: reason }, events: [] }
           break
         }
       }
+      if (outcome.ok && call.name === 'change_gold') {
+        const money = outcome.events.find((e) => e.event.type === 'moneyChanged')?.event
+        const why = isObject(call.arguments) && typeof call.arguments.reason === 'string' ? call.arguments.reason.trim() : ''
+        if (money?.type === 'moneyChanged' && why) reasons.set(money.heroId, [...(reasons.get(money.heroId) ?? []), why])
+      }
       toolCalls.push({ call, outcome })
-      runtime!.onTool?.(call, outcome)
-      turn.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
+      runtime.onTool?.(call, outcome)
+      results.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
     }
+
+    if (endCall) {
+      // Сверка: всё ли заявленное в end_turn сделано инструментами.
+      const problems = verifyEndTurn(endCall.arguments, turnDelta(ledger!, ledgerOf(current(), catalog!)), current(), catalog!)
+      if (problems.length === 0) {
+        verification = retried ? { status: 'fixed', problems: retried } : { status: 'ok' }
+        return finish(others.length ? '' : text, suggestions, response)
+      }
+      if (retried) {
+        verification = { status: 'unresolved', problems }
+        return finish(others.length ? '' : text, suggestions, response)
+      }
+      retried = problems
+      retryPending = true
+      if (!others.length) await narrate(text, suggestions)
+      runtime.onRound?.()
+      turn.push({ role: 'assistant', content: response.text || null, toolCalls: [...others, endCall] })
+      turn.push(...results, {
+        role: 'tool',
+        toolCallId: endCall.id,
+        content: JSON.stringify({
+          ok: false,
+          missing: problems,
+          message:
+            'В листе не хватает изменений, о которых ты рассказал. Вызови нужные инструменты, затем снова end_turn. ' +
+            'Новый текст пиши, только если что-то не вышло (например, денег не хватило) — тогда коротко обыграй это.',
+        }),
+      })
+      continue
+    }
+
+    if (others.length > 0) {
+      // Обычный раунд инструментов: результаты — модели, дальше её ответ.
+      turn.push({ role: 'assistant', content: response.text || null, toolCalls: others }, ...results)
+      continue
+    }
+
+    // Ответ без вызовов. end_turn нет: один раз напоминаем (если инструменты ещё доступны).
+    if (!toolsAllowed || retried) {
+      if (verification.status === 'skipped' && retried) verification = { status: 'unresolved', problems: retried }
+      return finish(text, suggestions, response)
+    }
+    retried = ['Ведущий не вызвал end_turn.']
+    retryPending = true
+    afterReminder = true
+    if (!text && !narrated) emptyAnswer(response)
+    await narrate(text, suggestions)
+    runtime.onRound?.()
+    turn.push({ role: 'assistant', content: response.text || null }, { role: 'user', content: END_TURN_REMINDER })
   }
 }
 

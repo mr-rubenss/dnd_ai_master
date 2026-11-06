@@ -170,3 +170,17 @@ export async function addHeroCopy(page: Page, copy: { id: string; name: string; 
     await store.flush()
   }, copy)
 }
+
+/**
+ * Ответ ведущего в подменённом API заканчивается служебным end_turn (как требует промт): если запрос предлагает
+ * инструмент end_turn, а в потоке нет своих вызовов инструментов, перед [DONE] добавляется end_turn с пустым списком
+ * (или с переданными изменениями).
+ */
+export function withEndTurn(route: { request(): { postDataJSON(): unknown } }, payload: string, changes: unknown[] = []): string {
+  const body = route.request().postDataJSON() as { tools?: { function: { name: string } }[] } | null
+  if (!body?.tools?.some((t) => t.function.name === 'end_turn') || payload.includes('"tool_calls"')) return payload
+  const call = {
+    choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'end', type: 'function', function: { name: 'end_turn', arguments: JSON.stringify({ changes }) } }] }, finish_reason: null }],
+  }
+  return payload.includes('data: [DONE]') ? payload.replace('data: [DONE]', `data: ${JSON.stringify(call)}\n\ndata: [DONE]`) : `${payload}data: ${JSON.stringify(call)}\n\n`
+}

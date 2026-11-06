@@ -1,4 +1,5 @@
 import { itemCatalog, rulesData } from '../../data'
+import { formatCoins } from '../../game/coins'
 import { ABILITIES, ABILITY_ABBREVIATIONS, abilityModifier, formatModifier, proficiencyBonus } from '../../engine/abilities'
 import { passivePerception, savingThrowModifier, skillModifier } from '../../engine/checks'
 import { SKILL_DEFINITIONS } from '../../engine/skills'
@@ -115,7 +116,7 @@ export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
 
       <section>
         <h4>
-          Снаряжение · {formatNumber(inventory.gold)} зм · {formatNumber(inventoryWeight(inventory, itemCatalog))} фнт.
+          Снаряжение · {formatCoins(inventory.coins)} · {formatNumber(inventoryWeight(inventory, itemCatalog))} фнт.
         </h4>
         <p data-testid="summary-items">
           {inventory.items.length === 0

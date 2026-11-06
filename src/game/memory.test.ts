@@ -249,7 +249,9 @@ describe('сжатие памяти (подменённый ответ ИИ)', (
     await expect(compactMemory(failing.master, env.runtime, { verbosity: 'normal', context, budget })).rejects.toThrow(AiError)
     expect(env.current()).toBe(story)
 
-    const turn = scriptedMaster(() => aiResponse({ text: 'Человек в капюшоне поднимает взгляд.' }))
+    const turn = scriptedMaster(() =>
+      aiResponse({ text: 'Человек в капюшоне поднимает взгляд.', toolCalls: [call('end_turn', { changes: [] }, 'end')] }),
+    )
     const sizes: number[] = []
     const result = await runMasterTurn(turn.master, story, {
       verbosity: 'normal',

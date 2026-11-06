@@ -65,6 +65,19 @@ export interface ItemDefinition {
   toolKind?: ToolKind
   weapon?: WeaponStats
   armor?: ArmorStats
+  /** Применение (инструмент ведущего use_item): заряды и эффект. Расходники и боеприпасы применяются и без этого поля. */
+  use?: ItemUse
 }
+
+/** Как предмет применяется. */
+export interface ItemUse {
+  /** Применений у одного предмета (набор целителя — 10); нет поля — предмет расходуется целиком за одно применение. */
+  charges?: number
+  /** Эффект, который исполняет движок: лечение — бросок по записи кости («2d4+2»). */
+  effect?: { healing: string }
+}
+
+/** Можно ли применить предмет (use_item): расходники, боеприпасы и предметы с описанием применения. */
+export const isUsable = (item: ItemDefinition) => item.category === 'consumable' || item.category === 'ammunition' || item.use !== undefined
 
 export type ItemCatalog = Record<string, ItemDefinition>

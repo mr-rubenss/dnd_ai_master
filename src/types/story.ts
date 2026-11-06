@@ -4,7 +4,8 @@
 
 import type { ActiveCondition } from '../engine/conditions'
 import type { Character, Equipment, Inventory } from './character'
-import type { ChatMessage, CheckCard, RollRecord } from './game'
+import type { Coins } from '../game/coins'
+import type { ChatMessage, CheckCard, RollRecord, TurnChange } from './game'
 import type { CellPosition, DoorState, LocationData, MapObject, Npc } from './location'
 
 export const STORY_TONES = ['dark-fantasy', 'light-adventure', 'detective', 'horror'] as const
@@ -146,7 +147,14 @@ export type StoryEvent =
   | { type: 'itemsGranted'; heroId: string; items: { itemId: string; quantity: number }[] }
   /** Предметы забрали (потрачены, отняты, сломаны). Если предмета не осталось — он снимается с экипировки. */
   | { type: 'itemsRemoved'; heroId: string; items: { itemId: string; quantity: number }[] }
+  /** Устарело (старые журналы): золото числом в зм. Новые изменения денег — moneyChanged. */
   | { type: 'goldChanged'; heroId: string; delta: number }
+  /** Деньги: delta в медных (плюс — получил, минус — заплатил), coins — кошелёк после (со сдачей). */
+  | { type: 'moneyChanged'; heroId: string; delta: number; coins: Coins }
+  /** Потрачены применения предмета с зарядами (набор целителя); закончились — предмет уходит. */
+  | { type: 'itemChargesUsed'; heroId: string; itemId: string; uses: number; perItem: number }
+  /** Строка изменений за ход ведущего — системное сообщение в ленте. */
+  | { type: 'turnSummarized'; messageId: string; changes: TurnChange[] }
   /** Урон (с типом) или лечение; хиты не уходят ниже 0 и выше максимума. */
   | { type: 'hpChanged'; heroId: string; kind: 'damage' | 'healing'; amount: number; damageType?: string }
   /** Проверка, которую запросил ведущий: бросок движка и карточка в ленте. */

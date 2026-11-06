@@ -9,7 +9,7 @@ const catalog = parseItemCatalog(itemsJson)
 /** Инвентарь с набором предметов (id или [id, количество]) и экипировкой. */
 function inv(items: (string | [string, number])[], equipped: Partial<Equipment> = {}): Inventory {
   return {
-    gold: 0,
+    coins: { gp: 0, sp: 0, cp: 0 },
     items: items.map((i) => (typeof i === 'string' ? { itemId: i, quantity: 1 } : { itemId: i[0], quantity: i[1] })),
     equipped: { mainHand: null, offHand: null, armor: null, ...equipped },
   }

@@ -26,6 +26,8 @@ import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
+import { migrateInventory } from './character'
+import { changeCoins, coinsFromCp, coinsValue, formatCoins, formatCp, gpToCp, isCoins } from './coins'
 import { isNonEmptyString } from './validation'
 
 export const TONE_LABELS: Record<StoryTone, string> = {
@@ -124,9 +126,15 @@ const updateLocation = (state: StoryState, locationId: string, change: (l: Locat
   return { ...state, world: { ...state.world, locations: { ...state.world.locations, [locationId]: change(location) } } }
 }
 
+/** Старое состояние (золото числом) → кошельки монетами. */
+export function migrateStory(state: StoryState): StoryState {
+  return { ...state, party: state.party.map((m) => ({ ...m, inventory: migrateInventory(m.inventory) })) }
+}
+
 /** Применяет действие к состоянию. Действие должно быть проверено (checkAction) до записи в журнал. */
 export function applyAction(state: StoryState | null, action: StoryAction): StoryState {
-  if (action.type === 'storyCreated') return { ...structuredClone(action.seed), updatedAt: action.at }
+  // Начало истории из старого сохранения: золото числом → кошелёк монетами.
+  if (action.type === 'storyCreated') return { ...migrateStory(structuredClone(action.seed)), updatedAt: action.at }
   if (!state) throw new Error(`Действие «${action.type}» до создания истории`)
   const next = applyEvent(state, action)
   return { ...next, updatedAt: action.at }
@@ -135,7 +143,7 @@ export function applyAction(state: StoryState | null, action: StoryAction): Stor
 function applyEvent(state: StoryState, action: StoryAction): StoryState {
   switch (action.type) {
     case 'storyCreated':
-      return structuredClone(action.seed)
+      return migrateStory(structuredClone(action.seed))
     case 'storyRenamed':
       return { ...state, title: action.title }
     case 'storyCompleted':
@@ -195,7 +203,34 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         return { ...m, inventory: { ...m.inventory, items, equipped } }
       })
     case 'goldChanged':
-      return updateMember(state, action.heroId, (m) => ({ ...m, inventory: { ...m.inventory, gold: Math.round((m.inventory.gold + action.delta) * 100) / 100 } }))
+      // Старые журналы: золото числом — переводим в медные и меняем кошелёк со сдачей.
+      return updateMember(state, action.heroId, (m) => {
+        const purse = m.inventory.coins
+        const coins = changeCoins(purse, gpToCp(action.delta)) ?? coinsFromCp(Math.max(0, coinsValue(purse) + gpToCp(action.delta)))
+        return { ...m, inventory: { ...m.inventory, coins } }
+      })
+    case 'moneyChanged':
+      return updateMember(state, action.heroId, (m) => ({ ...m, inventory: { ...m.inventory, coins: { ...action.coins } } }))
+    case 'itemChargesUsed':
+      return updateMember(state, action.heroId, (m) => {
+        const max = action.perItem
+        const entry = m.inventory.items.find((e) => e.itemId === action.itemId)
+        if (!entry || !max) return m
+        const left = (entry.quantity - 1) * max + (entry.charges ?? max) - action.uses
+        const quantity = Math.max(0, Math.ceil(left / max))
+        const charges = left % max === 0 ? max : left % max
+        const items = m.inventory.items
+          .map((e) => (e.itemId !== action.itemId ? e : charges === max ? { itemId: e.itemId, quantity } : { itemId: e.itemId, quantity, charges }))
+          .filter((e) => e.quantity > 0)
+        const has = (id: string | null) => !id || items.some((e) => e.itemId === id)
+        const eq = m.inventory.equipped
+        const equipped = { mainHand: has(eq.mainHand) ? eq.mainHand : null, offHand: has(eq.offHand) ? eq.offHand : null, armor: has(eq.armor) ? eq.armor : null }
+        return { ...m, inventory: { ...m.inventory, items, equipped } }
+      })
+    case 'turnSummarized': {
+      const text = `Изменения: ${action.changes.map((c) => c.text).join(', ')}`
+      return { ...state, messages: [...state.messages, { id: action.messageId, author: 'system', text, changes: action.changes }] }
+    }
     case 'hpChanged':
       return updateMember(state, action.heroId, (m) => {
         const c = m.character
@@ -341,11 +376,37 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       }
       return null
     }
+    case 'moneyChanged': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!Number.isInteger(action.delta) || action.delta === 0) return 'Изменение денег — ненулевое целое число медных.'
+      const have = coinsValue(hero.inventory.coins)
+      if (have + action.delta < 0) return `Денег не хватает: в кошельке ${formatCoins(hero.inventory.coins)}, а нужно ${formatCp(action.delta)}.`
+      if (!isCoins(action.coins) || coinsValue(action.coins) !== have + action.delta) return 'Кошелёк после оплаты не сходится с суммой.'
+      return null
+    }
+    case 'itemChargesUsed': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      const max = catalog[action.itemId]?.use?.charges
+      const name = catalog[action.itemId]?.name ?? action.itemId
+      if (!max) return `У «${name}» нет применений.`
+      if (action.perItem !== max) return `У «${name}» ${max} применений, а не ${action.perItem}.`
+      if (!Number.isInteger(action.uses) || action.uses < 1) return 'Применений — положительное целое.'
+      const entry = hero.inventory.items.find((e) => e.itemId === action.itemId)
+      if (!entry) return `У героя нет предмета «${name}».`
+      const left = (entry.quantity - 1) * max + (entry.charges ?? max)
+      return left < action.uses ? `У «${name}» осталось применений: ${left}, а нужно ${action.uses}.` : null
+    }
+    case 'turnSummarized':
+      if (action.author.kind !== 'engine') return 'Итог хода записывает движок.'
+      if (!Array.isArray(action.changes) || action.changes.length === 0) return 'Пустой итог хода.'
+      return action.changes.every((c) => isNonEmptyString(c.text) && (c.tone === 'gain' || c.tone === 'loss')) ? null : 'Некорректная строка изменений.'
     case 'goldChanged': {
       const hero = member(action.heroId)
       if (!hero) return 'Этого героя нет в отряде истории.'
       if (!Number.isFinite(action.delta) || action.delta === 0) return 'Изменение золота — ненулевое число.'
-      if (hero.inventory.gold + action.delta < 0) return `У героя только ${hero.inventory.gold} зм — нельзя забрать ${-action.delta}.`
+      if (coinsValue(hero.inventory.coins) + gpToCp(action.delta) < 0) return `У героя только ${formatCoins(hero.inventory.coins)} — нельзя забрать ${-action.delta} зм.`
       return null
     }
     case 'hpChanged': {

@@ -4055,3 +4055,52 @@ textarea {
   font-size: var(--text-82);
   color: var(--color-muted);
 }
+
+/* ---------- Подсветка изменившегося значения в листе (после хода ведущего) ---------- */
+
+.value-flash {
+  border-radius: var(--radius-xs);
+  animation: value-flash 1.6s ease-out;
+}
+
+@keyframes value-flash {
+  0%, 30% { background: var(--color-accent-tint-selected); color: var(--color-accent-bright); }
+  100% { background: transparent; }
+}
+
+:root[data-motion='reduce'] .value-flash {
+  /* Без движения: подсветка просто появляется и исчезает. */
+  animation: value-flash 1.6s steps(1, end);
+}
+
+/* ---------- Строка изменений за ход (после ответа ведущего) ---------- */
+
+.turn-changes {
+  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
+  max-width: 100%;
+  margin: 0;
+  padding: var(--space-4) var(--space-10);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-82);
+  color: var(--color-muted);
+}
+
+.turn-change {
+  overflow-wrap: anywhere;
+}
+
+.turn-change.is-loss {
+  color: var(--color-danger-text-soft);
+}
+
+.turn-change.is-gain {
+  color: var(--color-accent-bright);
+}
+
+.coin-part {
+  white-space: nowrap;
+}

@@ -2,7 +2,7 @@
 // и журнал разработчика, ошибка «слишком длинный контекст», итог истории от ИИ. API подменяется (page.route).
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { act, collectPageErrors, expectNoHorizontalScroll, MASTER, reloadAndContinue, startQuickGame } from './helpers'
+import { act, collectPageErrors, expectNoHorizontalScroll, MASTER, reloadAndContinue, startQuickGame, withEndTurn } from './helpers'
 
 const KEY = 'sk-e2e-fake-key-123456'
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions'
@@ -27,7 +27,8 @@ const textStream = (text: string) =>
   ])
 const toolStream = (name: string, args: unknown) =>
   sse([delta({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name, arguments: JSON.stringify(args) } }] }), delta({}, 'tool_calls'), '[DONE]'])
-const fulfillSse = (route: Route, body: string) => route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body })
+const fulfillSse = (route: Route, body: string) =>
+  route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: withEndTurn(route, body) })
 
 const kindOf = (body: Body) => {
   const system = body.messages[0]?.content ?? ''

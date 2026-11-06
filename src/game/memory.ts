@@ -13,7 +13,7 @@ import type { ActionAuthor, StoryEvent, StoryState, WorldFact } from '../types/s
 import { factsTooLarge } from './facts'
 import { buildMasterRequest, factsText, summaryText } from './masterPrompt'
 import type { MasterStateContext } from './masterState'
-import { executeTool, MASTER_TOOLS, type ToolContext } from './masterTools'
+import { executeTool, MASTER_TOOLS, TURN_TOOLS, type ToolContext } from './masterTools'
 import type { RequestReport } from './masterTurn'
 import { MASTER, MAX_EPILOGUE_LENGTH, MAX_SUMMARY_CHARS, TONE_LABELS } from './storyActions'
 
@@ -83,7 +83,7 @@ export function nextRequestPlan(story: StoryState, options: MemoryOptions) {
   return buildMasterRequest(story, {
     verbosity: options.verbosity,
     context: options.context,
-    tools: MASTER_TOOLS,
+    tools: TURN_TOOLS,
     budget: options.budget,
     factor: options.factor?.(),
   })

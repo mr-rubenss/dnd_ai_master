@@ -12,6 +12,7 @@ const PURPOSES: Record<string, string> = {
 const PART_LABELS: Record<string, string> = { ...PROMPT_PARTS, fragment: 'Фрагмент ленты', story: 'История', rules: 'Правила и промт' }
 const REASONS = { budget: 'запрос больше бюджета', 'context-error': 'ошибка «слишком длинный контекст»', size: 'разрослись сводка или факты' }
 
+const VERIFY = { ok: 'всё сходится', fixed: 'исправлено довызовом', unresolved: 'не сходится и после довызова' }
 const n = (v: number) => v.toLocaleString('ru-RU')
 const time = (at: number) => new Date(at).toLocaleTimeString('ru-RU')
 
@@ -48,6 +49,26 @@ function EntryView({ entry }: { entry: DevLogEntry }) {
           {entry.resummarized ? ' · сводка пересжата' : ''}
           {entry.factsMerged ? ' · факты объединены' : ''}
         </span>
+      </li>
+    )
+  if (entry.kind === 'tool')
+    return (
+      <li className={`dev-log-entry${entry.ok ? '' : ' is-error'}`} data-testid="dev-log-tool" data-tool={entry.name}>
+        <strong>
+          {time(entry.at)} · {entry.name} · {entry.ok ? 'выполнен' : 'отклонён'}
+        </strong>
+        {entry.detail && <span>{entry.detail}</span>}
+      </li>
+    )
+  if (entry.kind === 'verify')
+    return (
+      <li className={`dev-log-entry${entry.status === 'unresolved' ? ' is-error' : ''}`} data-testid="dev-log-verify" data-status={entry.status}>
+        <strong>
+          {time(entry.at)} · Сверка end_turn: {VERIFY[entry.status]}
+        </strong>
+        {entry.problems?.map((p) => (
+          <span key={p}>{p}</span>
+        ))}
       </li>
     )
   return (

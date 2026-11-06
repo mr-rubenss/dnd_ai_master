@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { coinsValue } from './coins'
 import itemsJson from '../data/items.json'
 import backgroundsJson from '../data/rules/backgrounds.json'
 import classesJson from '../data/rules/classes.json'
@@ -246,7 +247,7 @@ describe('навыки', () => {
 describe('снаряжение', () => {
   it('воин A + солдат A: наборы раскрываются, одинаковые предметы складываются', () => {
     const inventory = startingInventory(fighterDraft(), data, catalog)
-    expect(inventory.gold).toBe(18)
+    expect(inventory.coins).toEqual({ gp: 18, sp: 0, cp: 0 })
     const qty = Object.fromEntries(inventory.items.map((i) => [i.itemId, i.quantity]))
     expect(qty).toMatchObject({ 'chain-mail': 1, greatsword: 1, javelin: 8, rations: 10, torch: 10, arrow: 20, 'travelers-clothes': 1 })
     expect(inventory.equipped).toEqual({ mainHand: 'greatsword', offHand: null, armor: 'chain-mail' })
@@ -254,7 +255,7 @@ describe('снаряжение', () => {
 
   it('только золото: варианты B', () => {
     const inventory = startingInventory({ ...fighterDraft(), classEquipment: 'C', backgroundEquipment: 'B' }, data, catalog)
-    expect(inventory).toEqual({ gold: 205, items: [], equipped: { mainHand: null, offHand: null, armor: null } })
+    expect(inventory).toEqual({ coins: { gp: 205, sp: 0, cp: 0 }, items: [], equipped: { mainHand: null, offHand: null, armor: null } })
   })
 
   it('со щитом надевается одноручное оружие', () => {
@@ -270,7 +271,7 @@ describe('снаряжение', () => {
     for (const cls of Object.values(data.classes)) {
       for (const option of cls.equipment) {
         const inventory = startingInventory({ ...fighterDraft(), classId: cls.id, classEquipment: option.id }, data, catalog)
-        expect(inventory.gold).toBeGreaterThanOrEqual(option.gold)
+        expect(coinsValue(inventory.coins)).toBeGreaterThanOrEqual(option.gold * 100)
         for (const entry of inventory.items) expect(catalog[entry.itemId], entry.itemId).toBeDefined()
       }
     }
@@ -475,7 +476,7 @@ describe('своя предыстория', () => {
       ['arcana', 'athletics', 'history', 'insight', 'medicine', 'nature', 'perception'].sort(),
     )
     expect(finalScores(d, data)).toMatchObject({ str: 16, dex: 16 })
-    expect(inventory.gold).toBe(155 + 46)
+    expect(inventory.coins).toEqual({ gp: 155 + 46, sp: 0, cp: 0 })
     expect(inventory.equipped.mainHand).toBe('dagger')
   })
 

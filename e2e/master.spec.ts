@@ -2,7 +2,7 @@
 // запросов нет; ключ в тестах — выдуманный.
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, reloadAndContinue, startQuickGame } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, reloadAndContinue, startQuickGame, withEndTurn } from './helpers'
 
 const KEY = 'sk-e2e-fake-key-123456'
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions'
@@ -33,7 +33,7 @@ async function mockApi(page: Page, url: string, handler: Handler) {
 }
 
 const fulfillSse = (route: Route, text: string) =>
-  route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: text })
+  route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: withEndTurn(route, text) })
 const fulfillJson = (route: Route, status: number, json: unknown, extra: Record<string, string> = {}) =>
   route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json', ...extra }, body: JSON.stringify(json) })
 

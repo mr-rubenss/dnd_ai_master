@@ -2,7 +2,7 @@
 // нарушение шаблона с исправлением, «Предложить иначе», дописанные детали, история — в листе и в контексте ведущего.
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, openCharacterCreation } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, openCharacterCreation, withEndTurn } from './helpers'
 
 const KEY = 'sk-e2e-fake-key-123456'
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions'
@@ -58,7 +58,7 @@ async function mockApi(page: Page, proposals: unknown[]) {
     bodies.push(body)
     const isProposal = body.tools?.some((t) => t.function.name === 'propose_background')
     const payload = isProposal ? proposalStream(proposals.shift()) : textStream('Ветер с моря доносит запах соли.')
-    await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: payload })
+    await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: withEndTurn(route, payload) })
   })
   return bodies
 }

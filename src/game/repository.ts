@@ -7,10 +7,11 @@
 // - heroes, hall — «Мои герои» и «Зал славы» (герои принадлежат игроку, а их состояние в игре — истории);
 // - meta      — служебные отметки (например, перенос из localStorage выполнен).
 
+import { migrateSheet } from './character'
 import Dexie, { type Table } from 'dexie'
 import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
 import type { StoryAction, StoryMeta, StoryState } from '../types/story'
-import { replay, storyMeta } from './storyActions'
+import { migrateStory, replay, storyMeta } from './storyActions'
 
 export const DB_NAME = 'ai-master'
 
@@ -78,16 +79,20 @@ export class StoryRepository {
   async loadStory(storyId: string): Promise<LoadedStory | null> {
     const [snapshot, count] = await Promise.all([this.db.snapshots.get(storyId), this.db.actions.where('storyId').equals(storyId).count()])
     if (count === 0) return null
-    if (snapshot && snapshot.seq === count) return { state: snapshot.state, seq: count }
+    // Снимок мог сохраниться в старом формате (золото числом) — переводим кошельки в монеты.
+    if (snapshot && snapshot.seq === count) return { state: migrateStory(snapshot.state), seq: count }
     const actions = await this.actionsOf(storyId)
-    const from = snapshot && snapshot.seq < count ? snapshot : null
+    const from = snapshot && snapshot.seq < count ? { ...snapshot, state: migrateStory(snapshot.state) } : null
     const state = replay(actions.slice(from?.seq ?? 0), from?.state ?? null)
     return { state, seq: count }
   }
 
   async loadRoster(): Promise<HeroRoster> {
     const [heroes, hall] = await Promise.all([this.db.heroes.toArray(), this.db.hall.toArray()])
-    return { heroes: heroes.sort((a, b) => a.createdAt - b.createdAt), hallOfFame: hall.sort((a, b) => b.endedAt - a.endedAt) }
+    return {
+      heroes: heroes.map((h) => ({ ...h, sheet: migrateSheet(h.sheet) })).sort((a, b) => a.createdAt - b.createdAt),
+      hallOfFame: hall.sort((a, b) => b.endedAt - a.endedAt),
+    }
   }
 
   async commit({ story, roster, deleteStoryId }: Commit): Promise<void> {

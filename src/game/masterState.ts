@@ -1,5 +1,7 @@
 // Актуальное состояние игры для запроса ведущему: лист персонажа, инвентарь, текущая локация с объектами и НПС.
 // Чистые функции; данные (справочник предметов, правила) передаются параметрами.
+import type { PriceList } from './prices'
+import { coinsValue, formatCoins } from './coins'
 import { ABILITIES, ABILITY_ABBREVIATIONS, abilityModifier, formatModifier, proficiencyBonus } from '../engine/abilities'
 import { passivePerception, savingThrowModifier, skillModifier } from '../engine/checks'
 import { CONDITION_DEFINITIONS } from '../engine/conditions'
@@ -15,6 +17,8 @@ import { currentLocation } from './storyActions'
 export interface MasterStateContext {
   catalog: ItemCatalog
   rules: RulesData
+  /** Прейскурант еды, ночлега и услуг — идёт в неизменную часть промта. */
+  prices?: PriceList
 }
 
 const ATTITUDE: Record<string, string> = { friendly: 'дружелюбное', neutral: 'нейтральное', hostile: 'враждебное' }
@@ -51,7 +55,8 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
     `Состояния: ${conditions || 'нет'}.`,
     `Экипировка: основная рука — ${name(inv.equipped.mainHand)}, вторая рука — ${name(inv.equipped.offHand)}, доспех — ${name(inv.equipped.armor)}.`,
     attacks.length ? `Атаки: ${attacks.join('; ')}.` : '',
-    `Инвентарь: ${items.length ? items.join(', ') : 'пусто'}; золото: ${inv.gold} зм.`,
+    `Инвентарь: ${items.length ? items.join(', ') : 'пусто'}.`,
+    `Кошелёк: ${formatCoins(inv.coins)} (всего ${coinsValue(inv.coins)} мм; 1 зм = 10 см = 100 мм).`,
     `Положение на карте: клетка ${cell(member.position)}.`,
     ...heroPastText(c),
   ]

@@ -21,6 +21,10 @@ export type DevLogEntry =
       factsMerged: boolean
     }
   | { kind: 'error'; id: number; at: number; text: string }
+  /** Вызов инструмента ведущим и его итог (без аргументов целиком — только итог движка). */
+  | { kind: 'tool'; id: number; at: number; name: string; ok: boolean; detail: string }
+  /** Сверка end_turn за ход. */
+  | { kind: 'verify'; id: number; at: number; status: 'ok' | 'fixed' | 'unresolved'; problems?: string[] }
 
 type NewEntry = DevLogEntry extends infer E ? (E extends DevLogEntry ? Omit<E, 'id' | 'at'> : never) : never
 

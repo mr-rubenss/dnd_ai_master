@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { formatCoins } from '../game/coins'
 import { itemCatalog } from '../data'
 import { armorClass } from '../game/character'
 import { MAX_HERO_NAME_LENGTH } from '../game/heroes'
@@ -292,8 +293,8 @@ function HeroSheetDialog({ hero, sheet, onClose }: { hero: HeroRecord; sheet: Ch
             <dd data-testid="hero-sheet-ac">{armorClass(character, inventory, itemCatalog)}</dd>
           </div>
           <div>
-            <dt>Золото</dt>
-            <dd>{inventory.gold} зм</dd>
+            <dt>Кошелёк</dt>
+            <dd>{formatCoins(inventory.coins)}</dd>
           </div>
         </dl>
         <p className="hero-dialog-equipped">

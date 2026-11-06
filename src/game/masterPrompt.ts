@@ -13,6 +13,7 @@ import type { AiMessage, AiTool } from '../ai/types'
 import type { ChatMessage } from '../types/game'
 import type { StoryState } from '../types/story'
 import { gameStateText, type MasterStateContext } from './masterState'
+import { pricesText, type PriceList } from './prices'
 import { TONE_LABELS } from './storyActions'
 
 /** Системный промт ведущего (текст из dm-prompt.md). */
@@ -37,12 +38,15 @@ export interface PromptPart {
 }
 
 /** Неизменная часть системного промта: правила, эта история, длина ответа. */
-export function rulesText(story: StoryState, verbosity: Verbosity): string {
+export function rulesText(story: StoryState, verbosity: Verbosity, prices?: PriceList): string {
   return [
     DM_PROMPT,
+    prices ? pricesText(prices) : '',
     `## Эта история\n«${story.title}». Тон: ${TONE_LABELS[story.tone]} — держи его в описаниях и в поведении НПС.`,
     `## Длина ответа\n${VERBOSITY[verbosity].instruction}`,
-  ].join('\n\n')
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 export const summaryText = (summary: string) => (summary.trim() ? `## Что было раньше (сводка памяти ведущего)\n${summary.trim()}` : '')
@@ -51,7 +55,7 @@ export const factsText = (facts: readonly { text: string }[]) =>
 
 /** Системный промт целиком (без обрезки): правила, сводка, факты, состояние игры. */
 export function masterSystemPrompt(story: StoryState, verbosity: Verbosity, ctx: MasterStateContext): string {
-  return [rulesText(story, verbosity), summaryText(story.memory?.summary ?? ''), factsText(story.world.facts), gameStateText(story, ctx)]
+  return [rulesText(story, verbosity, ctx.prices), summaryText(story.memory?.summary ?? ''), factsText(story.world.facts), gameStateText(story, ctx)]
     .filter(Boolean)
     .join('\n\n')
 }
@@ -115,7 +119,7 @@ export function buildMasterRequest(story: StoryState, options: MasterRequestOpti
   const action = actionMsg ? [chatToAi(story, actionMsg)] : []
   const tail = [...(options.turn ?? []), ...(options.trailing ?? [])]
 
-  const rules = rulesText(story, options.verbosity)
+  const rules = rulesText(story, options.verbosity, options.context.prices)
   let summary = summaryText(story.memory?.summary ?? '')
   let factList = story.world.facts.map((f) => f.text)
   const state = gameStateText(story, options.context)

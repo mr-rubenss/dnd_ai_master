@@ -5,6 +5,7 @@ import { CONDITIONS, MAX_EXHAUSTION } from '../engine/conditions'
 import { SKILLS } from '../engine/skills'
 import type { Character, CharacterSheet, Equipment, Inventory } from '../types/character'
 import { ARMOR_TYPES, type ArmorType, type ItemCatalog } from '../types/items'
+import { coinsFromGold, isCoins } from './coins'
 import { EQUIPMENT_SLOTS, equipmentProblems } from './equipment'
 import { isInt, isNonEmptyString, isNumber, isObject, ValidationError } from './validation'
 
@@ -60,11 +61,26 @@ export function carryingCapacity(abilities: AbilityScores): number {
 /** Самая длинная «История героя» (символов). */
 export const MAX_BACKSTORY_LENGTH = 2000
 
-export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): CharacterSheet {
+/**
+ * Миграция старых сохранений: золото числом (`gold`, с дробной частью) → кошелёк монетами (`coins`).
+ * Применяется к листам героев, к началу истории (storyCreated) и к сохранённым снимкам.
+ */
+export function migrateInventory<T>(inventory: T): T {
+  if (!isObject(inventory) || isCoins(inventory.coins)) return inventory
+  const { gold, ...rest } = inventory as Record<string, unknown>
+  return { ...rest, coins: coinsFromGold(typeof gold === 'number' && gold > 0 ? gold : 0) } as T
+}
+
+export function migrateSheet<T>(sheet: T): T {
+  return isObject(sheet) && isObject(sheet.inventory) ? ({ ...sheet, inventory: migrateInventory(sheet.inventory) } as T) : sheet
+}
+
+export function parseCharacterSheet(input: unknown, catalog: ItemCatalog): CharacterSheet {
   const problems: string[] = []
   const fail = (message: string) => problems.push(message)
   const title = 'Некорректный лист персонажа'
-  if (!isObject(raw)) throw new ValidationError(title, ['лист персонажа должен быть объектом'])
+  if (!isObject(input)) throw new ValidationError(title, ['лист персонажа должен быть объектом'])
+  const raw = migrateSheet(input)
 
   const ch = raw.character
   if (!isObject(ch)) {
@@ -160,7 +176,7 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
   if (!isObject(inv)) {
     fail('"inventory" должно быть объектом')
   } else {
-    if (!isNumber(inv.gold) || inv.gold < 0) fail('inventory.gold: неотрицательное число')
+    if (!isCoins(inv.coins)) fail('inventory.coins: { gp, sp, cp } — неотрицательные целые')
     const owned = new Set<string>()
     if (!Array.isArray(inv.items)) {
       fail('inventory.items: должно быть массивом')
@@ -174,6 +190,9 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
         if (owned.has(entry.itemId)) fail(`${where}: предмет "${entry.itemId}" указан дважды — объедините количество`)
         owned.add(entry.itemId)
         if (!isInt(entry.quantity) || entry.quantity < 1) fail(`${where}: "quantity" — положительное целое`)
+        const uses = catalog[entry.itemId].use?.charges
+        if (entry.charges !== undefined && (!uses || !isInt(entry.charges) || entry.charges < 1 || entry.charges > uses))
+          fail(`${where}: "charges" — от 1 до числа применений предмета`)
       })
     }
 

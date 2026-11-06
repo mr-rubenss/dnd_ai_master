@@ -17,6 +17,7 @@ import {
 } from './backgroundTemplate'
 import type { BackgroundProposal } from './backgroundFromStory'
 import { MAX_BACKSTORY_LENGTH } from './character'
+import { coinsFromGold } from './coins'
 
 export const CREATION_STEPS = [
   { id: 'class', title: 'Класс' },
@@ -388,7 +389,7 @@ export function startingInventory(draft: CreationDraft, data: RulesData, catalog
   ]
   const items = mergeItems(lines)
   return {
-    gold: Math.round(((classOption?.gold ?? 0) + (backgroundOption?.gold ?? 0)) * 100) / 100,
+    coins: coinsFromGold((classOption?.gold ?? 0) + (backgroundOption?.gold ?? 0)),
     items,
     equipped: autoEquip(items, catalog),
   }

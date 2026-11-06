@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { Fragment, useState, type KeyboardEvent } from 'react'
 import { rulesData } from '../data'
 import { formatModifier } from '../engine/abilities'
 import { weaponAttacks, type WeaponAttack } from '../game/attacks'
@@ -10,6 +10,8 @@ import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types
 import type { StoryMemory, WorldFact } from '../types/story'
 import { AdventureJournal } from './AdventureJournal'
 import { CharacterStats } from './CharacterStats'
+import { Flash } from './Flash'
+import { formatCoins } from '../game/coins'
 import { CATEGORY_LABELS, formatDice, formatNumber, formatWeight, itemStatLines, itemSummary } from './itemText'
 
 interface Props {
@@ -67,6 +69,7 @@ function formatAttack(attack: WeaponAttack): string {
 
 /** Панель персонажа и инвентаря. На узком экране сворачивается в кнопку. */
 export function InventoryPanel({ character, inventory, catalog, onEquipChange, journal }: Props) {
+  const purse = formatCoins(inventory.coins)
   const [open, setOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [tab, setTabState] = useState<Tab>(loadTab)
@@ -120,7 +123,8 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
       >
         <span>{character.name}</span>
         <span className="inventory-toggle-meta">
-          ХП {character.hp}/{character.maxHp} · КД {ac} · {formatNumber(inventory.gold)} зм · {open ? '▲' : '▼'}
+          ХП <Flash value={character.hp}>{character.hp}</Flash>/{character.maxHp} · КД {ac} ·{' '}
+          <Flash value={purse}>{purse}</Flash> · {open ? '▲' : '▼'}
         </span>
       </button>
 
@@ -135,7 +139,10 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
             <div className="hp-label">
               <span>Хиты</span>
               <strong>
-                {character.hp} / {character.maxHp}
+                <Flash value={character.hp} testId="hp-value">
+                  {character.hp}
+                </Flash>{' '}
+                / {character.maxHp}
               </strong>
             </div>
             <div className="hp-bar">
@@ -152,8 +159,18 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
               <dd data-testid="armor-class">{ac}</dd>
             </div>
             <div>
-              <dt>Золото</dt>
-              <dd>{formatNumber(inventory.gold)} зм</dd>
+              <dt>Кошелёк</dt>
+              <dd>
+                <Flash value={purse} testId="purse">
+                  {/* Номиналы не разрываются при переносе: «17 зм · 9 см · 6 мм». */}
+                  {purse.split(/ (?=\d)/).map((part, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && ' '}
+                      <span className="coin-part">{part}</span>
+                    </Fragment>
+                  ))}
+                </Flash>
+              </dd>
             </div>
           </dl>
         </section>
@@ -252,6 +269,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
                         key={entry.itemId}
                         item={catalog[entry.itemId]}
                         quantity={entry.quantity}
+                        charges={entry.charges}
                         slots={EQUIPMENT_SLOTS.filter((s) => inventory.equipped[s] === entry.itemId)}
                         expanded={expandedId === entry.itemId}
                         error={equipError?.place === entry.itemId ? equipError.message : null}
@@ -280,6 +298,8 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
 interface ItemRowProps {
   item: ItemDefinition
   quantity: number
+  /** Осталось применений у начатого предмета с зарядами. */
+  charges?: number
   /** Слоты, в которых предмет сейчас экипирован. */
   slots: EquipmentSlot[]
   expanded: boolean
@@ -289,7 +309,7 @@ interface ItemRowProps {
   onChange?: (change: EquipmentChange) => void
 }
 
-function ItemRow({ item, quantity, slots, expanded, error, onToggle, onChange }: ItemRowProps) {
+function ItemRow({ item, quantity, charges, slots, expanded, error, onToggle, onChange }: ItemRowProps) {
   const detailsId = `item-details-${item.id}`
   const actions = equipActions(item)
   return (
@@ -302,7 +322,10 @@ function ItemRow({ item, quantity, slots, expanded, error, onToggle, onChange }:
           {item.name}
           {slots.length > 0 && <span className="item-badge">{slots.map((s) => SLOT_NAMES[s].toLowerCase()).join(', ')}</span>}
         </span>
-        <span className="item-qty">{quantity > 1 ? `×${quantity}` : ''}</span>
+        <Flash value={`${quantity}:${charges ?? ''}`} className="item-qty">
+          {quantity > 1 ? `×${quantity}` : ''}
+          {item.use?.charges ? ` ${charges ?? item.use.charges}/${item.use.charges}` : ''}
+        </Flash>
         <span className="item-weight">{formatNumber(Math.round(item.weight * quantity * 100) / 100)}</span>
       </button>
       {expanded && (

@@ -16,10 +16,10 @@ import { AiError } from './ai'
 import { calibrationStore } from './ai/calibrationStore'
 import { settingsProblems } from './ai/settings'
 import { useAiSettings } from './ai/settingsStore'
-import { adventures, defaultAdventure, itemCatalog, rulesData, startingSheet } from './data'
+import { adventures, defaultAdventure, itemCatalog, priceList, rulesData, startingSheet } from './data'
 import { DiceError, roll, type RollMode } from './engine/dice'
 import { draftEpilogue } from './game/epilogue'
-import { rewritableMessageId, streamingText } from './game/masterSuggestions'
+import { lastNarrative, rewritableMessageId, streamingText } from './game/masterSuggestions'
 import { runMasterRewrite, runMasterTurn } from './game/masterTurn'
 import { devLog } from './game/devLog'
 import { compactionNeeded, compactMemory, writeEpilogueSummary } from './game/memory'
@@ -302,7 +302,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     const onRetry = ({ delayMs }: { delayMs: number }) =>
       setAiNotice(`Превышен лимит запросов — повторяю через ${Math.ceil(delayMs / 1000)} с…`)
     const session = masterSession(ai.settings, ai.apiKey)
-    const context = { catalog: itemCatalog, rules: rulesData }
+    const context = { catalog: itemCatalog, rules: rulesData, prices: priceList }
     const common = { verbosity: ai.settings.verbosity, context, ...session.turn, signal: controller.signal, onText, onRetry }
     let ok = false
     try {
@@ -321,13 +321,16 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               if (reason) setAiError(reason)
             }
           } else {
-            const { text, suggestions } = await runMasterTurn(session.master, current, {
+            const { text, suggestions, changes, verification } = await runMasterTurn(session.master, current, {
               ...common,
               // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
               runtime: {
                 getStory: () => (appStore.getState().active?.id === story.id ? appStore.getState().active! : current),
                 commit: (event, author) => appStore.dispatchTo(story.id, event, author),
-                tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
+                tools: { catalog: itemCatalog, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
+                // Журнал разработчика: каждый вызов инструмента и его итог — чтобы видеть, где потерялось изменение.
+                onTool: (call, outcome) =>
+                  devLog.add({ kind: 'tool', name: call.name, ok: outcome.ok, detail: String(outcome.result.error ?? outcome.result.message ?? '') }),
                 onRound: () => {
                   streamed = ''
                   setStreamText('')
@@ -340,6 +343,9 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
                 { type: 'masterNarrated', messageId: crypto.randomUUID(), text, ...(suggestions.length ? { suggestions } : {}) },
                 MASTER,
               )
+            // Строка изменений за ход — после ответа ведущего: игрок видит, что рассказ отразился в листе.
+            if (changes.length) await appStore.dispatchTo(story.id, { type: 'turnSummarized', messageId: crypto.randomUUID(), changes }, ENGINE)
+            if (verification.status !== 'skipped') devLog.add({ kind: 'verify', ...verification })
           }
           ok = true
           break
@@ -372,7 +378,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     if (compactingRef.current) return compactingRef.current
     const active = appStore.getState().active
     if (!active || active.id !== story.id) return
-    const options = { verbosity: ai.settings.verbosity, context: { catalog: itemCatalog, rules: rulesData }, ...session.compact, force }
+    const options = { verbosity: ai.settings.verbosity, context: { catalog: itemCatalog, rules: rulesData, prices: priceList }, ...session.compact, force }
     if (!force && !compactionNeeded(active, options)) return
     const controller = new AbortController()
     compactAbortRef.current = controller
@@ -388,7 +394,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               return now
             },
             commit: (event, author) => appStore.dispatchTo(story.id, event, author),
-            tools: { catalog: itemCatalog, now: () => Date.now(), newId: () => crypto.randomUUID() },
+            tools: { catalog: itemCatalog, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
             now: () => Date.now(),
           },
           { ...options, signal: controller.signal },
@@ -414,7 +420,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   }
 
   /** Подсказки последнего ответа ведущего (если он последний в ленте). */
-  const lastMessage = story.messages.at(-1)
+  const lastMessage = lastNarrative(story.messages)
   const suggestions = lastMessage?.author === 'master' && !waiting ? (lastMessage.suggestions ?? []) : []
 
   const handleSend = (text: string) => {

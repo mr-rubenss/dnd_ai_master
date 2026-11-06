@@ -1,3 +1,4 @@
+import type { Coins } from '../game/coins'
 // Типы персонажа и инвентаря. Пример — src/data/characters/fighter-ratibor.json.
 
 import type { AbilityScores } from '../engine/abilities'
@@ -66,6 +67,8 @@ export interface ChronicleEntry {
 export interface InventoryEntry {
   itemId: string
   quantity: number
+  /** Заряды у предмета с применениями (набор целителя — 10): сколько осталось у начатого; нет поля — полный. */
+  charges?: number
 }
 
 /**
@@ -80,7 +83,8 @@ export interface Equipment {
 }
 
 export interface Inventory {
-  gold: number
+  /** Кошелёк: золотые, серебряные и медные монеты (src/game/coins.ts). В старых сохранениях — `gold` числом. */
+  coins: Coins
   items: InventoryEntry[]
   equipped: Equipment
 }

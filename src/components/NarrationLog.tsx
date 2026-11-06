@@ -54,7 +54,15 @@ export function NarrationLog({ messages, pending = null, replacingId = null, onR
   return (
     <section ref={logRef} className="narration-log" aria-label="Повествование" aria-live="polite">
       {messages.map((message) =>
-        message.id === replacingId && pending !== null ? null : message.check ? (
+        message.id === replacingId && pending !== null ? null : message.changes ? (
+          <p key={message.id} className="turn-changes" data-testid="turn-changes" aria-label="Изменения за ход">
+            {message.changes.map((c, i) => (
+              <span key={i} className={`turn-change is-${c.tone}`} data-kind={c.kind}>
+                {c.text}
+              </span>
+            ))}
+          </p>
+        ) : message.check ? (
           <CheckCardView key={message.id} card={message.check} />
         ) : (
           <article key={message.id} className={`message message--${message.author}`}>

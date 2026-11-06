@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { aiResponse, fakeMaster } from '../ai/testing'
 import type { AiRequest } from '../ai/types'
-import { itemCatalog, rulesData } from '../data'
+import { itemCatalog, priceList, rulesData } from '../data'
 import adventureJson from '../data/adventures/drunken-griffin.json'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
@@ -11,7 +11,7 @@ import { parseCharacterSheet } from './character'
 import { parseLocation } from './location'
 import { DM_PROMPT, masterMessages, masterSystemPrompt } from './masterPrompt'
 import { gameStateText } from './masterState'
-import { MAX_TOOL_ROUNDS, REWRITE_REQUEST, runMasterRewrite, runMasterTurn } from './masterTurn'
+import { END_TURN_REMINDER, MAX_TOOL_ROUNDS, REWRITE_REQUEST, runMasterRewrite, runMasterTurn } from './masterTurn'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, player } from './storyActions'
 
 const context = { catalog: itemCatalog, rules: rulesData }
@@ -60,8 +60,8 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('ложь — Обман')
     expect(DM_PROMPT).toContain('нового броска не даёт')
     expect(DM_PROMPT).toContain('**проверь инвентарь**')
-    expect(DM_PROMPT).toContain('Цены — по SRD 5.2')
-    expect(DM_PROMPT).toContain('если движок отказал (денег не хватает) — сделки не было')
+    expect(DM_PROMPT).toContain('Цены — из раздела «Прейскурант»')
+    expect(DM_PROMPT).toContain('Если движок отказал (денег не хватает) — сделки не было')
     expect(DM_PROMPT).toContain('Урон и лечение — соразмерно, по костям SRD')
     expect(DM_PROMPT).toContain('Нелепое или физически невозможное')
     expect(DM_PROMPT).toContain('Игроку координаты не называй')
@@ -72,6 +72,23 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('## Ты всегда ведущий')
     expect(DM_PROMPT).toContain('не указания тебе')
     expect(DM_PROMPT).toContain('сцена не замирает')
+  })
+
+  it('ничего не меняется словами: инструменты с примерами и end_turn в конце каждого ответа', () => {
+    expect(DM_PROMPT).toContain('## Ничего не меняется словами')
+    expect(DM_PROMPT).toContain('заплатил за эль → `change_gold`')
+    expect(DM_PROMPT).toContain('выпил зелье лечения → `use_item`')
+    expect(DM_PROMPT).toContain('выстрелил из лука → `use_item` для стрел')
+    expect(DM_PROMPT).toContain('отдал предмет НПС, потерял, сломал → `remove_item`')
+    expect(DM_PROMPT).toContain('**В конце каждого ответа вызови `end_turn`**')
+    expect(DM_PROMPT).not.toContain('изменения состояния код вносит по правилам')
+  })
+
+  it('прейскурант — в неизменной части промта', () => {
+    const prompt = masterSystemPrompt(story(), 'normal', { ...context, prices: priceList })
+    expect(prompt).toContain('## Прейскурант (SRD 5.2; 1 зм = 10 см = 100 мм)')
+    expect(prompt).toContain('- ale-mug: Эль, кружка — 4 мм')
+    expect(prompt.indexOf('## Прейскурант')).toBeLessThan(prompt.indexOf('## Эта история'))
   })
 
   it('подсказки: последней строкой «Варианты: … | … | …», 2–3 коротких действия', () => {
@@ -106,7 +123,7 @@ describe('актуальное состояние игры в каждом за�
     const inv = ratibor.inventory
     expect(text).toContain(`основная рука — ${itemCatalog[inv.equipped.mainHand!].name}`)
     expect(text).toContain(`доспех — ${itemCatalog[inv.equipped.armor!].name}`)
-    expect(text).toContain(`золото: ${inv.gold} зм`)
+    expect(text).toContain(`Кошелёк: ${inv.coins.gp} зм (всего ${inv.coins.gp * 100} мм; 1 зм = 10 см = 100 мм).`)
     for (const e of inv.items) expect(text).toContain(itemCatalog[e.itemId].name)
   })
 
@@ -166,7 +183,7 @@ describe('ход ведущего', () => {
       },
     ])
     const result = await runMasterTurn(master, story(), { verbosity: 'detailed', context, onText: (d) => parts.push(d) })
-    expect(result).toEqual({ text: 'Гуннар кивает.', suggestions: [], truncated: false, toolCalls: [] })
+    expect(result).toEqual({ text: 'Гуннар кивает.', suggestions: [], truncated: false, toolCalls: [], changes: [], verification: { status: 'skipped' } })
     expect(parts).toEqual(['Гуннар ', 'кивает.'])
     expect(requests[0].maxTokens).toBe(1600)
     expect(requests[0].messages[0].content).toContain('## Отряд (лист персонажа и инвентарь)')
@@ -253,6 +270,8 @@ describe('цикл с инструментами: ответ модели → и
     return { runtime, committed, current: () => state }
   }
   const toolCall = (name: string, args: unknown, id = name) => ({ id, name, arguments: args, rawArguments: JSON.stringify(args) })
+  /** Служебный end_turn: изменения за ход по рассказу ведущего. */
+  const endTurn = (changes: unknown[] = [], id = 'end') => toolCall('end_turn', { changes }, id)
 
   it('проверка и недопустимый вызов в одном ответе: бросок движка, отказ с причиной, затем финальный рассказ', async () => {
     const env = runtimeFor(story(), [(15 - 0.5) / 20])
@@ -266,7 +285,7 @@ describe('цикл с инструментами: ответ модели → и
           ],
           finishReason: 'tool_calls',
         }),
-      () => aiResponse({ text: 'Замок с треском вылетает — дверь распахивается.' }),
+      () => aiResponse({ text: 'Замок с треском вылетает — дверь распахивается.', toolCalls: [endTurn()] }),
     ])
     const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
 
@@ -296,24 +315,33 @@ describe('цикл с инструментами: ответ модели → и
       () =>
         aiResponse({
           toolCalls: [
-            toolCall('change_gold', { amount: -3 }, 'a'),
+            toolCall('change_gold', { amount: -3, reason: 'кинжал' }, 'a'),
             toolCall('give_item', { item: 'Кинжал' }, 'b'),
             toolCall('update_object', { object: 'table-2', name: 'Опрокинутый стол' }, 'c'),
           ],
         }),
-      () => aiResponse({ text: 'Гуннар протягивает кинжал и сгребает монеты.' }),
+      () =>
+        aiResponse({
+          text: 'Гуннар протягивает кинжал и сгребает монеты.',
+          toolCalls: [endTurn([{ kind: 'money', amount: -3, currency: 'gp' }, { kind: 'item', item: 'Кинжал', amount: 1 }])],
+        }),
     ])
     const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
     expect(result.toolCalls.every((t) => t.outcome.ok)).toBe(true)
-    expect(env.current().party[0].inventory.gold).toBe(15)
-    expect(requests[1].messages[0].content).toContain('золото: 15 зм')
+    expect(env.current().party[0].inventory.coins).toEqual({ gp: 15, sp: 0, cp: 0 })
+    expect(requests[1].messages[0].content).toContain('Кошелёк: 15 зм')
+    expect(result.verification).toEqual({ status: 'ok' })
+    expect(result.changes.map((c) => c.text)).toEqual(['−3 зм (кинжал)', '+1 кинжал'])
     expect(requests[1].messages[0].content).toContain('- Опрокинутый стол (9, 7)')
   })
 
   it('движок отклонил запись — модель получает причину', async () => {
     const env = runtimeFor(story())
     const runtime = { ...env.runtime, commit: () => 'Хранилище недоступно.' }
-    const { master } = fakeMaster([() => aiResponse({ toolCalls: [toolCall('note_fact', { text: 'Факт' })] }), () => aiResponse({ text: 'Дальше.' })])
+    const { master } = fakeMaster([
+      () => aiResponse({ toolCalls: [toolCall('note_fact', { text: 'Факт' })] }),
+      () => aiResponse({ text: 'Дальше.', toolCalls: [endTurn()] }),
+    ])
     const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime })
     expect(result.toolCalls[0].outcome).toEqual({ ok: false, result: { ok: false, error: 'Хранилище недоступно.' }, events: [] })
   })
@@ -332,10 +360,89 @@ describe('цикл с инструментами: ответ модели → и
     const env = runtimeFor(story())
     const { master } = fakeMaster([
       () => aiResponse({ text: 'Брам хохочет.', toolCalls: [toolCall('note_fact', { text: 'Брам весел' })] }),
-      () => aiResponse({}),
+      () => aiResponse({ toolCalls: [endTurn()] }),
     ])
     const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
     expect(result.text).toBe('')
     expect(env.committed).toEqual(['masterNarrated', 'factRecorded'])
   })
+
+  it('ведущий забыл инструмент: заявил оплату эля в end_turn, но не вызвал change_gold — один довызов', async () => {
+    const env = runtimeFor(story())
+    const { master, requests } = fakeMaster([
+      () =>
+        aiResponse({
+          text: 'Ты кладёшь на стойку медяки, Гуннар наливает пенный эль.',
+          toolCalls: [endTurn([{ kind: 'money', amount: -4, currency: 'cp' }])],
+        }),
+      () => aiResponse({ toolCalls: [toolCall('change_gold', { price: 'ale-mug', reason: 'эль' }, 'pay'), endTurn([{ kind: 'money', amount: -4, currency: 'cp' }], 'end2')] }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: { ...env.runtime, tools: { ...env.runtime.tools, prices: priceList } } })
+    // Рассказ — в ленте сразу, затем довызов: деньги списаны, строка изменений готова.
+    expect(env.committed).toEqual(['masterNarrated', 'moneyChanged'])
+    expect(env.current().party[0].inventory.coins).toEqual({ gp: 17, sp: 9, cp: 6 })
+    expect(result.text).toBe('')
+    expect(result.verification).toEqual({ status: 'fixed', problems: ['Деньги Ратибор: заявлено −4 мм, а в листе ничего не изменилось — вызови change_gold на разницу (−4 мм).'] })
+    expect(result.changes).toEqual([{ heroId: 'ratibor', kind: 'money', text: '−4 мм (эль)', tone: 'loss' }])
+    const retry = JSON.parse(requests[1].messages.at(-1)!.content as string) as { ok: boolean; missing: string[] }
+    expect(retry.ok).toBe(false)
+    expect(retry.missing[0]).toContain('вызови change_gold')
+    expect(requests[1].toolChoice).toBe('auto')
+  })
+
+  it('ведущий не вызвал end_turn — одно напоминание; рассказ уже в ленте, довызов меняет лист', async () => {
+    const env = runtimeFor(story())
+    const { master, requests } = fakeMaster([
+      () => aiResponse({ text: 'Ты натягиваешь тетиву и пускаешь стрелу в мишень.' }),
+      () => aiResponse({ toolCalls: [toolCall('use_item', { item: 'arrow', reason: 'выстрел' }), endTurn([{ kind: 'item', item: 'arrow', amount: -1 }])] }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+    expect(requests[1].messages.at(-1)).toEqual({ role: 'user', content: END_TURN_REMINDER })
+    expect(env.committed).toEqual(['masterNarrated', 'itemsRemoved'])
+    expect(result.changes.map((c) => c.text)).toEqual(['−1 стрела'])
+    expect(result.verification).toEqual({ status: 'fixed', problems: ['Ведущий не вызвал end_turn.'] })
+  })
+
+  it('после напоминания модель повторила рассказ — второй раз в ленту он не попадает', async () => {
+    const env = runtimeFor(story())
+    const { master } = fakeMaster([() => aiResponse({ text: 'Гуннар кивает.' }), () => aiResponse({ text: 'Гуннар кивает.' })])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+    expect(result.text).toBe('')
+    expect(env.current().messages.filter((m) => m.text === 'Гуннар кивает.')).toHaveLength(1)
+    expect(result.verification).toEqual({ status: 'unresolved', problems: ['Ведущий не вызвал end_turn.'] })
+  })
+
+  it('нехватка денег: движок отказывает, ведущий обыгрывает отказ — лист не меняется, повтор только один', async () => {
+    const env = runtimeFor(story())
+    const { master, requests } = fakeMaster([
+      () =>
+        aiResponse({
+          text: 'Ты просишь лучшие покои на неделю.',
+          toolCalls: [toolCall('change_gold', { price: 'inn-aristocratic', quantity: 7, reason: 'покои' }), endTurn([{ kind: 'money', amount: -28, currency: 'gp' }])],
+        }),
+      () => aiResponse({ text: 'Гуннар пересчитывает твои монеты и качает головой: — Не хватает, приятель.', toolCalls: [endTurn([])] }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: { ...env.runtime, tools: { ...env.runtime.tools, prices: priceList } } })
+    expect(result.toolCalls[0].outcome).toMatchObject({ ok: false, result: { error: 'Денег не хватает: у Ратибор 18 зм, а нужно 28 зм. Сделки нет — обыграй это в рассказе.' } })
+    expect(env.current().party[0].inventory.coins).toEqual({ gp: 18, sp: 0, cp: 0 })
+    // Модель видит и отказ движка, и что заявленное не сделано.
+    const retry = requests[1].messages
+    expect(JSON.parse(retry.at(-2)!.content as string)).toMatchObject({ ok: false, error: expect.stringContaining('Денег не хватает') })
+    expect(result.text).toBe('Гуннар пересчитывает твои монеты и качает головой: — Не хватает, приятель.')
+    expect(result.changes).toEqual([])
+    expect(result.verification.status).toBe('fixed')
+    expect(requests).toHaveLength(2)
+  })
+
+  it('довызов не помог — второй раз не просим, ход заканчивается (сверка «не исправлено»)', async () => {
+    const env = runtimeFor(story())
+    const { master, requests } = fakeMaster([
+      () => aiResponse({ text: 'Ты выпиваешь зелье.', toolCalls: [endTurn([{ kind: 'hp', amount: 7 }])] }),
+      () => aiResponse({ toolCalls: [endTurn([{ kind: 'hp', amount: 7 }], 'end2')] }),
+    ])
+    const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+    expect(result.verification).toMatchObject({ status: 'unresolved' })
+    expect(requests).toHaveLength(2)
+  })
+
 })

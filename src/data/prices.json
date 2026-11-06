@@ -1,0 +1,29 @@
+{
+  "note": "Прейскурант еды, напитков, ночлега и услуг по SRD 5.2 (таблицы «Food, Drink, and Lodging» и «Services»). 1 зм = 10 см = 100 мм.",
+  "entries": [
+    { "id": "ale-mug", "name": "Эль, кружка", "category": "drink", "price": { "amount": 4, "unit": "cp" } },
+    { "id": "wine-common", "name": "Вино простое, кувшин", "category": "drink", "price": { "amount": 2, "unit": "sp" } },
+    { "id": "wine-fine", "name": "Вино хорошее, бутылка", "category": "drink", "price": { "amount": 10, "unit": "gp" } },
+    { "id": "bread", "name": "Хлеб, буханка", "category": "food", "price": { "amount": 2, "unit": "cp" } },
+    { "id": "cheese", "name": "Сыр, кусок", "category": "food", "price": { "amount": 1, "unit": "sp" } },
+    { "id": "meal-squalid", "name": "Еда нищенская", "category": "food", "price": { "amount": 1, "unit": "cp" } },
+    { "id": "meal-poor", "name": "Еда бедная", "category": "food", "price": { "amount": 2, "unit": "cp" } },
+    { "id": "meal-modest", "name": "Еда скромная", "category": "food", "price": { "amount": 1, "unit": "sp" } },
+    { "id": "meal-comfortable", "name": "Еда хорошая", "category": "food", "price": { "amount": 2, "unit": "sp" } },
+    { "id": "meal-wealthy", "name": "Еда богатая", "category": "food", "price": { "amount": 3, "unit": "sp" } },
+    { "id": "meal-aristocratic", "name": "Еда аристократическая", "category": "food", "price": { "amount": 6, "unit": "sp" } },
+    { "id": "inn-squalid", "name": "Ночлег нищенский (сутки)", "category": "lodging", "price": { "amount": 7, "unit": "cp" } },
+    { "id": "inn-poor", "name": "Ночлег бедный (сутки)", "category": "lodging", "price": { "amount": 1, "unit": "sp" } },
+    { "id": "inn-modest", "name": "Комната скромная (сутки)", "category": "lodging", "price": { "amount": 5, "unit": "sp" } },
+    { "id": "inn-comfortable", "name": "Комната хорошая (сутки)", "category": "lodging", "price": { "amount": 8, "unit": "sp" } },
+    { "id": "inn-wealthy", "name": "Комната богатая (сутки)", "category": "lodging", "price": { "amount": 2, "unit": "gp" } },
+    { "id": "inn-aristocratic", "name": "Покои аристократические (сутки)", "category": "lodging", "price": { "amount": 4, "unit": "gp" } },
+    { "id": "coach-between-towns", "name": "Дилижанс между городами (за милю)", "category": "service", "price": { "amount": 3, "unit": "cp" } },
+    { "id": "coach-in-city", "name": "Извозчик по городу", "category": "service", "price": { "amount": 1, "unit": "cp" } },
+    { "id": "hireling-skilled", "name": "Наёмный работник умелый (день)", "category": "service", "price": { "amount": 2, "unit": "gp" } },
+    { "id": "hireling-untrained", "name": "Наёмный работник неумелый (день)", "category": "service", "price": { "amount": 2, "unit": "sp" } },
+    { "id": "messenger", "name": "Посыльный (за милю)", "category": "service", "price": { "amount": 2, "unit": "cp" } },
+    { "id": "toll", "name": "Пошлина за дорогу или ворота", "category": "service", "price": { "amount": 1, "unit": "cp" } },
+    { "id": "ship-passage", "name": "Проезд на корабле (за милю)", "category": "service", "price": { "amount": 1, "unit": "sp" } }
+  ]
+}

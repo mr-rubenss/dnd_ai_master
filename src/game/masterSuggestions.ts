@@ -68,6 +68,12 @@ export function suggestionsProblem(suggestions: unknown): string | null {
 
 /** Последний ответ ведущего, который можно переписать: он последний в ленте и это не карточка броска; иначе null. */
 export function rewritableMessageId(messages: readonly ChatMessage[]): string | null {
-  const last = messages.at(-1)
+  const last = lastNarrative(messages)
   return last && last.author === 'master' && !last.check ? last.id : null
+}
+
+/** Последнее сообщение ленты без строки изменений за ход (она идёт сразу после ответа ведущего). */
+export function lastNarrative(messages: readonly ChatMessage[]): ChatMessage | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) if (!messages[i].changes) return messages[i]
+  return undefined
 }

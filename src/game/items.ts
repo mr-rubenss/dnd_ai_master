@@ -13,6 +13,7 @@ import {
 } from '../types/items'
 import { isInt, isNonEmptyString, isNumber, isObject, isOneOf, ValidationError } from './validation'
 
+const DICE_HEAL_RE = /^\d+d\d+([+-]\d+)?$/
 const DICE_RE = /^\d+d\d+$/
 
 /** Проверяет массив описаний предметов и возвращает справочник по id. */
@@ -38,6 +39,17 @@ export function parseItemCatalog(raw: unknown): ItemCatalog {
       fail(`${where}: "toolKind" должно быть одним из: ${TOOL_KINDS.join(', ')}`)
     }
 
+    if (item.use !== undefined) {
+      const u = item.use
+      if (!isObject(u)) fail(`${where}: "use" должно быть объектом`)
+      else {
+        if (u.charges !== undefined && (!isInt(u.charges) || u.charges < 2)) fail(`${where}: "use.charges" — целое не меньше 2`)
+        if (u.effect !== undefined) {
+          const e = u.effect
+          if (!isObject(e) || typeof e.healing !== 'string' || !DICE_HEAL_RE.test(e.healing)) fail(`${where}: "use.effect.healing" — запись кости «2d4+2»`)
+        }
+      }
+    }
     if (item.weapon !== undefined) {
       const w = item.weapon
       if (!isObject(w)) {

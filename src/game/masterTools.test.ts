@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AiToolCall } from '../ai/types'
-import { itemCatalog } from '../data'
+import { itemCatalog, priceList } from '../data'
 import adventureJson from '../data/adventures/drunken-griffin.json'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
@@ -22,7 +22,7 @@ const face = (value: number, sides = 20) => (value - 0.5) / sides
 
 function context(rolls: number[] = []): ToolContext {
   let n = 0
-  return { catalog: itemCatalog, rng: () => rolls.shift() ?? 0.5, now: () => 1000, newId: () => `id${++n}` }
+  return { catalog: itemCatalog, prices: priceList, rng: () => rolls.shift() ?? 0.5, now: () => 1000, newId: () => `id${++n}` }
 }
 
 const fresh = (): StoryState => newStorySeed({ id: 's1', title: 'Тест', tone: 'detective', adventure, locations, party: [ratibor], now: 1 })
@@ -51,6 +51,7 @@ describe('описания инструментов', () => {
       'give_item',
       'remove_item',
       'change_gold',
+      'use_item',
       'change_hp',
       'move_npc',
       'add_npc',
@@ -84,10 +85,21 @@ describe('недопустимые вызовы отклоняются, ниче
     expect(rejected(s, 'give_item', { item: 'dagger', quantity: 0 })).toBe('Нельзя выдать «dagger» × 0.')
   })
 
-  it('золото не уходит в минус; изменение — ненулевое число', () => {
-    expect(rejected(s, 'change_gold', { amount: -100 })).toBe('У героя только 18 зм — нельзя забрать 100.')
-    expect(rejected(s, 'change_gold', { amount: 0 })).toBe('«amount» — ненулевое число.')
-    expect(rejected(s, 'change_gold', { amount: 'десять' })).toBe('«amount» — ненулевое число.')
+  it('деньги: нехватка — отказ с причиной (сделки нет); сумма — ненулевое целое число монет; цена — из прейскуранта', () => {
+    expect(rejected(s, 'change_gold', { amount: -100, reason: 'меч' })).toBe('Денег не хватает: у Ратибор 18 зм, а нужно 100 зм. Сделки нет — обыграй это в рассказе.')
+    expect(rejected(s, 'change_gold', { amount: 0, currency: 'cp', reason: 'x' })).toBe('«amount» — ненулевое число.')
+    expect(rejected(s, 'change_gold', { amount: 'десять', reason: 'x' })).toBe('«amount» — число.')
+    expect(rejected(s, 'change_gold', { amount: -0.5, currency: 'cp', reason: 'x' })).toBe('-0.5 мм — не целое число медных монет. 1 зм = 10 см = 100 мм.')
+    expect(rejected(s, 'change_gold', { reason: 'эль' })).toBe('Нужен «amount» (с currency) или «price» из прейскуранта.')
+    expect(rejected(s, 'change_gold', { price: 'dragon-ride', reason: 'полёт' })).toMatch(/^В прейскуранте нет «dragon-ride»\. Есть: ale-mug,/)
+    expect(rejected(s, 'change_gold', { price: 'inn-aristocratic', quantity: 5, reason: 'покои' })).toBe('Денег не хватает: у Ратибор 18 зм, а нужно 20 зм. Сделки нет — обыграй это в рассказе.')
+  })
+
+  it('use_item: нет предмета, не хватает, предмет не расходуется', () => {
+    expect(rejected(s, 'use_item', { item: 'potion-of-healing' })).toBe('У героя нет предмета «Зелье лечения».')
+    expect(rejected(s, 'use_item', { item: 'arrow', quantity: 25 })).toBe('У героя только 20 шт. «Стрела», а забрать нужно 25.')
+    expect(rejected(s, 'use_item', { item: 'greatsword' })).toMatch(/^«Двуручный меч» не расходуется при применении/)
+    expect(rejected(s, 'use_item', { item: 'healers-kit', quantity: 11 })).toBe('У «Набор целителя» осталось применений: 10, а нужно 11.')
   })
 
   it('урон и лечение: целое ≥ 1, вид и тип из списка, герой из отряда', () => {
@@ -206,9 +218,43 @@ describe('допустимые вызовы меняют игру через д�
     s = run(s, 'remove_item', { item: 'greatsword' }).state
     expect(s.party[0].inventory.items.some((e) => e.itemId === 'greatsword')).toBe(false)
     expect(s.party[0].inventory.equipped.mainHand).toBeNull()
-    const paid = run(s, 'change_gold', { amount: -2.5 })
-    expect(paid.outcome.result.gold).toBe(15.5)
-    expect(paid.state.party[0].inventory.gold).toBe(15.5)
+    const paid = run(s, 'change_gold', { amount: -2.5, reason: 'еда' })
+    expect(paid.outcome.result.purse).toBe('15 зм 5 см')
+    expect(paid.state.party[0].inventory.coins).toEqual({ gp: 15, sp: 5, cp: 0 })
+  })
+
+  it('change_gold: эль за 4 мм со сдачей с золотого; цена из прейскуранта; сумма строкой тоже принимается', () => {
+    const ale = run(fresh(), 'change_gold', { amount: -4, currency: 'cp', reason: 'эль' })
+    expect(ale.state.party[0].inventory.coins).toEqual({ gp: 17, sp: 9, cp: 6 })
+    expect(ale.outcome.result.message).toBe('Ратибор: заплатил 4 мм (со сдачей). В кошельке: 17 зм 9 см 6 мм.')
+    const room = run(ale.state, 'change_gold', { price: 'inn-modest', reason: 'комната' })
+    expect(room.state.party[0].inventory.coins).toEqual({ gp: 17, sp: 4, cp: 6 })
+    const twoAles = run(fresh(), 'change_gold', { price: 'ale-mug', quantity: 2, reason: 'эль' })
+    expect(twoAles.state.party[0].inventory.coins).toEqual({ gp: 17, sp: 9, cp: 2 })
+    const stringy = run(fresh(), 'change_gold', { amount: '−4', currency: 'cp', reason: 'эль' })
+    expect(stringy.state.party[0].inventory.coins).toEqual({ gp: 17, sp: 9, cp: 6 })
+    const reward = run(fresh(), 'change_gold', { amount: 3, currency: 'sp', reason: 'награда' })
+    expect(reward.state.party[0].inventory.coins).toEqual({ gp: 18, sp: 3, cp: 0 })
+  })
+
+  it('use_item: стрела списывается, набор целителя — заряд, зелье — бросок лечения движком', () => {
+    const shot = run(fresh(), 'use_item', { item: 'Стрела', reason: 'выстрел' })
+    expect(shot.state.party[0].inventory.items.find((e) => e.itemId === 'arrow')?.quantity).toBe(19)
+    expect(shot.outcome.result.left).toBe(19)
+    const kit = run(fresh(), 'use_item', { item: 'healers-kit', quantity: 3 })
+    expect(kit.state.party[0].inventory.items.find((e) => e.itemId === 'healers-kit')).toEqual({ itemId: 'healers-kit', quantity: 1, charges: 7 })
+    expect(kit.outcome.result.left).toBe(7)
+    const empty = run(kit.state, 'use_item', { item: 'healers-kit', quantity: 7 })
+    expect(empty.state.party[0].inventory.items.some((e) => e.itemId === 'healers-kit')).toBe(false)
+
+    // Раненый герой с зельем: 2к4+2, на кубиках 3 и 4 → 9 хитов.
+    let wounded = run(fresh(), 'change_hp', { kind: 'damage', amount: 10 }).state
+    wounded = run(wounded, 'give_item', { item: 'potion-of-healing' }).state
+    const drink = run(wounded, 'use_item', { item: 'Зелье лечения' }, context([(3 - 0.5) / 4, (4 - 0.5) / 4]))
+    expect(drink.outcome.result.healing).toEqual({ rolls: ['2d4+2 = 9'], total: 9, hp: 11, max_hp: 12 })
+    expect(drink.outcome.events.map((e) => e.event.type)).toEqual(['itemsRemoved', 'diceRolled', 'hpChanged'])
+    expect(drink.state.party[0].character.hp).toBe(11)
+    expect(drink.state.party[0].inventory.items.some((e) => e.itemId === 'potion-of-healing')).toBe(false)
   })
 
   it('урон до 0 — без сознания; массивный урон — гибель (движок); лечение — в сознании', () => {

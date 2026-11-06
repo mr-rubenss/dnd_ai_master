@@ -2,7 +2,7 @@
 // затем — финальный текст. API поставщика подменяется (page.route), броски — через installRngQueue.
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { collectPageErrors, expectNoHorizontalScroll, face, installRngQueue, queueRolls, startQuickGame } from './helpers'
+import { collectPageErrors, expectNoHorizontalScroll, face, installRngQueue, queueRolls, startQuickGame, withEndTurn } from './helpers'
 
 const KEY = 'sk-e2e-fake-key-123456'
 const API = 'https://api.deepseek.com/chat/completions'
@@ -21,7 +21,7 @@ async function mockRounds(page: Page, rounds: string[]) {
   await page.route(API, async (route: Route) => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS })
     bodies.push(route.request().postDataJSON() as Body)
-    await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: rounds.shift() ?? sse([delta({ content: '…' }, 'stop')]) })
+    await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: withEndTurn(route, rounds.shift() ?? sse([delta({ content: '…' }, 'stop')])) })
   })
   return bodies
 }

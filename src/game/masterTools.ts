@@ -6,13 +6,16 @@ import type { AiTool, AiToolCall } from '../ai/types'
 import { ABILITIES, ABILITY_NAMES, type Ability } from '../engine/abilities'
 import { abilityCheck, CheckError, MAX_DC, MIN_DC, savingThrow, type D20TestResult } from '../engine/checks'
 import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition, type ConditionId } from '../engine/conditions'
-import type { RollMode, Rng } from '../engine/dice'
+import { roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
-import type { ItemCatalog } from '../types/items'
+import { isUsable, type ItemCatalog } from '../types/items'
 import { DOOR_STATES, NPC_ATTITUDES, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
 import type { ActionAuthor, PartyMember, StoryEvent, StoryState } from '../types/story'
+import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
+import type { PriceList } from './prices'
+import { END_TURN_TOOL } from './turnChanges'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER } from './storyActions'
 
 /** Типы урона SRD 5.2. */
@@ -88,10 +91,31 @@ export const MASTER_TOOLS: AiTool[] = [
   },
   {
     name: 'change_gold',
-    description: 'Изменить золото героя: положительное число — получил, отрицательное — заплатил. Нельзя уйти в минус.',
+    description:
+      'Деньги героя: заплатил (минус) или получил (плюс). Кошелёк — монеты мм/см/зм, сдачу движок посчитает сам. ' +
+      'Цена из прейскуранта — укажи price (id) и quantity; своя цена — amount и currency (например −4 и cp за кружку эля). ' +
+      'Денег не хватает — движок откажет: тогда сделки не было, обыграй это в рассказе.',
     parameters: object(
-      { hero: HERO, amount: { type: 'number', description: 'Сколько золотых (зм), например 5 или −2.5.' }, reason: str('За что.') },
-      ['amount'],
+      {
+        hero: HERO,
+        amount: { type: 'number', description: 'Сколько: отрицательное — заплатил, положительное — получил. Например −4.' },
+        currency: oneOf(['cp', 'sp', 'gp'], 'Монеты для amount: cp — медные (мм), sp — серебряные (см), gp — золотые (зм). По умолчанию gp.'),
+        price: str('id из прейскуранта (ale-mug, inn-modest…) — оплата по этой цене.'),
+        quantity: int('Сколько раз по цене из прейскуранта (по умолчанию 1).', 1, 999),
+        reason: str('За что, коротко: «эль», «комната на ночь».'),
+      },
+      ['reason'],
+    ),
+  },
+  {
+    name: 'use_item',
+    description:
+      'Герой применил или израсходовал предмет: выстрелил (стрела), съел рацион, зажёг факел, выпил зелье, применил набор целителя. ' +
+      'Движок спишет количество или заряды и применит эффект из справочника (зелье лечения — бросок лечения). ' +
+      'Не хватает — откажет. Отдал, потерял, сломал — это remove_item.',
+    parameters: object(
+      { hero: HERO, item: str('id предмета или его название.'), quantity: int('Сколько (по умолчанию 1).', 1, 99), reason: str('Зачем.') },
+      ['item'],
     ),
   },
   {
@@ -208,8 +232,13 @@ export const MASTER_TOOLS: AiTool[] = [
   },
 ]
 
+/** Инструменты хода ведущего: все инструменты игры и служебный end_turn (сверка изменений за ход). */
+export const TURN_TOOLS: AiTool[] = [...MASTER_TOOLS, END_TURN_TOOL]
+
 export interface ToolContext {
   catalog: ItemCatalog
+  /** Прейскурант (src/data/prices.json) — для change_gold с price. */
+  prices?: PriceList
   /** Генератор случайных чисел для бросков (в тестах — подменённый). */
   rng?: Rng
   now: () => number
@@ -242,10 +271,17 @@ const text = (args: Args, key: string, required = false): string | undefined => 
   if (v === undefined || v === null || v === '') return required ? reject(`Нужен параметр «${key}».`) : undefined
   return typeof v === 'string' && v.trim() ? v.trim() : reject(`«${key}» — непустая строка.`)
 }
-const integer = (args: Args, key: string, required = false): number | undefined => {
+/** Число; модели иногда присылают его строкой («-4») — принимаем и так. */
+const numberArg = (args: Args, key: string): number | undefined => {
   const v = args[key]
-  if (v === undefined || v === null) return required ? reject(`Нужен параметр «${key}».`) : undefined
-  return typeof v === 'number' && Number.isInteger(v) ? v : reject(`«${key}» — целое число.`)
+  if (v === undefined || v === null || v === '') return undefined
+  const n = typeof v === 'string' ? Number(v.trim().replace(',', '.').replace('−', '-')) : v
+  return typeof n === 'number' && Number.isFinite(n) ? n : reject(`«${key}» — число.`)
+}
+const integer = (args: Args, key: string, required = false): number | undefined => {
+  const v = numberArg(args, key)
+  if (v === undefined) return required ? reject(`Нужен параметр «${key}».`) : undefined
+  return Number.isInteger(v) ? v : reject(`«${key}» — целое число.`)
 }
 const choice = <T extends string>(args: Args, key: string, values: readonly T[], required = false): T | undefined => {
   const v = text(args, key, required)
@@ -262,6 +298,31 @@ function findByName<T extends { id: string; name: string }>(list: readonly T[], 
   if (named.length === 1) return named[0]
   if (named.length > 1) return reject(`${what} с именем «${query}» несколько — укажи id: ${named.map((x) => x.id).join(', ')}.`)
   return reject(`${what} «${query}» здесь нет. Есть: ${list.map((x) => `${x.name} (${x.id})`).join(', ') || 'никого'}.`)
+}
+
+/** Урон или лечение героя и их последствия по SRD 5.2 (без сознания, гибель от массивного урона, приход в себя). */
+function hpEvents(member: PartyMember, kind: 'damage' | 'healing', amount: number, damageType: DamageTypeId | undefined, author: ActionAuthor) {
+  const c = member.character
+  const events: ToolEvent[] = [{ event: { type: 'hpChanged', heroId: member.heroId, kind, amount, ...(damageType ? { damageType } : {}) }, author }]
+  const hp = kind === 'damage' ? Math.max(0, c.hp - amount) : Math.min(c.maxHp, c.hp + amount)
+  const has = (id: ConditionId) => c.conditions.some((x) => x.id === id)
+  let died = false
+  let unconscious = has('unconscious')
+  if (kind === 'damage' && hp === 0) {
+    // SRD 5.2: урон, который сверх нуля хитов достигает максимума хитов, убивает сразу; иначе — без сознания.
+    if (amount - c.hp >= c.maxHp) {
+      died = true
+      events.push({ event: { type: 'heroDied', heroId: member.heroId }, author: ENGINE })
+    } else if (!unconscious) {
+      unconscious = true
+      events.push({ event: { type: 'conditionsChanged', heroId: member.heroId, conditions: [...c.conditions, { id: 'unconscious' }] }, author: ENGINE })
+    }
+  }
+  if (kind === 'healing' && c.hp === 0 && hp > 0 && unconscious) {
+    unconscious = false
+    events.push({ event: { type: 'conditionsChanged', heroId: member.heroId, conditions: c.conditions.filter((x) => x.id !== 'unconscious') }, author: ENGINE })
+  }
+  return { events, hp, died, unconscious }
 }
 
 function heroOf(state: StoryState, args: Args): PartyMember {
@@ -371,16 +432,76 @@ const HANDLERS: Record<string, Handler> = {
     }
   },
 
-  change_gold(state, args) {
+  change_gold(state, args, ctx) {
     const member = heroOf(state, args)
-    const amount = args.amount
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount === 0) reject('«amount» — ненулевое число.')
-    const delta = Math.round((amount as number) * 100) / 100
+    const priceId = text(args, 'price')
+    let delta: number
+    if (priceId) {
+      const entry = ctx.prices?.[priceId] ?? reject(`В прейскуранте нет «${priceId}».${ctx.prices ? ` Есть: ${Object.keys(ctx.prices).join(', ')}.` : ''}`)
+      const quantity = integer(args, 'quantity') ?? 1
+      if (quantity < 1) reject('«quantity» — не меньше 1.')
+      delta = -entry.cp * quantity
+    } else {
+      const amount = numberArg(args, 'amount') ?? reject('Нужен «amount» (с currency) или «price» из прейскуранта.')
+      const currency = choice<CoinUnit>(args, 'currency', COIN_UNITS) ?? 'gp'
+      const cp = priceToCp(amount, currency)
+      if (cp === null) reject(`${amount} ${COIN_LABELS[currency]} — не целое число медных монет. 1 зм = 10 см = 100 мм.`)
+      delta = cp!
+      if (delta === 0) reject('«amount» — ненулевое число.')
+    }
+    const purse = member.inventory.coins
+    const coins = changeCoins(purse, delta)
+    if (!coins) reject(`Денег не хватает: у ${member.character.name} ${formatCoins(purse)}, а нужно ${formatCp(delta)}. Сделки нет — обыграй это в рассказе.`)
     return {
-      events: [{ event: { type: 'goldChanged', heroId: member.heroId, delta }, author: MASTER }],
+      events: [{ event: { type: 'moneyChanged', heroId: member.heroId, delta, coins: coins! }, author: MASTER }],
       result: {
-        gold: Math.round((member.inventory.gold + delta) * 100) / 100,
-        message: `Золото ${member.character.name}: ${delta > 0 ? '+' : ''}${delta} зм.`,
+        purse: formatCoins(coins!),
+        message: `${member.character.name}: ${delta < 0 ? 'заплатил' : 'получил'} ${formatCp(delta)}${delta < 0 && coins!.gp < purse.gp ? ' (со сдачей)' : ''}. В кошельке: ${formatCoins(coins!)}.`,
+      },
+    }
+  },
+
+  use_item(state, args, ctx) {
+    const member = heroOf(state, args)
+    const query = text(args, 'item', true)!
+    const owned = member.inventory.items.map((e) => ctx.catalog[e.itemId]).filter(Boolean)
+    const item = ctx.catalog[query] ?? owned.find((i) => norm(i.name) === norm(query)) ?? itemOf(ctx.catalog, query)
+    if (!isUsable(item))
+      reject(`«${item.name}» не расходуется при применении — просто опиши это в рассказе (отдал, потерял, сломал — remove_item).`)
+    const quantity = integer(args, 'quantity') ?? 1
+    if (quantity < 1) reject('«quantity» — не меньше 1.')
+    const perItem = item.use?.charges
+    const events: ToolEvent[] = [
+      perItem
+        ? { event: { type: 'itemChargesUsed', heroId: member.heroId, itemId: item.id, uses: quantity, perItem }, author: MASTER }
+        : { event: { type: 'itemsRemoved', heroId: member.heroId, items: [{ itemId: item.id, quantity }] }, author: MASTER },
+    ]
+    const result: Record<string, unknown> = {}
+    const healing = item.use?.effect?.healing
+    if (healing) {
+      // Эффект из справочника — бросает движок: каждое зелье отдельно.
+      let total = 0
+      const rolls: string[] = []
+      for (let i = 0; i < quantity; i++) {
+        const r = roll(healing, { rng: ctx.rng })
+        total += r.total
+        rolls.push(`${healing} = ${r.total}`)
+        events.push({ event: { type: 'diceRolled', roll: { id: `roll-${ctx.newId()}`, timestamp: ctx.now(), result: r } }, author: ENGINE })
+      }
+      const hp = hpEvents(member, 'healing', total, undefined, ENGINE)
+      events.push(...hp.events)
+      result.healing = { rolls, total, hp: hp.hp, max_hp: member.character.maxHp }
+    }
+    const entry = member.inventory.items.find((e) => e.itemId === item.id)
+    const leftUnits = entry ? (perItem ? (entry.quantity - 1) * perItem + (entry.charges ?? perItem) : entry.quantity) - quantity : -quantity
+    return {
+      events,
+      result: {
+        ...result,
+        left: Math.max(0, leftUnits),
+        message: `${member.character.name} применяет: ${item.name}${quantity > 1 ? ` ×${quantity}` : ''}${perItem ? ` (осталось применений: ${Math.max(0, leftUnits)})` : `, осталось ${Math.max(0, leftUnits)}`}.${
+          healing ? ` Лечение ${result.healing && (result.healing as { total: number }).total}, хиты ${(result.healing as { hp: number }).hp}/${member.character.maxHp}.` : ''
+        }`,
       },
     }
   },
@@ -392,33 +513,7 @@ const HANDLERS: Record<string, Handler> = {
     if (amount < 1) reject('«amount» — не меньше 1.')
     const damageType = choice<DamageTypeId>(args, 'damage_type', Object.keys(DAMAGE_TYPE_NAMES) as DamageTypeId[])
     const c = member.character
-    const events: ToolEvent[] = [
-      { event: { type: 'hpChanged', heroId: member.heroId, kind, amount, ...(damageType ? { damageType } : {}) }, author: MASTER },
-    ]
-    const hp = kind === 'damage' ? Math.max(0, c.hp - amount) : Math.min(c.maxHp, c.hp + amount)
-    const has = (id: ConditionId) => c.conditions.some((x) => x.id === id)
-    let died = false
-    let unconscious = has('unconscious')
-    if (kind === 'damage' && hp === 0) {
-      // SRD 5.2: урон, который сверх нуля хитов достигает максимума хитов, убивает сразу; иначе — без сознания.
-      if (amount - c.hp >= c.maxHp) {
-        died = true
-        events.push({ event: { type: 'heroDied', heroId: member.heroId }, author: ENGINE })
-      } else if (!unconscious) {
-        unconscious = true
-        events.push({
-          event: { type: 'conditionsChanged', heroId: member.heroId, conditions: [...c.conditions, { id: 'unconscious' }] },
-          author: ENGINE,
-        })
-      }
-    }
-    if (kind === 'healing' && c.hp === 0 && hp > 0 && unconscious) {
-      unconscious = false
-      events.push({
-        event: { type: 'conditionsChanged', heroId: member.heroId, conditions: c.conditions.filter((x) => x.id !== 'unconscious') },
-        author: ENGINE,
-      })
-    }
+    const { events, hp, died, unconscious } = hpEvents(member, kind, amount, damageType, MASTER)
     const typeText = damageType ? ` (${DAMAGE_TYPE_NAMES[damageType]})` : ''
     return {
       events,

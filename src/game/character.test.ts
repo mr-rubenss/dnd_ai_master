@@ -12,7 +12,7 @@ const abilities: AbilityScores = { str: 10, dex: 14, con: 10, int: 10, wis: 10, 
 
 function inventoryWith(equipped: Inventory['equipped'], extra: string[] = []): Inventory {
   const ids = [...new Set([...Object.values(equipped).filter((id): id is string => id !== null), ...extra])]
-  return { gold: 0, items: ids.map((itemId) => ({ itemId, quantity: 1 })), equipped }
+  return { coins: { gp: 0, sp: 0, cp: 0 }, items: ids.map((itemId) => ({ itemId, quantity: 1 })), equipped }
 }
 
 function problemsOf(raw: unknown): string[] {
@@ -116,7 +116,7 @@ describe('тестовый воин Ратибор (SRD 5.2)', () => {
   })
 
   it('стартовое золото 18 (4 зм воина + 14 зм солдата), вес снаряжения 148 фнт.', () => {
-    expect(sheet.inventory.gold).toBe(18)
+    expect(sheet.inventory.coins).toEqual({ gp: 18, sp: 0, cp: 0 })
     expect(inventoryWeight(sheet.inventory, catalog)).toBe(148)
   })
 })
