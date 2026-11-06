@@ -1,4 +1,7 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { AiError, createMaster } from '../../ai'
+import { aiConnection, settingsProblems } from '../../ai/settings'
+import { useAiSettings } from '../../ai/settingsStore'
 import { itemCatalog, rulesData } from '../../data'
 import { ABILITIES, ABILITY_ABBREVIATIONS, ABILITY_NAMES, abilityModifier, formatModifier, type Ability } from '../../engine/abilities'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../../engine/skills'
@@ -29,8 +32,13 @@ import {
   skillSlots,
   toolsOfKinds,
   updateCustomBackground,
+  applyBackgroundProposal,
+  chooseCustomBackground,
+  decideProposalDetail,
   type CreationDraft,
 } from '../../game/creation'
+import { backstoryProblem, EXPLANATION_KEYS, EXPLANATION_LABELS, suggestBackground } from '../../game/backgroundFromStory'
+import { MAX_BACKSTORY_LENGTH } from '../../game/character'
 import type { ToolKind } from '../../types/items'
 import { armorTrainingText } from '../itemText'
 import type { EquipmentOption } from '../../types/rules'
@@ -381,12 +389,123 @@ function CustomBackgroundForm({ draft, update }: StepProps) {
   )
 }
 
+/** «История героя» — свободный текст игрока; доступна при любой предыстории. */
+function BackstoryField({ draft, update }: StepProps) {
+  return (
+    <section className="creation-backstory" aria-label="История героя">
+      <label className="field">
+        <span>История героя (необязательно)</span>
+        <textarea
+          rows={3}
+          maxLength={MAX_BACKSTORY_LENGTH}
+          value={draft.backstory}
+          onChange={(e) => update({ ...draft, backstory: e.target.value })}
+          placeholder="Кем был ваш герой — своими словами. Например: бывший моряк, сбежал с корабля после бунта, ищет брата."
+          data-testid="backstory"
+        />
+      </label>
+      <p className="hint">Ведущий будет знать эту историю и сплетать из неё зацепки для сюжета.</p>
+    </section>
+  )
+}
+
+/** «По моей истории»: ИИ предлагает механику предыстории с объяснениями; игрок правит её и решает о дописанных деталях. */
+function StoryProposal({ draft, update }: StepProps) {
+  const { settings, apiKey } = useAiSettings()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  // Свежий черновик для ответа ИИ: пока он думает, игрок может править историю.
+  const draftRef = useRef(draft)
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
+  useEffect(() => () => abortRef.current?.abort(), [])
+  const proposal = draft.backgroundProposal
+  const problem = backstoryProblem(draft.backstory)
+
+  const suggest = async () => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setError(null)
+    try {
+      const master = createMaster(aiConnection(settings, apiKey))
+      const next = await suggestBackground(master, draft.backstory, data, { previous: proposal, signal: controller.signal })
+      update(applyBackgroundProposal(draftRef.current, next, data))
+    } catch (e) {
+      if (controller.signal.aborted) return
+      setError(e instanceof AiError ? e.message : 'Не удалось получить предложение.')
+    } finally {
+      if (!controller.signal.aborted) setLoading(false)
+    }
+  }
+
+  return (
+    <section className="creation-details story-proposal" aria-label="Предыстория по моей истории" data-testid="story-proposal">
+      <h3>По моей истории</h3>
+      {problem && !proposal && <p className="hint">{problem}</p>}
+      <button type="button" className="primary-button" onClick={() => void suggest()} disabled={loading || !!problem} data-testid="suggest-background">
+        {loading ? 'ИИ читает историю…' : proposal ? 'Предложить иначе' : 'Предложить по моей истории'}
+      </button>
+      {error && (
+        <p className="proposal-error" role="alert" data-testid="proposal-error">
+          {error}
+        </p>
+      )}
+      {proposal && (
+        <>
+          <dl className="fact-list proposal-explanations" data-testid="proposal-explanations">
+            {EXPLANATION_KEYS.map((key) => (
+              <Fragment key={key}>
+                <dt>{EXPLANATION_LABELS[key]}</dt>
+                <dd>{proposal.explanations[key]}</dd>
+              </Fragment>
+            ))}
+          </dl>
+          {proposal.details.length > 0 && (
+            <section className="proposal-details" aria-label="Что ИИ предлагает дописать" data-testid="proposal-details">
+              <h4>ИИ предлагает дописать в историю</h4>
+              <p className="hint">Это не ваши слова — решите сами, оставить ли.</p>
+              <ul>
+                {proposal.details.map((d, i) => (
+                  <li key={i} className={`proposal-detail is-${d.status}`} data-status={d.status}>
+                    <span>{d.text}</span>
+                    {d.status === 'pending' ? (
+                      <span className="proposal-detail-actions">
+                        <button type="button" className="secondary-button" onClick={() => update(decideProposalDetail(draft, i, true))}>
+                          Добавить в историю
+                        </button>
+                        <button type="button" className="secondary-button" onClick={() => update(decideProposalDetail(draft, i, false))}>
+                          Не надо
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="proposal-detail-status">{d.status === 'accepted' ? 'Добавлено' : 'Отклонено'}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <p className="hint">Ниже — предложенная предыстория. Любой пункт можно поменять вручную.</p>
+        </>
+      )}
+    </section>
+  )
+}
+
 export function BackgroundStep({ draft, update }: StepProps) {
   const selected = backgroundOf(draft, data)
   const isCustom = draft.backgroundId === CUSTOM_BACKGROUND_ID
+  const fromStory = isCustom && draft.backgroundSource === 'story'
   const feat = selected ? data.feats[selected.feat] : undefined
+  const ai = useAiSettings()
+  const aiReady = settingsProblems(ai.settings, ai.apiKey).length === 0
   return (
     <>
+      <BackstoryField draft={draft} update={update} />
       <div className="option-grid" role="radiogroup" aria-label="Предыстория">
         {Object.values(data.backgrounds).map((bg) => (
           <OptionCard
@@ -402,16 +521,29 @@ export function BackgroundStep({ draft, update }: StepProps) {
         ))}
         <OptionCard
           optionId={CUSTOM_BACKGROUND_ID}
-          selected={isCustom}
-          onSelect={() => update(chooseBackground(draft, CUSTOM_BACKGROUND_ID, data))}
+          selected={isCustom && !fromStory}
+          onSelect={() => update(chooseCustomBackground(draft, 'manual', data))}
           title="Своя предыстория"
           meta="по шаблону правил 2024"
         >
           Придумайте прошлое героя сами: характеристики, навыки, инструмент, черта и снаряжение.
         </OptionCard>
+        <OptionCard
+          optionId="from-story"
+          selected={fromStory}
+          disabled={!aiReady}
+          onSelect={() => update(chooseCustomBackground(draft, 'story', data))}
+          title="По моей истории"
+          meta={aiReady ? 'ИИ подберёт по «Истории героя»' : 'нужен ключ API'}
+        >
+          {aiReady
+            ? 'ИИ прочитает вашу историю и предложит предысторию по шаблону 2024 — с объяснением каждого выбора.'
+            : 'Недоступно без ведущего: укажите ключ API в «Настройки» → «Ведущий». История героя и своя предыстория работают и так.'}
+        </OptionCard>
       </div>
 
-      {isCustom && <CustomBackgroundForm draft={draft} update={update} />}
+      {fromStory && <StoryProposal draft={draft} update={update} />}
+      {isCustom && (!fromStory || draft.backgroundProposal) && <CustomBackgroundForm draft={draft} update={update} />}
 
       {selected && !isCustom && feat && (
         <Details title={selected.name}>

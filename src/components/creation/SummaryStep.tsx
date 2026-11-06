@@ -132,6 +132,15 @@ export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
           <p className="summary-appearance">{character.appearance}</p>
         </section>
       )}
+
+      {character.backstory && (
+        <section>
+          <h4>История героя</h4>
+          <p className="summary-appearance" data-testid="summary-backstory">
+            {character.backstory}
+          </p>
+        </section>
+      )}
     </article>
   )
 }

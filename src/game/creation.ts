@@ -15,6 +15,8 @@ import {
   validateBackgroundTemplate,
   type CustomBackgroundInput,
 } from './backgroundTemplate'
+import type { BackgroundProposal } from './backgroundFromStory'
+import { MAX_BACKSTORY_LENGTH } from './character'
 
 export const CREATION_STEPS = [
   { id: 'class', title: 'Класс' },
@@ -69,6 +71,12 @@ export interface CreationDraft {
   backgroundEquipment: string | null
   name: string
   appearance: string
+  /** «История героя» — свободный текст игрока; доступна при любой предыстории и попадает в лист персонажа. */
+  backstory: string
+  /** Как заполнена своя предыстория: вручную или «по моей истории» (предложение ИИ, которое можно править). */
+  backgroundSource: 'manual' | 'story'
+  /** Последнее предложение ИИ «по моей истории»: объяснения выбора и дописанные детали. */
+  backgroundProposal: BackgroundProposal | null
 }
 
 export function emptyDraft(): CreationDraft {
@@ -96,7 +104,31 @@ export function emptyDraft(): CreationDraft {
     backgroundEquipment: null,
     name: '',
     appearance: '',
+    backstory: '',
+    backgroundSource: 'manual',
+    backgroundProposal: null,
   }
+}
+
+/** Выбрать «Свою предысторию» вручную или «По моей истории». */
+export function chooseCustomBackground(draft: CreationDraft, source: 'manual' | 'story', data: RulesData): CreationDraft {
+  return { ...chooseBackground(draft, CUSTOM_BACKGROUND_ID, data), backgroundSource: source }
+}
+
+/** Применить предложение ИИ: поля своей предыстории заполняются (их можно править), объяснения сохраняются. */
+export function applyBackgroundProposal(draft: CreationDraft, proposal: BackgroundProposal, data: RulesData): CreationDraft {
+  const next = chooseCustomBackground(draft, 'story', data)
+  return { ...updateCustomBackground(next, proposal.input, data), backgroundProposal: proposal }
+}
+
+/** Решение игрока по дописанной ИИ детали: принятая дописывается в «Историю героя». */
+export function decideProposalDetail(draft: CreationDraft, index: number, accept: boolean): CreationDraft {
+  const proposal = draft.backgroundProposal
+  const detail = proposal?.details[index]
+  if (!proposal || !detail || detail.status !== 'pending') return draft
+  const details = proposal.details.map((d, i) => (i === index ? { ...d, status: accept ? ('accepted' as const) : ('rejected' as const) } : d))
+  const backstory = accept ? [draft.backstory.trim(), detail.text.trim()].filter(Boolean).join(' ').slice(0, MAX_BACKSTORY_LENGTH) : draft.backstory
+  return { ...draft, backstory, backgroundProposal: { ...proposal, details } }
 }
 
 // ---------- Обновление черновика: смена выбора сбрасывает зависящие от него решения ----------
@@ -520,6 +552,7 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
       conditions: [],
       feats: chosenFeats(draft, data),
       appearance: draft.appearance.trim(),
+      ...(draft.backstory.trim() ? { backstory: draft.backstory.trim() } : {}),
     },
     inventory: startingInventory(draft, data, catalog),
   }

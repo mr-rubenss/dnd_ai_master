@@ -53,9 +53,30 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
     attacks.length ? `Атаки: ${attacks.join('; ')}.` : '',
     `Инвентарь: ${items.length ? items.join(', ') : 'пусто'}; золото: ${inv.gold} зм.`,
     `Положение на карте: клетка ${cell(member.position)}.`,
+    ...heroPastText(c),
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+/** Сколько последних записей «Летописи» идёт в запрос. */
+export const CHRONICLE_IN_PROMPT = 5
+
+/**
+ * Прошлое героя — источник зацепок для сюжета: «История героя» словами игрока и «Летопись» прошлых приключений
+ * (старые враги и друзья, что кончилось и как).
+ */
+export function heroPastText(c: PartyMember['character']): string[] {
+  const lines: string[] = []
+  if (c.backstory?.trim()) lines.push(`История героя (словами игрока; источник зацепок для сюжета): ${c.backstory.trim()}`)
+  const chronicle = (c.chronicle ?? []).slice(-CHRONICLE_IN_PROMPT)
+  if (chronicle.length)
+    lines.push(
+      `Летопись (прошлые приключения героя — старые враги, друзья, долги):\n${chronicle
+        .map((e) => `- «${e.storyTitle}» (${e.fate === 'fallen' ? 'погиб' : `ур. ${e.startLevel}→${e.endLevel}`}): ${e.summary} ${e.outcome}`.trim())
+        .join('\n')}`,
+    )
+  return lines
 }
 
 /** Текущая локация: описание, комнаты, объекты, двери (с состоянием в этой истории), НПС. */

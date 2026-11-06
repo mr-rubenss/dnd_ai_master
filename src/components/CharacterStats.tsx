@@ -102,6 +102,15 @@ export function CharacterStats({ character }: { character: Character }) {
         </dl>
       </section>
 
+      {character.backstory && (
+        <section className="inventory-section" aria-label="История героя">
+          <h3>История героя</h3>
+          <p className="backstory-text" data-testid="sheet-backstory">
+            {character.backstory}
+          </p>
+        </section>
+      )}
+
       <section className="inventory-section" aria-label="Летопись">
         <h3>Летопись</h3>
         <Chronicle entries={character.chronicle ?? []} />

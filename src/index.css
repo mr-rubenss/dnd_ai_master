@@ -3975,3 +3975,83 @@ textarea {
 .dev-log-entry.is-error span {
   color: var(--color-danger-text);
 }
+
+/* ---------- История героя и предыстория «по моей истории» ---------- */
+
+.creation-backstory {
+  margin-bottom: var(--space-14);
+  padding: var(--space-12) var(--space-14);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-tint);
+}
+
+.creation-backstory .hint {
+  margin-bottom: 0;
+}
+
+.backstory-text {
+  margin: 0;
+  font-size: var(--text-90);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.story-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.story-proposal > .primary-button {
+  align-self: flex-start;
+}
+
+.proposal-error {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--text-88);
+}
+
+.proposal-details ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.proposal-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6) var(--space-10);
+  padding: var(--space-8) var(--space-10);
+  border: 1px dashed var(--color-border-bright);
+  border-radius: var(--radius-md);
+  font-size: var(--text-90);
+}
+
+.proposal-detail > span:first-child {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-style: italic;
+}
+
+.proposal-detail.is-rejected > span:first-child {
+  text-decoration: line-through;
+  color: var(--color-muted);
+}
+
+.proposal-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.proposal-detail-status {
+  font-size: var(--text-82);
+  color: var(--color-muted);
+}

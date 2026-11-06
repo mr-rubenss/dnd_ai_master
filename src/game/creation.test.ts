@@ -278,6 +278,13 @@ describe('снаряжение', () => {
 })
 
 describe('готовый лист персонажа', () => {
+  it('«История героя» — в листе при любой предыстории (готовой тоже); пустая — без поля', () => {
+    const story = buildCharacterSheet({ ...fighterDraft(), backstory: '  Бывший моряк, ищет брата.  ' }, data, catalog, 'x')
+    expect(story.character.backstory).toBe('Бывший моряк, ищет брата.')
+    expect(story.character.background).toBe('Солдат')
+    expect('backstory' in buildCharacterSheet(fighterDraft(), data, catalog, 'x').character).toBe(false)
+  })
+
   it('собирает воина, совпадающего с Ратибором по правилам', () => {
     const sheet = buildCharacterSheet(fighterDraft(), data, catalog, 'new-hero')
     const { character, inventory } = sheet

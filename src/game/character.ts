@@ -57,6 +57,9 @@ export function carryingCapacity(abilities: AbilityScores): number {
 }
 
 /** Проверяет лист персонажа (персонаж + инвентарь) по справочнику предметов. */
+/** Самая длинная «История героя» (символов). */
+export const MAX_BACKSTORY_LENGTH = 2000
+
 export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): CharacterSheet {
   const problems: string[] = []
   const fail = (message: string) => problems.push(message)
@@ -85,6 +88,8 @@ export function parseCharacterSheet(raw: unknown, catalog: ItemCatalog): Charact
     if (ch.speciesOption !== null && typeof ch.speciesOption !== 'string') fail('character.speciesOption: строка или null')
     if (!Array.isArray(ch.feats) || !ch.feats.every((f) => typeof f === 'string')) fail('character.feats: массив id черт')
     if (typeof ch.appearance !== 'string') fail('character.appearance: строка')
+    if (ch.backstory !== undefined && (typeof ch.backstory !== 'string' || ch.backstory.length > MAX_BACKSTORY_LENGTH))
+      fail(`character.backstory: строка не длиннее ${MAX_BACKSTORY_LENGTH} символов`)
     if (ch.chronicle !== undefined) {
       if (!Array.isArray(ch.chronicle)) fail('character.chronicle: массив записей «Летописи»')
       else {
