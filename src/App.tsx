@@ -6,6 +6,9 @@ import { DiceTray } from './components/DiceTray'
 import { EpilogueDialog } from './components/EpilogueDialog'
 import { HeroesScreen } from './components/HeroesScreen'
 import { InventoryPanel } from './components/InventoryPanel'
+import { SpellChoiceDialog } from './components/MagicPanel'
+import { needsSpellChoice } from './game/magic'
+import type { CharacterMagic } from './types/spells'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
@@ -236,6 +239,7 @@ function App() {
           onContinue={openStory}
           onRename={(heroId, name) => appStore.renameHero(heroId, name)}
           onDelete={(heroId) => appStore.deleteHero(heroId)}
+          onChooseSpells={(heroId, magic) => appStore.chooseHeroSpells(heroId, magic)}
         />
       )}
       {current === 'creation' && (
@@ -375,7 +379,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               runtime: {
                 getStory: () => (appStore.getState().active?.id === story.id ? appStore.getState().active! : current),
                 commit: (event, author) => appStore.dispatchTo(story.id, event, author),
-                tools: { catalog: itemCatalog, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
+                tools: { catalog: itemCatalog, rules: rulesData, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
                 // Журнал разработчика: каждый вызов инструмента и его итог — чтобы видеть, где потерялось изменение.
                 onTool: (call, outcome) =>
                   devLog.add({ kind: 'tool', name: call.name, ok: outcome.ok, detail: String(outcome.result.error ?? outcome.result.message ?? '') }),
@@ -443,7 +447,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               return now
             },
             commit: (event, author) => appStore.dispatchTo(story.id, event, author),
-            tools: { catalog: itemCatalog, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
+            tools: { catalog: itemCatalog, rules: rulesData, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
             now: () => Date.now(),
           },
           { ...options, signal: controller.signal },
@@ -489,6 +493,11 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       throw error
     }
   }
+
+  // Старое сохранение заклинателя: магия теперь часть листа — при загрузке предлагаем выбрать заклинания.
+  const [spellDialog, setSpellDialog] = useState(() => !readOnly && needsSpellChoice(lead.character, rulesData))
+  const chooseSpells = (magic: CharacterMagic) => appStore.dispatch({ type: 'spellsChosen', heroId: lead.heroId, magic }, player(lead.heroId))
+  const prepareSpells = (prepared: string[]) => appStore.dispatch({ type: 'preparedSpellsChanged', heroId: lead.heroId, prepared }, player(lead.heroId))
 
   const handleEquipChange = (change: EquipmentChange): string | null => {
     const result = equipmentEvent(lead, itemCatalog, change)
@@ -546,8 +555,13 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
           catalog={itemCatalog}
           onEquipChange={readOnly ? undefined : handleEquipChange}
           journal={{ memory: story.memory, facts: story.world.facts }}
+          onPrepareSpells={readOnly ? undefined : prepareSpells}
+          onChooseSpells={readOnly ? undefined : () => setSpellDialog(true)}
         />
       </div>
+      {spellDialog && !readOnly && needsSpellChoice(lead.character, rulesData) && (
+        <SpellChoiceDialog character={lead.character} onSubmit={chooseSpells} onClose={() => setSpellDialog(false)} />
+      )}
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}
     </>
   )

@@ -26,7 +26,8 @@ import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
-import { migrateInventory } from './character'
+import { magicShapeProblems, migrateInventory } from './character'
+import { castProblem, emptyMagic, magicProblems, needsSpellChoice, preparedProblems, spendCast, type MagicRules } from './magic'
 import { changeCoins, coinsFromCp, coinsValue, formatCoins, formatCp, gpToCp, isCoins } from './coins'
 import { isNonEmptyString } from './validation'
 
@@ -227,6 +228,15 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         const equipped = { mainHand: has(eq.mainHand) ? eq.mainHand : null, offHand: has(eq.offHand) ? eq.offHand : null, armor: has(eq.armor) ? eq.armor : null }
         return { ...m, inventory: { ...m.inventory, items, equipped } }
       })
+    case 'spellsChosen':
+      return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, magic: structuredClone(action.magic) } }))
+    case 'preparedSpellsChanged':
+      return updateMember(state, action.heroId, (m) => ({
+        ...m,
+        character: { ...m.character, magic: { ...(m.character.magic ?? emptyMagic()), prepared: [...action.prepared] } },
+      }))
+    case 'spellCast':
+      return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, magic: spendCast(m.character.magic, action) } }))
     case 'turnSummarized': {
       const text = `Изменения: ${action.changes.map((c) => c.text).join(', ')}`
       return { ...state, messages: [...state.messages, { id: action.messageId, author: 'system', text, changes: action.changes }] }
@@ -297,13 +307,15 @@ export function replay(actions: readonly StoryAction[], from: StoryState | null 
 
 export interface ActionContext {
   catalog: ItemCatalog
+  /** Правила магии (классы, виды, заклинания) — для событий заклинаний; нет — такие события отклоняются. */
+  rules?: MagicRules
 }
 
 /**
  * Проверяет действие по правилам и текущему состоянию истории. Возвращает причину отказа или null.
  * Так проверяются и действия игрока, и предложения ведущего, и (в будущем) действия, пришедшие по сети.
  */
-export function checkAction(state: StoryState | null, action: StoryAction, { catalog }: ActionContext): string | null {
+export function checkAction(state: StoryState | null, action: StoryAction, { catalog, rules }: ActionContext): string | null {
   if (action.type === 'storyCreated') {
     if (state) return 'История уже создана.'
     if (action.seed.id !== action.storyId) return 'id истории в действии и в состоянии не совпадают.'
@@ -397,6 +409,33 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!entry) return `У героя нет предмета «${name}».`
       const left = (entry.quantity - 1) * max + (entry.charges ?? max)
       return left < action.uses ? `У «${name}» осталось применений: ${left}, а нужно ${action.uses}.` : null
+    }
+    case 'spellsChosen': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил магии.'
+      if (action.author.kind !== 'player' && action.author.kind !== 'system') return 'Заклинания выбирает игрок.'
+      if (!needsSpellChoice(hero.character, rules)) return 'Заклинания этого героя уже выбраны.'
+      const shape = magicShapeProblems(action.magic)
+      if (shape.length) return `Некорректная магия: ${shape[0]}.`
+      return magicProblems(hero.character, action.magic, rules)[0] ?? null
+    }
+    case 'preparedSpellsChanged': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил магии.'
+      if (action.author.kind !== 'player') return 'Подготовленные заклинания меняет игрок.'
+      const c = hero.character
+      if (!c.magic) return 'Сначала выберите заклинания.'
+      if (!Array.isArray(action.prepared) || !action.prepared.every((id) => typeof id === 'string')) return 'Подготовленные — список заклинаний.'
+      return preparedProblems(c.classId, c.level, action.prepared, rules, c.magic.spellbook)[0] ?? null
+    }
+    case 'spellCast': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил магии.'
+      if (hero.fallen) return 'Герой погиб.'
+      return castProblem({ ...hero.character }, action, rules)
     }
     case 'turnSummarized':
       if (action.author.kind !== 'engine') return 'Итог хода записывает движок.'

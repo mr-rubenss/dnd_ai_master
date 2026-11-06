@@ -19,11 +19,14 @@ import {
   reconcileRoster,
   renameHero,
   retireHero,
+  chooseHeroSpells,
   type RosterResult,
 } from './heroes'
 import { importLegacy, type LegacyContext } from './legacyImport'
 import type { KeyValueStorage } from './legacySave'
 import type { StoryRepository } from './repository'
+import type { MagicRules } from './magic'
+import type { CharacterMagic } from '../types/spells'
 import {
   applyAction,
   checkAction,
@@ -56,6 +59,8 @@ export interface NewStoryRequest {
 export interface AppStoreOptions {
   repo: StoryRepository
   catalog: ItemCatalog
+  /** Правила магии — для событий заклинаний (выбор, подготовка, сотворение). */
+  rules?: MagicRules
   locations: Record<string, LocationData>
   adventures: Record<string, AdventureData>
   /** localStorage — откуда переносятся старые данные. */
@@ -69,7 +74,7 @@ export interface AppStoreOptions {
 export type CommandResult = string | null
 
 export function createAppStore(options: AppStoreOptions) {
-  const { repo, catalog, locations, adventures } = options
+  const { repo, catalog, locations, adventures, rules } = options
   const now = options.now ?? Date.now
   const newId = options.newId ?? (() => crypto.randomUUID())
 
@@ -103,7 +108,7 @@ export function createAppStore(options: AppStoreOptions) {
   /** Проверить, применить и сохранить действие в историю, состояние которой уже загружено. */
   function commitAction(story: StoryState, seq: number, event: StoryEvent, author: ActionAuthor): { state: StoryState; seq: number } | string {
     const action = makeAction(story.id, seq, event, author, now(), newId())
-    const reason = checkAction(story, action, { catalog })
+    const reason = checkAction(story, action, { catalog, rules })
     if (reason) return reason
     const next = applyAction(story, action)
     void serial(() => repo.commit({ story: { state: next, actions: [action], seq: seq + 1 } }))
@@ -189,7 +194,7 @@ export function createAppStore(options: AppStoreOptions) {
       const at = now()
       const seed = newStorySeed({ id, title: request.title, tone: request.tone, adventure, locations, party: heroes.map((h) => h!.sheet), now: at })
       const action = makeAction(id, 0, { type: 'storyCreated', seed }, SYSTEM, at, newId())
-      const reason = checkAction(null, action, { catalog })
+      const reason = checkAction(null, action, { catalog, rules })
       if (reason) return reason
       let roster = state.roster
       for (const heroId of request.heroIds) {
@@ -279,6 +284,14 @@ export function createAppStore(options: AppStoreOptions) {
 
     async saveHero(sheet: CharacterSheet): Promise<CommandResult> {
       const reason = applyRoster(addHero(state.roster, createHeroRecord(sheet, now())))
+      if (!reason) await saveRoster()
+      return reason
+    },
+
+    /** Выбрать заклинания герою из «Моих героев» (старое сохранение заклинателя). */
+    async chooseHeroSpells(heroId: string, magic: CharacterMagic): Promise<CommandResult> {
+      if (!rules) return 'Нет данных правил магии.'
+      const reason = applyRoster(chooseHeroSpells(state.roster, heroId, magic, rules))
       if (!reason) await saveRoster()
       return reason
     },

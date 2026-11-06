@@ -4,6 +4,7 @@ import type { Coins } from '../game/coins'
 import type { AbilityScores } from '../engine/abilities'
 import type { Proficiencies } from '../engine/checks'
 import type { ActiveCondition } from '../engine/conditions'
+import type { CharacterMagic } from './spells'
 
 export { ABILITIES, type Ability, type AbilityScores } from '../engine/abilities'
 
@@ -42,6 +43,11 @@ export interface Character {
    * Переходит вместе с героем в новые истории. Нет поля — записей ещё нет.
    */
   chronicle?: ChronicleEntry[]
+  /**
+   * Магия (src/game/magic.ts): выбранные заговоры и заклинания, книга, «Посвящённый в магию», потраченные ячейки.
+   * Нет поля у заклинателя — заклинания ещё не выбраны (старое сохранение).
+   */
+  magic?: CharacterMagic
 }
 
 /** Чем закончился для героя путь в истории. */

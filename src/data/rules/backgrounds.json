@@ -3,17 +3,10 @@
     "id": "acolyte",
     "name": "Прислужник",
     "description": "Вы служили в храме, помогая жрецам в обрядах и изучая священные тексты.",
-    "abilities": [
-      "int",
-      "wis",
-      "cha"
-    ],
+    "abilities": ["int", "wis", "cha"],
     "feat": "magic-initiate",
     "featNote": "список жреца",
-    "skills": [
-      "insight",
-      "religion"
-    ],
+    "skills": ["insight", "religion"],
     "tool": {
       "itemId": "calligraphers-supplies"
     },
@@ -45,22 +38,16 @@
         "items": [],
         "gold": 50
       }
-    ]
+    ],
+    "featSpellList": "cleric"
   },
   {
     "id": "criminal",
     "name": "Преступник",
     "description": "Вы зарабатывали на жизнь в тёмных переулках: обчищали карманы, вскрывали замки и знали нужных людей.",
-    "abilities": [
-      "dex",
-      "con",
-      "int"
-    ],
+    "abilities": ["dex", "con", "int"],
     "feat": "alert",
-    "skills": [
-      "sleight-of-hand",
-      "stealth"
-    ],
+    "skills": ["sleight-of-hand", "stealth"],
     "tool": {
       "itemId": "thieves-tools"
     },
@@ -99,17 +86,10 @@
     "id": "sage",
     "name": "Мудрец",
     "description": "Годы среди книг и свитков в библиотеках и университетах научили вас многому о мире и магии.",
-    "abilities": [
-      "con",
-      "int",
-      "wis"
-    ],
+    "abilities": ["con", "int", "wis"],
     "feat": "magic-initiate",
     "featNote": "список волшебника",
-    "skills": [
-      "arcana",
-      "history"
-    ],
+    "skills": ["arcana", "history"],
     "tool": {
       "itemId": "calligraphers-supplies"
     },
@@ -141,22 +121,16 @@
         "items": [],
         "gold": 50
       }
-    ]
+    ],
+    "featSpellList": "wizard"
   },
   {
     "id": "soldier",
     "name": "Солдат",
     "description": "Вы начали военную службу, едва повзрослев, и знаете цену дисциплине и боевому братству.",
-    "abilities": [
-      "str",
-      "dex",
-      "con"
-    ],
+    "abilities": ["str", "dex", "con"],
     "feat": "savage-attacker",
-    "skills": [
-      "athletics",
-      "intimidation"
-    ],
+    "skills": ["athletics", "intimidation"],
     "tool": {
       "choose": "gaming"
     },

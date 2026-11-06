@@ -1,0 +1,1784 @@
+[
+  {
+    "id": "acid-splash",
+    "name": "Брызги кислоты",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Шар кислоты взрывается в точке: существа в радиусе 5 футов совершают спасбросок Ловкости или получают 1к6 урона кислотой.",
+    "effect": {
+      "save": "dex",
+      "onSave": "none",
+      "damage": {
+        "dice": "1d6",
+        "type": "acid"
+      }
+    }
+  },
+  {
+    "id": "chill-touch",
+    "name": "Леденящее прикосновение",
+    "level": 0,
+    "school": "necromancy",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Рукопашная атака заклинанием: 1к10 некротического урона, до конца вашего следующего хода цель не восстанавливает хиты.",
+    "effect": {
+      "attack": "melee",
+      "damage": {
+        "dice": "1d10",
+        "type": "necrotic"
+      }
+    }
+  },
+  {
+    "id": "dancing-lights",
+    "name": "Пляшущие огоньки",
+    "level": 0,
+    "school": "illusion",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "кусочек фосфора"
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "До четырёх огоньков размером с факел парят в воздухе и дают тусклый свет в радиусе 10 футов; бонусным действием их можно двигать.",
+    "effect": {
+      "light": true
+    }
+  },
+  {
+    "id": "druidcraft",
+    "name": "Искусство друидов",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid"
+    ],
+    "description": "Малое природное чудо: предсказать погоду, заставить цветок распуститься, зажечь или погасить свечу, создать безвредный природный эффект."
+  },
+  {
+    "id": "eldritch-blast",
+    "name": "Мистический заряд",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "warlock"
+    ],
+    "description": "Луч потрескивающей энергии — дальнобойная атака заклинанием, 1к10 урона силовым полем.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d10",
+        "type": "force"
+      }
+    }
+  },
+  {
+    "id": "fire-bolt",
+    "name": "Огненный снаряд",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Сгусток огня — дальнобойная атака заклинанием, 1к10 урона огнём; поджигает горючие предметы, которые никто не несёт.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d10",
+        "type": "fire"
+      }
+    }
+  },
+  {
+    "id": "guidance",
+    "name": "Указание",
+    "level": 0,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "druid"
+    ],
+    "description": "Выберите навык: пока заклинание действует, союзник добавляет 1к4 к одной проверке характеристики с этим навыком."
+  },
+  {
+    "id": "light",
+    "name": "Свет",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": false,
+      "material": "светлячок или фосфоресцирующий мох"
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "cleric",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Предмет размером не больше 10 футов излучает яркий свет в радиусе 20 футов и тусклый ещё на 20 футов.",
+    "effect": {
+      "light": true
+    }
+  },
+  {
+    "id": "mage-hand",
+    "name": "Волшебная рука",
+    "level": 0,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Призрачная рука двигает предметы до 10 фунтов, открывает незапертые двери и контейнеры; атаковать не может."
+  },
+  {
+    "id": "mending",
+    "name": "Починка",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 минута",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "два магнитных камня"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "cleric",
+      "druid",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Чинит одну поломку или разрыв не больше 1 фута: порванный плащ, звено цепи, треснувший ключ."
+  },
+  {
+    "id": "message",
+    "name": "Сообщение",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": false,
+      "somatic": true,
+      "material": "медная проволока"
+    },
+    "duration": "1 раунд",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Шёпот достигает существа на расстоянии; только оно слышит послание и может ответить шёпотом."
+  },
+  {
+    "id": "minor-illusion",
+    "name": "Малая иллюзия",
+    "level": 0,
+    "school": "illusion",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": false,
+      "somatic": true,
+      "material": "клок шерсти"
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Звук или неподвижный образ предмета размером с куб 5 футов. Распознать иллюзию — проверка Интеллекта (Анализ) против Сл заклинания."
+  },
+  {
+    "id": "poison-spray",
+    "name": "Ядовитые брызги",
+    "level": 0,
+    "school": "necromancy",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Струя ядовитого тумана — дальнобойная атака заклинанием, 1к12 урона ядом.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d12",
+        "type": "poison"
+      }
+    }
+  },
+  {
+    "id": "prestidigitation",
+    "name": "Фокусы",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "10 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "До 1 часа",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Мелкие чудеса: искры, запах, чистка или пачкание, нагрев или охлаждение еды, маленький знак или безделушка-иллюзия."
+  },
+  {
+    "id": "produce-flame",
+    "name": "Сотворение пламени",
+    "level": 0,
+    "school": "conjuration",
+    "castingTime": "1 бонусное действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "10 минут",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid"
+    ],
+    "description": "Пламя в ладони даёт свет в радиусе 20 футов; его можно метнуть — дальнобойная атака заклинанием на 60 футов, 1к8 урона огнём.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d8",
+        "type": "fire"
+      },
+      "light": true
+    }
+  },
+  {
+    "id": "ray-of-frost",
+    "name": "Луч холода",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Ледяной луч — дальнобойная атака заклинанием, 1к8 урона холодом, скорость цели уменьшается на 10 футов.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d8",
+        "type": "cold"
+      }
+    }
+  },
+  {
+    "id": "resistance",
+    "name": "Сопротивление",
+    "level": 0,
+    "school": "abjuration",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "druid"
+    ],
+    "description": "Выберите тип урона: раз за ход союзник уменьшает урон этого типа на 1к4."
+  },
+  {
+    "id": "sacred-flame",
+    "name": "Священное пламя",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric"
+    ],
+    "description": "Сияние нисходит на существо: спасбросок Ловкости, при провале 1к8 урона излучением. Укрытие не помогает.",
+    "effect": {
+      "save": "dex",
+      "onSave": "none",
+      "damage": {
+        "dice": "1d8",
+        "type": "radiant"
+      }
+    }
+  },
+  {
+    "id": "shillelagh",
+    "name": "Дубинка",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 бонусное действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "омела"
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid"
+    ],
+    "description": "Дубинка или боевой посох в руке: атаки и урон по вашей характеристике заклинаний, кость урона — к8, урон можно сделать силовым полем."
+  },
+  {
+    "id": "shocking-grasp",
+    "name": "Шокирующая хватка",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Рукопашная атака заклинанием: 1к8 урона электричеством, цель не может совершать провоцированные атаки до начала своего хода.",
+    "effect": {
+      "attack": "melee",
+      "damage": {
+        "dice": "1d8",
+        "type": "lightning"
+      }
+    }
+  },
+  {
+    "id": "spare-the-dying",
+    "name": "Пощада умирающим",
+    "level": 0,
+    "school": "necromancy",
+    "castingTime": "1 действие",
+    "range": "15 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "druid"
+    ],
+    "description": "Существо с 0 хитов становится стабилизированным."
+  },
+  {
+    "id": "thaumaturgy",
+    "name": "Чудотворство",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "До 1 минуты",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric"
+    ],
+    "description": "Знак божественной силы: голос гремит втрое громче, пламя вспыхивает, двери распахиваются, земля дрожит, глаза меняют вид."
+  },
+  {
+    "id": "true-strike",
+    "name": "Меткий удар",
+    "level": 0,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": false,
+      "somatic": true,
+      "material": "оружие, которым вы владеете"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Атака оружием, использующая вашу характеристику заклинаний вместо Силы или Ловкости; урон можно сделать излучением."
+  },
+  {
+    "id": "vicious-mockery",
+    "name": "Злая насмешка",
+    "level": 0,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard"
+    ],
+    "description": "Колкое оскорбление с магией: спасбросок Мудрости, при провале 1к6 психического урона и помеха на следующий бросок атаки.",
+    "effect": {
+      "save": "wis",
+      "onSave": "none",
+      "damage": {
+        "dice": "1d6",
+        "type": "psychic"
+      }
+    }
+  },
+  {
+    "id": "alarm",
+    "name": "Тревога",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 минута",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "колокольчик и серебряная проволока"
+    },
+    "duration": "8 часов",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "ranger",
+      "wizard"
+    ],
+    "description": "Охраняет дверь, окно или область до куба 20 футов: при входе существа звучит колокольчик или мысленный сигнал."
+  },
+  {
+    "id": "animal-friendship",
+    "name": "Дружба с животными",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "кусочек еды"
+    },
+    "duration": "24 часа",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid",
+      "ranger"
+    ],
+    "description": "Зверь, который видит и слышит вас, совершает спасбросок Мудрости; при провале он очарован вами на время заклинания.",
+    "effect": {
+      "save": "wis",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "bane",
+    "name": "Порча",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "капля крови"
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "cleric"
+    ],
+    "description": "До трёх существ совершают спасбросок Харизмы; при провале вычитают 1к4 из бросков атаки и спасбросков.",
+    "effect": {
+      "save": "cha",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "bless",
+    "name": "Благословение",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "святая вода"
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "paladin"
+    ],
+    "description": "До трёх существ добавляют 1к4 к броскам атаки и спасброскам."
+  },
+  {
+    "id": "burning-hands",
+    "name": "Огненные ладони",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "На себя (конус 15 футов)",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Веер пламени: существа в конусе совершают спасбросок Ловкости, 3к6 урона огнём при провале или половина при успехе.",
+    "effect": {
+      "save": "dex",
+      "onSave": "half",
+      "damage": {
+        "dice": "3d6",
+        "type": "fire"
+      }
+    }
+  },
+  {
+    "id": "charm-person",
+    "name": "Очарование личности",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Гуманоид совершает спасбросок Мудрости (с преимуществом, если вы с ним сражаетесь); при провале он очарован и считает вас другом. Потом знает, что был очарован.",
+    "effect": {
+      "save": "wis",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "chromatic-orb",
+    "name": "Цветной шарик",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "90 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "алмаз стоимостью не меньше 50 зм"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Шар энергии — дальнобойная атака заклинанием, 3к8 урона выбранного типа: кислота, холод, огонь, электричество, яд или звук.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "3d8",
+        "type": "acid"
+      }
+    }
+  },
+  {
+    "id": "color-spray",
+    "name": "Сверкающие брызги",
+    "level": 1,
+    "school": "illusion",
+    "castingTime": "1 действие",
+    "range": "На себя (конус 15 футов)",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "щепотка цветного песка"
+    },
+    "duration": "1 раунд",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Ослепительные разноцветные вспышки: существа в конусе совершают спасбросок Телосложения, при провале ослеплены до конца вашего следующего хода.",
+    "effect": {
+      "save": "con",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "command",
+    "name": "Приказ",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "1 раунд",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "cleric",
+      "paladin"
+    ],
+    "description": "Приказ одним словом («Ко мне», «Бросай», «Беги», «Стой», «Ниц»): при провале спасброска Мудрости цель выполняет его в свой ход.",
+    "effect": {
+      "save": "wis",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "comprehend-languages",
+    "name": "Понимание языков",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "щепотка сажи и соли"
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Вы понимаете буквальный смысл любой услышанной речи и написанного текста, если касаетесь его."
+  },
+  {
+    "id": "create-or-destroy-water",
+    "name": "Сотворение или уничтожение воды",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "капля воды или несколько песчинок"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "druid"
+    ],
+    "description": "Создаёт до 10 галлонов чистой воды или дождь, либо уничтожает столько же воды или туман."
+  },
+  {
+    "id": "cure-wounds",
+    "name": "Лечение ран",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "cleric",
+      "druid",
+      "paladin",
+      "ranger"
+    ],
+    "description": "Существо, которого вы касаетесь, восстанавливает 2к8 + модификатор вашей характеристики заклинаний хитов.",
+    "effect": {
+      "healing": "2d8",
+      "addModifier": true
+    }
+  },
+  {
+    "id": "detect-evil-and-good",
+    "name": "Обнаружение добра и зла",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "paladin"
+    ],
+    "description": "Вы чувствуете аберраций, исчадий, небожителей, нежить и фей в пределах 30 футов и места, освящённые или осквернённые магией."
+  },
+  {
+    "id": "detect-magic",
+    "name": "Обнаружение магии",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": true,
+    "classes": [
+      "bard",
+      "cleric",
+      "druid",
+      "paladin",
+      "ranger",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Вы чувствуете магию в пределах 30 футов, видите ауру магических существ и предметов и узнаёте школу магии."
+  },
+  {
+    "id": "detect-poison-and-disease",
+    "name": "Обнаружение болезней и яда",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "лист тиса"
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": true,
+    "classes": [
+      "cleric",
+      "druid",
+      "paladin",
+      "ranger"
+    ],
+    "description": "Вы чувствуете яды, ядовитых существ и болезни в пределах 30 футов и узнаёте их вид."
+  },
+  {
+    "id": "disguise-self",
+    "name": "Маскировка",
+    "level": 1,
+    "school": "illusion",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Вы меняете внешность, одежду и снаряжение иллюзией. Распознать — проверка Интеллекта (Анализ) против Сл заклинания."
+  },
+  {
+    "id": "divine-favor",
+    "name": "Божественное благоволение",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 бонусное действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "paladin"
+    ],
+    "description": "Ваши атаки оружием наносят дополнительно 1к4 урона излучением при попадании."
+  },
+  {
+    "id": "divine-smite",
+    "name": "Божественная кара",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 бонусное действие сразу после попадания",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "paladin"
+    ],
+    "description": "Цель, по которой вы попали оружием, получает дополнительно 2к8 урона излучением (ещё 1к8 исчадию или нежити).",
+    "effect": {
+      "damage": {
+        "dice": "2d8",
+        "type": "radiant"
+      }
+    }
+  },
+  {
+    "id": "entangle",
+    "name": "Опутывание",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "90 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "ranger"
+    ],
+    "description": "Цепкие растения в квадрате 20 футов: существа совершают спасбросок Силы, при провале опутаны; местность труднопроходима.",
+    "effect": {
+      "save": "str",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "expeditious-retreat",
+    "name": "Поспешное отступление",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 бонусное действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Сразу и затем каждым бонусным действием вы совершаете Рывок."
+  },
+  {
+    "id": "faerie-fire",
+    "name": "Огонь фей",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid"
+    ],
+    "description": "Предметы и существа в кубе 20 футов при провале спасброска Ловкости светятся: атаки по ним с преимуществом, невидимость не помогает.",
+    "effect": {
+      "save": "dex",
+      "onSave": "none",
+      "light": true
+    }
+  },
+  {
+    "id": "false-life",
+    "name": "Ложная жизнь",
+    "level": 1,
+    "school": "necromancy",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "капля алкоголя"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Вы получаете 2к4 + 4 временных хита."
+  },
+  {
+    "id": "feather-fall",
+    "name": "Падение пёрышком",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 реакция",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false,
+      "material": "маленькое перо или кусочек пуха"
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "До пяти падающих существ опускаются медленно (60 футов за раунд) и не получают урона от падения."
+  },
+  {
+    "id": "find-familiar",
+    "name": "Поиск фамильяра",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 час",
+    "range": "10 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "горящие благовония стоимостью 10 зм, расходуются"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "wizard"
+    ],
+    "description": "Вы получаете фамильяра — духа в облике маленького зверя (кошка, сова, ворон, крыса…), который служит вам и делится чувствами."
+  },
+  {
+    "id": "floating-disk",
+    "name": "Парящий диск",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "капля ртути"
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "wizard"
+    ],
+    "description": "Горизонтальный силовой диск диаметром 3 фута держит до 500 фунтов и следует за вами."
+  },
+  {
+    "id": "fog-cloud",
+    "name": "Туманное облако",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 1 часа",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "ranger",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Сфера тумана радиусом 20 футов, в ней сильно заслонённая местность."
+  },
+  {
+    "id": "goodberry",
+    "name": "Чудо-ягоды",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "веточка омелы"
+    },
+    "duration": "24 часа",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "ranger"
+    ],
+    "description": "Десять волшебных ягод: каждая восстанавливает 1 хит и насыщает на день."
+  },
+  {
+    "id": "grease",
+    "name": "Скользкая поверхность",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "кусочек свиной шкурки или масло"
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "wizard"
+    ],
+    "description": "Квадрат 10 футов покрывается жиром: труднопроходимая местность, при провале спасброска Ловкости существо падает ничком.",
+    "effect": {
+      "save": "dex",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "guiding-bolt",
+    "name": "Направленный снаряд",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "1 раунд",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric"
+    ],
+    "description": "Вспышка света — дальнобойная атака заклинанием, 4к6 урона излучением; следующая атака по цели — с преимуществом.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "4d6",
+        "type": "radiant"
+      }
+    }
+  },
+  {
+    "id": "healing-word",
+    "name": "Лечащее слово",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 бонусное действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "cleric",
+      "druid"
+    ],
+    "description": "Существо, которое вы видите, восстанавливает 2к4 + модификатор вашей характеристики заклинаний хитов.",
+    "effect": {
+      "healing": "2d4",
+      "addModifier": true
+    }
+  },
+  {
+    "id": "hellish-rebuke",
+    "name": "Адское возмездие",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 реакция, когда вас ранят",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "warlock"
+    ],
+    "description": "Обидчика охватывает пламя: спасбросок Ловкости, 2к10 урона огнём при провале или половина при успехе.",
+    "effect": {
+      "save": "dex",
+      "onSave": "half",
+      "damage": {
+        "dice": "2d10",
+        "type": "fire"
+      }
+    }
+  },
+  {
+    "id": "heroism",
+    "name": "Героизм",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "paladin"
+    ],
+    "description": "Существо не может быть испугано и в начале каждого хода получает временные хиты, равные модификатору вашей характеристики заклинаний."
+  },
+  {
+    "id": "hex",
+    "name": "Сглаз",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 бонусное действие",
+    "range": "90 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "окаменевший глаз тритона"
+    },
+    "duration": "Концентрация, до 1 часа",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "warlock"
+    ],
+    "description": "Проклятие: при каждом попадании атакой цель получает дополнительно 1к6 некротического урона и совершает с помехой проверки выбранной характеристики."
+  },
+  {
+    "id": "hunters-mark",
+    "name": "Метка охотника",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 бонусное действие",
+    "range": "90 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Концентрация, до 1 часа",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "ranger"
+    ],
+    "description": "Вы метите добычу: попадая по ней атакой, наносите дополнительно 1к6 урона силовым полем; проверки Внимательности и Выживания, чтобы найти её, — с преимуществом."
+  },
+  {
+    "id": "identify",
+    "name": "Опознание",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 минута",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "жемчужина стоимостью не меньше 100 зм"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "bard",
+      "wizard"
+    ],
+    "description": "Вы узнаёте свойства магического предмета или заклинания, действующие на существо или предмет."
+  },
+  {
+    "id": "illusory-script",
+    "name": "Невидимое письмо",
+    "level": 1,
+    "school": "illusion",
+    "castingTime": "1 минута",
+    "range": "Касание",
+    "components": {
+      "verbal": false,
+      "somatic": true,
+      "material": "чернила на основе свинца стоимостью 10 зм, расходуются"
+    },
+    "duration": "10 дней",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "bard",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Тайное послание на пергаменте: его читают только те, кого вы назвали; остальным видится бессмыслица или другой текст."
+  },
+  {
+    "id": "inflict-wounds",
+    "name": "Нанесение ран",
+    "level": 1,
+    "school": "necromancy",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric"
+    ],
+    "description": "Существо, которого вы касаетесь, совершает спасбросок Телосложения: 2к10 некротического урона при провале или половина при успехе.",
+    "effect": {
+      "save": "con",
+      "onSave": "half",
+      "damage": {
+        "dice": "2d10",
+        "type": "necrotic"
+      }
+    }
+  },
+  {
+    "id": "jump",
+    "name": "Прыжок",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 бонусное действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "лапка кузнечика"
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "ranger",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Раз за ход существо может прыгнуть на 30 футов, потратив 10 футов перемещения."
+  },
+  {
+    "id": "longstrider",
+    "name": "Скороход",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "щепотка грязи"
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid",
+      "ranger",
+      "wizard"
+    ],
+    "description": "Скорость существа увеличивается на 10 футов."
+  },
+  {
+    "id": "mage-armor",
+    "name": "Доспехи мага",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "кусочек выделанной кожи"
+    },
+    "duration": "8 часов",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Существо без доспеха получает базовый КД 13 + модификатор Ловкости."
+  },
+  {
+    "id": "magic-missile",
+    "name": "Волшебная стрела",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Три светящихся дротика бьют без промаха: каждый — 1к4 + 1 урона силовым полем, их можно направить в одну или разные цели.",
+    "effect": {
+      "damage": {
+        "dice": "3d4+3",
+        "type": "force"
+      }
+    }
+  },
+  {
+    "id": "protection-from-evil-and-good",
+    "name": "Защита от зла и добра",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 действие",
+    "range": "Касание",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "фляга святой воды или порошок серебра и железа"
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "druid",
+      "paladin",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Аберрации, исчадия, небожители, нежить, феи и элементали атакуют существо с помехой и не могут его очаровать, испугать или вселиться в него."
+  },
+  {
+    "id": "purify-food-and-drink",
+    "name": "Очищение пищи и питья",
+    "level": 1,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "10 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "cleric",
+      "druid",
+      "paladin"
+    ],
+    "description": "Вся немагическая еда и питьё в сфере 5 футов очищаются от ядов и гнили."
+  },
+  {
+    "id": "sanctuary",
+    "name": "Убежище",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 бонусное действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "осколок зеркала"
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "cleric"
+    ],
+    "description": "Тот, кто хочет атаковать защищённое существо, сначала совершает спасбросок Мудрости, иначе выбирает другую цель. Защита пропадает, если существо атакует."
+  },
+  {
+    "id": "shield",
+    "name": "Щит",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 реакция, когда по вам попадают",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "1 раунд",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Невидимый барьер: +5 к КД до начала вашего следующего хода, Волшебная стрела не наносит вам урона."
+  },
+  {
+    "id": "shield-of-faith",
+    "name": "Щит веры",
+    "level": 1,
+    "school": "abjuration",
+    "castingTime": "1 бонусное действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "пергамент со священным текстом"
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "cleric",
+      "paladin"
+    ],
+    "description": "Мерцающее поле даёт существу +2 к КД."
+  },
+  {
+    "id": "silent-image",
+    "name": "Безмолвный образ",
+    "level": 1,
+    "school": "illusion",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "клок шерсти"
+    },
+    "duration": "Концентрация, до 10 минут",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Беззвучная иллюзия предмета, существа или явления размером до куба 15 футов; её можно двигать."
+  },
+  {
+    "id": "sleep",
+    "name": "Усыпление",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "щепотка песка или лепестки роз"
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Существа в сфере 5 футов совершают спасбросок Мудрости: при провале недееспособны, а в конце следующего хода засыпают (Без сознания).",
+    "effect": {
+      "save": "wis",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "speak-with-animals",
+    "name": "Разговор с животными",
+    "level": 1,
+    "school": "divination",
+    "castingTime": "1 действие",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "10 минут",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "bard",
+      "druid",
+      "ranger"
+    ],
+    "description": "Вы понимаете зверей и можете говорить с ними; их знания ограничены их умом."
+  },
+  {
+    "id": "hideous-laughter",
+    "name": "Жуткий смех",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "крошечный пирог и перо"
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "wizard"
+    ],
+    "description": "Существо совершает спасбросок Мудрости: при провале падает ничком от смеха и недееспособно.",
+    "effect": {
+      "save": "wis",
+      "onSave": "none"
+    }
+  },
+  {
+    "id": "thunderwave",
+    "name": "Волна грома",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "На себя (куб 15 футов)",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Волна силы: существа в кубе совершают спасбросок Телосложения, 2к8 урона звуком и отталкивание на 10 футов при провале или половина урона при успехе.",
+    "effect": {
+      "save": "con",
+      "onSave": "half",
+      "damage": {
+        "dice": "2d8",
+        "type": "thunder"
+      }
+    }
+  },
+  {
+    "id": "unseen-servant",
+    "name": "Невидимый слуга",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "кусочек верёвки и дерева"
+    },
+    "duration": "1 час",
+    "concentration": false,
+    "ritual": true,
+    "classes": [
+      "bard",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Невидимая безмозглая сила выполняет простые поручения: носит, убирает, чинит одежду, разжигает огонь."
+  }
+]

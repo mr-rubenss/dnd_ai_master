@@ -35,6 +35,7 @@ import {
   applyBackgroundProposal,
   chooseCustomBackground,
   decideProposalDetail,
+  draftMagicSubject,
   type CreationDraft,
 } from '../../game/creation'
 import {
@@ -54,6 +55,7 @@ import type { ToolKind } from '../../types/items'
 import { armorTrainingText } from '../itemText'
 import type { EquipmentOption } from '../../types/rules'
 import { ChoiceChip, OptionCard } from './OptionCard'
+import { SpellChoiceForm } from '../SpellPicker'
 
 export interface StepProps {
   draft: CreationDraft
@@ -947,6 +949,12 @@ export function SkillsStep({ draft, update }: StepProps) {
       )}
     </>
   )
+}
+
+// ---------- Заклинания ----------
+
+export function SpellsStep({ draft, update }: StepProps) {
+  return <SpellChoiceForm subject={draftMagicSubject(draft, data)} choice={draft.spells} onChange={(spells) => update({ ...draft, spells })} />
 }
 
 // ---------- Снаряжение ----------

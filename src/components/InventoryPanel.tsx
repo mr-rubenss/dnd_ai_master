@@ -9,6 +9,8 @@ import type { Character, Inventory } from '../types/character'
 import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types/items'
 import type { StoryMemory, WorldFact } from '../types/story'
 import { AdventureJournal } from './AdventureJournal'
+import { MagicPanel } from './MagicPanel'
+import { hasMagic, needsSpellChoice } from '../game/magic'
 import { CharacterStats } from './CharacterStats'
 import { Flash } from './Flash'
 import { formatCoins } from '../game/coins'
@@ -23,13 +25,18 @@ interface Props {
   onEquipChange?: (change: EquipmentChange) => string | null
   /** Журнал приключения: сводка ведущего и журнал фактов истории. */
   journal?: { memory?: StoryMemory; facts: readonly WorldFact[] }
+  /** Изменить подготовленные заклинания; нет — только чтение. */
+  onPrepareSpells?: (prepared: string[]) => string | null
+  /** Открыть окно выбора заклинаний (старое сохранение заклинателя). */
+  onChooseSpells?: () => void
 }
 
-type Tab = 'stats' | 'equipment' | 'journal'
+type Tab = 'stats' | 'equipment' | 'magic' | 'journal'
 
-const TABS: { id: Tab; label: string }[] = [
+const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'stats', label: 'Характеристики' },
   { id: 'equipment', label: 'Снаряжение' },
+  { id: 'magic', label: 'Магия' },
   { id: 'journal', label: 'Журнал' },
 ]
 
@@ -39,7 +46,7 @@ const TAB_STORAGE_KEY = 'ai-master:sheet-tab'
 function loadTab(): Tab {
   try {
     const saved = window.localStorage.getItem(TAB_STORAGE_KEY)
-    return saved === 'equipment' || saved === 'stats' || saved === 'journal' ? saved : 'stats'
+    return ALL_TABS.some((t) => t.id === saved) ? (saved as Tab) : 'stats'
   } catch {
     return 'stats'
   }
@@ -68,11 +75,15 @@ function formatAttack(attack: WeaponAttack): string {
 }
 
 /** Панель персонажа и инвентаря. На узком экране сворачивается в кнопку. */
-export function InventoryPanel({ character, inventory, catalog, onEquipChange, journal }: Props) {
+export function InventoryPanel({ character, inventory, catalog, onEquipChange, journal, onPrepareSpells, onChooseSpells }: Props) {
+  // Вкладка «Магия» — только у тех, кто владеет магией.
+  const magical = hasMagic(character, rulesData)
+  const TABS = ALL_TABS.filter((t) => t.id !== 'magic' || magical)
   const purse = formatCoins(inventory.coins)
   const [open, setOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [tab, setTabState] = useState<Tab>(loadTab)
+  const [savedTab, setTabState] = useState<Tab>(loadTab)
+  const tab: Tab = savedTab === 'magic' && !magical ? 'stats' : savedTab
   /** Сообщение об отказе в смене экипировки: где показать и что. */
   const [equipError, setEquipError] = useState<{ place: string; message: string } | null>(null)
 
@@ -286,6 +297,19 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
             })}
           </section>
         </div>
+
+        {magical && (
+          <div id="sheet-panel-magic" role="tabpanel" aria-labelledby="sheet-tab-magic" hidden={tab !== 'magic'}>
+            {tab === 'magic' && (
+              <MagicPanel
+                character={character}
+                onPrepare={onPrepareSpells}
+                onChooseSpells={onChooseSpells}
+                needsChoice={needsSpellChoice(character, rulesData)}
+              />
+            )}
+          </div>
+        )}
 
         <div id="sheet-panel-journal" role="tabpanel" aria-labelledby="sheet-tab-journal" hidden={tab !== 'journal'}>
           {tab === 'journal' && <AdventureJournal memory={journal?.memory} facts={journal?.facts ?? []} />}

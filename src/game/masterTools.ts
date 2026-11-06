@@ -16,24 +16,11 @@ import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
 import type { PriceList } from './prices'
 import { END_TURN_TOOL } from './turnChanges'
+import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
+import { DAMAGE_TYPE_NAMES } from './damageTypes'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER } from './storyActions'
 
-/** Типы урона SRD 5.2. */
-export const DAMAGE_TYPE_NAMES = {
-  acid: 'кислотой',
-  bludgeoning: 'дробящий',
-  cold: 'холодом',
-  fire: 'огнём',
-  force: 'силовым полем',
-  lightning: 'электричеством',
-  necrotic: 'некротический',
-  piercing: 'колющий',
-  poison: 'ядом',
-  psychic: 'психический',
-  radiant: 'излучением',
-  slashing: 'рубящий',
-  thunder: 'звуком',
-} as const
+export { DAMAGE_TYPE_NAMES } from './damageTypes'
 type DamageTypeId = keyof typeof DAMAGE_TYPE_NAMES
 
 const HERO = { type: 'string', description: 'Имя или id героя. Можно не указывать — тогда это герой игрока.' }
@@ -116,6 +103,24 @@ export const MASTER_TOOLS: AiTool[] = [
     parameters: object(
       { hero: HERO, item: str('id предмета или его название.'), quantity: int('Сколько (по умолчанию 1).', 1, 99), reason: str('Зачем.') },
       ['item'],
+    ),
+  },
+  {
+    name: 'cast_spell',
+    description:
+      'Герой творит заклинание из своего листа (заговоры, подготовленные, магия черт и вида — список в «Магии» героя). ' +
+      'Движок проверит, что герой его знает и что есть свободная ячейка, спишет ячейку (заговор, ритуал и бесплатное сотворение — без ячейки) ' +
+      'и сам бросит атаку, спасбросок цели-героя, урон или лечение. Не знает или ячеек нет — откажет: тогда заклинание не сотворено, обыграй это.',
+    parameters: object(
+      {
+        hero: HERO,
+        spell: str('id или русское название заклинания из списка героя.'),
+        slot_level: int('Круг ячейки (не ниже круга заклинания). Не указывай — движок выберет бесплатное сотворение или младшую свободную ячейку.', 1, 9),
+        ritual: { type: 'boolean', description: 'true — ритуалом (только у заклинаний с пометкой «ритуал»): на 10 минут дольше, без ячейки.' },
+        target: str('Цель: имя героя отряда, имя НПС или что-то ещё («дверь», «трое гоблинов»). Лечение без цели — на себя.'),
+        reason: str('Зачем, коротко.'),
+      },
+      ['spell'],
     ),
   },
   {
@@ -239,6 +244,8 @@ export interface ToolContext {
   catalog: ItemCatalog
   /** Прейскурант (src/data/prices.json) — для change_gold с price. */
   prices?: PriceList
+  /** Правила магии и справочник заклинаний — для cast_spell; нет — заклинания не творятся. */
+  rules?: MagicRules
   /** Генератор случайных чисел для бросков (в тестах — подменённый). */
   rng?: Rng
   now: () => number
@@ -506,6 +513,102 @@ const HANDLERS: Record<string, Handler> = {
     }
   },
 
+  cast_spell(state, args, ctx) {
+    const rules = ctx.rules ?? reject('Заклинания недоступны: нет справочника заклинаний.')
+    const member = heroOf(state, args)
+    const c = member.character
+    const query = text(args, 'spell', true)!
+    const spell = rules.spells[query] ?? Object.values(rules.spells).find((s) => norm(s.name) === norm(query))
+    if (!spell) reject(`Заклинания «${query}» нет в справочнике.`)
+    const slotLevel = integer(args, 'slot_level')
+    const plan = planCast({ ...c }, { spellId: spell!.id, slotLevel, ritual: args.ritual === true }, rules)
+    if (typeof plan === 'string') return reject(plan)
+    const events: ToolEvent[] = [
+      {
+        event: { type: 'spellCast', heroId: member.heroId, spellId: spell!.id, slotLevel: plan.slotLevel, freeKey: plan.freeKey, ritual: plan.ritual },
+        author: MASTER,
+      },
+    ]
+    const targetName = text(args, 'target')
+    const targetHero = targetName ? state.party.find((m) => !m.fallen && (m.heroId === targetName || norm(m.character.name) === norm(targetName))) : undefined
+    const result: Record<string, unknown> = {
+      spell: spell!.name,
+      level: spell!.level,
+      spent: plan.slotLevel ? `ячейка ${plan.slotLevel}-го круга` : plan.freeKey ? 'бесплатное сотворение' : plan.ritual ? 'ритуал (без ячейки, +10 минут)' : 'заговор (без ячейки)',
+      save_dc: plan.stats.saveDc,
+      attack_bonus: plan.stats.attackBonus,
+      concentration: spell!.concentration,
+      duration: spell!.duration,
+    }
+    const notes: string[] = []
+    const rollDice = (notation: string, label: string) => {
+      const r = roll(notation, { rng: ctx.rng })
+      events.push({ event: { type: 'diceRolled', roll: { id: `roll-${ctx.newId()}`, label, timestamp: ctx.now(), result: r } }, author: ENGINE })
+      return r
+    }
+    const effect = spell!.effect
+    const mod = plan.stats.modifier
+    if (effect?.healing) {
+      const heal = rollDice(`${effect.healing}${effect.addModifier && mod ? (mod > 0 ? `+${mod}` : `${mod}`) : ''}`, `${spell!.name}: лечение`)
+      const amount = Math.max(1, heal.total)
+      const patient = targetHero ?? (targetName ? undefined : member)
+      result.healing = amount
+      if (patient) {
+        const hp = hpEvents(patient, 'healing', amount, undefined, ENGINE)
+        events.push(...hp.events)
+        result.hp = `${hp.hp}/${patient.character.maxHp}`
+        notes.push(`${patient.character.name} восстанавливает ${amount} хитов (${hp.hp}/${patient.character.maxHp}).`)
+      } else notes.push(`Лечение ${amount} хитов — цель «${targetName}» не герой отряда.`)
+    }
+    if (effect?.attack) {
+      const attack = rollDice(`1d20${plan.stats.attackBonus >= 0 ? '+' : ''}${plan.stats.attackBonus}`, `${spell!.name}: атака заклинанием`)
+      const natural = attack.natural
+      result.attack = { total: attack.total, natural }
+      notes.push(`Атака заклинанием: ${attack.total}${natural === 20 ? ' (натуральная 20 — критическое попадание)' : natural === 1 ? ' (натуральная 1 — промах)' : ''} — сравни с КД цели.`)
+    }
+    if (effect?.save) {
+      result.save = { ability: effect.save, dc: plan.stats.saveDc }
+      if (targetHero) {
+        const check = savingThrow(targetHero.character, effect.save, { dc: plan.stats.saveDc, rng: ctx.rng })
+        const id = ctx.newId()
+        events.push({
+          event: {
+            type: 'checkRolled',
+            messageId: `check-${id}`,
+            check: { heroId: targetHero.heroId, heroName: targetHero.character.name, reason: `${spell!.name}`, result: check },
+            roll: check.roll ? { id: `roll-${id}`, label: check.label, timestamp: ctx.now(), result: check.roll } : undefined,
+          },
+          author: ENGINE,
+        })
+        result.save = { ...(result.save as object), total: check.total, success: check.success }
+        notes.push(`${targetHero.character.name}: ${check.label} ${check.total ?? '—'} против Сл ${plan.stats.saveDc} — ${check.success ? 'успех' : 'провал'}.`)
+      } else notes.push(`Цель совершает спасбросок ${ABILITY_NAMES[effect.save]} Сл ${plan.stats.saveDc} — исход реши сам по силе цели.`)
+    }
+    if (effect?.damage) {
+      const damage = rollDice(effect.damage.dice, `${spell!.name}: урон`)
+      result.damage = { total: damage.total, type: effect.damage.type }
+      const typeName = DAMAGE_TYPE_NAMES[effect.damage.type as DamageTypeId] ?? effect.damage.type
+      const saved = effect.save && targetHero ? (result.save as { success?: boolean }).success : undefined
+      if (targetHero && effect.save) {
+        const amount = saved ? (effect.onSave === 'half' ? Math.floor(damage.total / 2) : 0) : damage.total
+        if (amount > 0) {
+          const hp = hpEvents(targetHero, 'damage', amount, effect.damage.type as DamageTypeId, ENGINE)
+          events.push(...hp.events)
+          notes.push(`${targetHero.character.name} получает ${amount} урона (${typeName}), хиты ${hp.hp}/${targetHero.character.maxHp}.`)
+        } else notes.push(`${targetHero.character.name} не получает урона.`)
+      } else
+        notes.push(
+          `Урон ${damage.total} (${typeName})${effect.save ? (effect.onSave === 'half' ? ', при успешном спасброске — половина' : ', при успешном спасброске — нет') : effect.attack ? ' при попадании' : ''}.`,
+        )
+    }
+    if (effect?.light) notes.push('Свет: опиши, что теперь освещено.')
+    if (!effect) notes.push('Эффект — по описанию заклинания: опиши его в рассказе.')
+    const after = spellSlots({ ...c, magic: spendCast(c.magic, plan) }, rules)
+    result.slots_left = after.map((s) => `${s.level}-й круг: ${s.left}/${s.total}`).join(', ') || 'нет ячеек'
+    result.message = `${c.name} творит «${spell!.name}» (${result.spent}). ${notes.join(' ')}`
+    return { events, result }
+  },
+
   change_hp(state, args) {
     const member = heroOf(state, args)
     const kind = choice<'damage' | 'healing'>(args, 'kind', ['damage', 'healing'], true)!
@@ -716,7 +819,7 @@ export function executeTool(state: StoryState, call: AiToolCall, ctx: ToolContex
     let probe = state
     for (const [i, { event, author }] of events.entries()) {
       const action = makeAction(state.id, i, event, author, ctx.now(), `probe-${i}`)
-      const reason = checkAction(probe, action, { catalog: ctx.catalog })
+      const reason = checkAction(probe, action, { catalog: ctx.catalog, rules: ctx.rules })
       if (reason) return fail(reason)
       probe = applyAction(probe, action)
     }

@@ -6,6 +6,7 @@ import { SKILL_DEFINITIONS } from '../../engine/skills'
 import { armorClass, inventoryWeight } from '../../game/character'
 import type { CharacterSheet } from '../../types/character'
 import { formatNumber } from '../itemText'
+import { knownSpells } from '../../game/magic'
 
 /** Итоговый лист персонажа перед началом игры. */
 export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
@@ -113,6 +114,17 @@ export function SummaryStep({ sheet }: { sheet: CharacterSheet }) {
           </ul>
         </section>
       </div>
+
+      {knownSpells(character, rulesData).length > 0 && (
+        <section>
+          <h4>Заклинания</h4>
+          <p data-testid="summary-spells">
+            {knownSpells(character, rulesData)
+              .map((k) => `${k.spell.name}${k.spell.level === 0 ? ' (заговор)' : ''}${k.inBookOnly ? ' (в книге)' : ''}${k.source !== 'class' ? ` — ${k.sourceName}` : ''}`)
+              .join(', ')}
+          </p>
+        </section>
+      )}
 
       <section>
         <h4>

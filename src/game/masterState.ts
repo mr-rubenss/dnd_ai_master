@@ -13,6 +13,7 @@ import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
 import { armorClass } from './character'
 import { currentLocation } from './storyActions'
+import { classSpellcasting, hasMagic, knownSpells, needsSpellChoice, spellcastingStats, spellSlots } from './magic'
 
 export interface MasterStateContext {
   catalog: ItemCatalog
@@ -56,12 +57,58 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
     `Экипировка: основная рука — ${name(inv.equipped.mainHand)}, вторая рука — ${name(inv.equipped.offHand)}, доспех — ${name(inv.equipped.armor)}.`,
     attacks.length ? `Атаки: ${attacks.join('; ')}.` : '',
     `Инвентарь: ${items.length ? items.join(', ') : 'пусто'}.`,
+    ...magicText(member, ctx),
     `Кошелёк: ${formatCoins(inv.coins)} (всего ${coinsValue(inv.coins)} мм; 1 зм = 10 см = 100 мм).`,
     `Положение на карте: клетка ${cell(member.position)}.`,
     ...heroPastText(c),
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+/**
+ * Магия героя для ведущего: Сл и бонус атаки, ячейки (осталось/всего), заговоры, подготовленные и врождённые
+ * заклинания. Чего здесь нет — герой не умеет, и ведущий не даёт это колдовать.
+ */
+export function magicText(member: PartyMember, ctx: MasterStateContext): string[] {
+  const c = member.character
+  const rules = ctx.rules
+  if (!rules.spells || !hasMagic(c, rules)) return []
+  const lines: string[] = []
+  const sc = classSpellcasting(c.classId, rules)
+  if (sc) {
+    const stats = spellcastingStats(c, sc.ability)
+    const slots = spellSlots(c, rules)
+    lines.push(
+      `Магия (${c.className}): характеристика ${ABILITY_ABBREVIATIONS[sc.ability]}, Сл спасброска ${stats.saveDc}, атака заклинанием ${formatModifier(stats.attackBonus)}. ` +
+        `Ячейки${slots[0]?.pact ? ' магии договора' : ''}: ${slots.map((s) => `${s.level}-й круг ${s.left}/${s.total}`).join(', ') || 'нет'}.`,
+    )
+  }
+  if (needsSpellChoice(c, rules)) lines.push('Заклинания ещё не выбраны игроком — пока колдовать нельзя (кроме магии вида).')
+  const known = knownSpells(c, rules)
+  const byGroup = (filter: (k: (typeof known)[number]) => boolean) =>
+    known
+      .filter(filter)
+      .map((k) => `${k.spell.name} (${k.spell.id}${k.spell.ritual ? ', ритуал' : ''}${k.spell.concentration ? ', концентрация' : ''})`)
+      .join(', ')
+  const cantrips = byGroup((k) => k.source === 'class' && k.spell.level === 0)
+  const prepared = byGroup((k) => k.source === 'class' && k.spell.level > 0 && !k.inBookOnly)
+  const book = byGroup((k) => Boolean(k.inBookOnly))
+  if (cantrips) lines.push(`Заговоры: ${cantrips}.`)
+  if (prepared) lines.push(`Подготовлены: ${prepared}.`)
+  if (book) lines.push(`В книге, не подготовлены (только ритуалом, если ритуал): ${book}.`)
+  const innate = known.filter((k) => k.innate)
+  if (innate.length)
+    lines.push(
+      `Магия черт и вида: ${innate
+        .map((k) => {
+          const i = k.innate!
+          const stats = spellcastingStats(c, k.ability)
+          return `${k.spell.name} (${k.spell.id}; ${i.sourceName}; Сл ${stats.saveDc}, атака ${formatModifier(stats.attackBonus)}${i.freeMax !== null ? `; без ячейки ${i.freeMax - i.freeUsed}/${i.freeMax}` : ''})`
+        })
+        .join(', ')}.`,
+    )
+  return lines
 }
 
 /** Сколько последних записей «Летописи» идёт в запрос. */

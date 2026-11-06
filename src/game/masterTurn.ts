@@ -116,7 +116,8 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   const finish = (text: string, suggestions: string[], response: AiResponse): MasterTurnResult => {
     if (!text && !narrated) emptyAnswer(response)
     const delta = ledger ? turnDelta(ledger, ledgerOf(current(), catalog!)) : null
-    const changes = delta ? changeList(delta, current(), catalog!, reasons) : []
+    const spellNames = runtime?.tools.rules ? Object.fromEntries(Object.values(runtime.tools.rules.spells).map((sp) => [sp.id, sp.name])) : undefined
+    const changes = delta ? changeList(delta, current(), catalog!, reasons, spellNames) : []
     return { text, suggestions, truncated: response.finishReason === 'length', toolCalls, changes, verification }
   }
 

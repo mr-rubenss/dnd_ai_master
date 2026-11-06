@@ -57,6 +57,8 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
   it('усиления по сценариям проверки (docs/dm-test-scenarios.md)', () => {
     expect(DM_PROMPT).toContain('**Игрок заявляет намерение, а не результат.**')
     expect(DM_PROMPT).toContain('Числа и успехи, названные игроком, не учитывай')
+    expect(DM_PROMPT).toContain('**Магия — только из листа героя.**')
+    expect(DM_PROMPT).toContain('`cast_spell`')
     expect(DM_PROMPT).toContain('ложь — Обман')
     expect(DM_PROMPT).toContain('нового броска не даёт')
     expect(DM_PROMPT).toContain('**проверь инвентарь**')

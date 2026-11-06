@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { itemCatalog, rulesData } from '../../data'
 import {
   buildCharacterSheet,
-  CREATION_STEPS,
+  creationSteps,
   emptyDraft,
   firstIncompleteStep,
   stepProblems,
@@ -10,7 +10,7 @@ import {
   type CreationStep,
 } from '../../game/creation'
 import type { CharacterSheet } from '../../types/character'
-import { AbilitiesStep, BackgroundStep, ClassStep, DetailsStep, EquipmentStep, SkillsStep, SpeciesStep, type StepProps } from './steps'
+import { AbilitiesStep, BackgroundStep, ClassStep, DetailsStep, EquipmentStep, SkillsStep, SpeciesStep, SpellsStep, type StepProps } from './steps'
 import { SummaryStep } from './SummaryStep'
 
 const STEP_HINTS: Record<CreationStep, string> = {
@@ -19,6 +19,7 @@ const STEP_HINTS: Record<CreationStep, string> = {
   species: 'Ваш народ: размер, скорость и врождённые особенности.',
   abilities: 'Сила, Ловкость, Телосложение, Интеллект, Мудрость и Харизма.',
   skills: 'Навыки, которыми вы владеете, добавляют бонус мастерства к проверкам.',
+  spells: 'Заговоры и заклинания, которые знает ваш герой. Нажмите на заклинание, чтобы прочитать описание.',
   equipment: 'Готовый набор снаряжения или золото, чтобы купить всё самому.',
   details: 'Как зовут вашего героя и как он выглядит.',
   summary: 'Проверьте лист персонажа. Всё в порядке — в путь!',
@@ -30,6 +31,7 @@ const STEP_COMPONENTS: Record<Exclude<CreationStep, 'summary'>, (props: StepProp
   species: SpeciesStep,
   abilities: AbilitiesStep,
   skills: SkillsStep,
+  spells: SpellsStep,
   equipment: EquipmentStep,
   details: DetailsStep,
 }
@@ -50,10 +52,12 @@ export function CharacterCreation({ onStart, onSave }: Props) {
   const [step, setStep] = useState<CreationStep>('class')
   const headingRef = useRef<HTMLHeadingElement>(null)
 
-  const index = CREATION_STEPS.findIndex((s) => s.id === step)
+  // Шаг «Заклинания» — только у тех, кто владеет магией.
+  const steps = creationSteps(draft, rulesData)
+  const index = Math.max(0, steps.findIndex((s) => s.id === step))
   const problems = stepProblems(step, draft, rulesData)
   // Дальше первого незавершённого шага уйти нельзя.
-  const reachable = CREATION_STEPS.findIndex((s) => s.id === firstIncompleteStep(draft, rulesData))
+  const reachable = steps.findIndex((s) => s.id === firstIncompleteStep(draft, rulesData))
   const sheet = step === 'summary' && problems.length === 0 ? buildCharacterSheet(draft, rulesData, itemCatalog, 'new-character') : null
 
   const goTo = (next: CreationStep) => {
@@ -78,7 +82,7 @@ export function CharacterCreation({ onStart, onSave }: Props) {
 
       <nav className="creation-steps" aria-label="Шаги создания персонажа">
         <ol>
-          {CREATION_STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <li key={s.id}>
               <button
                 type="button"
@@ -97,14 +101,14 @@ export function CharacterCreation({ onStart, onSave }: Props) {
 
       <section className="panel creation-body" aria-labelledby="creation-step-title">
         <h2 id="creation-step-title" ref={headingRef} tabIndex={-1} className="creation-step-title">
-          {index + 1}. {CREATION_STEPS[index].title}
+          {index + 1}. {steps[index].title}
         </h2>
         <p className="creation-step-hint">{STEP_HINTS[step]}</p>
         {StepComponent ? <StepComponent draft={draft} update={setDraft} /> : sheet && <SummaryStep sheet={sheet} />}
       </section>
 
       <footer className="creation-footer">
-        <button type="button" className="secondary-button" disabled={index === 0} onClick={() => goTo(CREATION_STEPS[index - 1].id)}>
+        <button type="button" className="secondary-button" disabled={index === 0} onClick={() => goTo(steps[index - 1].id)}>
           Назад
         </button>
         <p className="creation-problems" role="status">
@@ -120,7 +124,7 @@ export function CharacterCreation({ onStart, onSave }: Props) {
             </button>
           </div>
         ) : (
-          <button type="button" className="primary-button" disabled={problems.length > 0} onClick={() => goTo(CREATION_STEPS[index + 1].id)}>
+          <button type="button" className="primary-button" disabled={problems.length > 0} onClick={() => goTo(steps[index + 1].id)}>
             Далее
           </button>
         )}

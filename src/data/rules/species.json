@@ -126,11 +126,7 @@
     ],
     "skillChoice": {
       "count": 1,
-      "from": [
-        "insight",
-        "perception",
-        "survival"
-      ],
+      "from": ["insight", "perception", "survival"],
       "source": "Острые чувства"
     },
     "choice": {
@@ -140,18 +136,33 @@
           "id": "drow",
           "name": "Дроу",
           "description": "Тёмное зрение 120 футов, заговор «Пляшущие огоньки».",
-          "darkvision": 120
+          "darkvision": 120,
+          "innateSpells": [
+            {
+              "spellId": "dancing-lights"
+            }
+          ]
         },
         {
           "id": "high-elf",
           "name": "Высший эльф",
-          "description": "Заговор «Фокусы чародея», который можно менять после продолжительного отдыха."
+          "description": "Заговор «Фокусы», который можно менять после продолжительного отдыха.",
+          "innateSpells": [
+            {
+              "spellId": "prestidigitation"
+            }
+          ]
         },
         {
           "id": "wood-elf",
           "name": "Лесной эльф",
           "description": "Скорость 35 футов, заговор «Искусство друидов».",
-          "speed": 35
+          "speed": 35,
+          "innateSpells": [
+            {
+              "spellId": "druidcraft"
+            }
+          ]
         }
       ]
     }
@@ -179,12 +190,29 @@
         {
           "id": "forest-gnome",
           "name": "Лесной гном",
-          "description": "Заговор «Малая иллюзия», «Разговор с животными»."
+          "description": "Заговор «Малая иллюзия», «Разговор с животными».",
+          "innateSpells": [
+            {
+              "spellId": "minor-illusion"
+            },
+            {
+              "spellId": "speak-with-animals",
+              "uses": "proficiency"
+            }
+          ]
         },
         {
           "id": "rock-gnome",
           "name": "Скальный гном",
-          "description": "Заговоры «Починка» и «Фокусы чародея», мастерите заводные игрушки."
+          "description": "Заговоры «Починка» и «Фокусы», мастерите заводные игрушки.",
+          "innateSpells": [
+            {
+              "spellId": "mending"
+            },
+            {
+              "spellId": "prestidigitation"
+            }
+          ]
         }
       ]
     }
@@ -341,19 +369,39 @@
         {
           "id": "abyssal",
           "name": "Бездна",
-          "description": "Сопротивление яду, заговор «Ядовитые брызги»."
+          "description": "Сопротивление яду, заговор «Ядовитые брызги».",
+          "innateSpells": [
+            {
+              "spellId": "poison-spray"
+            }
+          ]
         },
         {
           "id": "chthonic",
           "name": "Хтоническое",
-          "description": "Сопротивление некротической энергии, заговор «Леденящее прикосновение»."
+          "description": "Сопротивление некротической энергии, заговор «Леденящее прикосновение».",
+          "innateSpells": [
+            {
+              "spellId": "chill-touch"
+            }
+          ]
         },
         {
           "id": "infernal",
           "name": "Инфернальное",
-          "description": "Сопротивление огню, заговор «Огненный снаряд»."
+          "description": "Сопротивление огню, заговор «Огненный снаряд».",
+          "innateSpells": [
+            {
+              "spellId": "fire-bolt"
+            }
+          ]
         }
       ]
-    }
+    },
+    "innateSpells": [
+      {
+        "spellId": "thaumaturgy"
+      }
+    ]
   }
 ]

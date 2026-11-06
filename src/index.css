@@ -830,6 +830,8 @@ textarea {
   top: 0;
   z-index: 1;
   display: flex;
+  /* Четыре вкладки (с «Магией») на узком экране переносятся на вторую строку, а не обрезаются. */
+  flex-wrap: wrap;
   background: var(--color-panel);
   border-bottom: 1px solid var(--color-border);
 }
@@ -4219,4 +4221,272 @@ textarea {
 .ai-task-dialog h2 {
   margin: 0;
   font-family: var(--font-display);
+}
+
+/* ---------- Заклинания: выбор ---------- */
+
+.spell-ability,
+.spell-initiate-fields .field {
+  max-width: 320px;
+}
+
+.spell-ability select,
+.spell-initiate-fields select {
+  padding: var(--space-7) var(--space-8);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+}
+
+.spell-initiate-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin-bottom: var(--space-8);
+}
+
+.spell-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spell-option {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.spell-option.is-checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint-selected);
+}
+
+.spell-option-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.spell-option-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-8);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-7) var(--space-8);
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.spell-option-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.spell-option-toggle:focus-visible,
+.spell-option-more:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.spell-option-mark {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: var(--space-2);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-78);
+  color: var(--color-on-accent);
+}
+
+.spell-option.is-checked .spell-option-mark {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.spell-option-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.spell-option-meta {
+  font-size: var(--text-74);
+  color: var(--color-muted);
+}
+
+.spell-option-more {
+  flex: none;
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--text-78);
+}
+
+.spell-details {
+  padding: 0 var(--space-10) var(--space-10);
+  font-size: var(--text-84);
+  line-height: 1.45;
+}
+
+.spell-details p {
+  margin: var(--space-6) 0 0;
+}
+
+.spell-details .fact-list {
+  font-size: var(--text-80);
+}
+
+/* ---------- Вкладка «Магия» ---------- */
+
+.magic-panel {
+  display: grid;
+}
+
+.magic-choice-banner {
+  display: grid;
+  gap: var(--space-8);
+  margin: var(--space-12) var(--space-14) 0;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-tint-selected);
+  font-size: var(--text-86);
+}
+
+.magic-choice-banner p {
+  margin: 0;
+}
+
+.magic-sources {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-86);
+}
+
+.slot-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6) var(--space-10);
+  margin: var(--space-4) 0;
+  font-size: var(--text-86);
+}
+
+.slot-row-label {
+  min-width: 0;
+  color: var(--color-muted);
+}
+
+.slot-dots {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  vertical-align: middle;
+}
+
+.slot-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-round);
+  background: transparent;
+}
+
+.slot-dot.is-spent {
+  background: var(--color-accent);
+}
+
+.slot-row-left {
+  color: var(--color-muted);
+  font-size: var(--text-78);
+}
+
+.magic-spells {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.magic-spell {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.magic-spell.is-open {
+  border-color: var(--color-border-bright);
+}
+
+.magic-spell-toggle {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-7) var(--space-10);
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.magic-spell-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.magic-spell-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.magic-spell-meta {
+  font-size: var(--text-74);
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.prepared-editor {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.prepared-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.spell-dialog {
+  max-width: 760px;
+}
+
+.spell-dialog-body {
+  padding: 0 var(--space-16);
+}
+
+.spell-dialog-footer {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16) 0;
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-12);
 }

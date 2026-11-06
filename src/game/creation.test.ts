@@ -30,14 +30,24 @@ import {
   updateCustomBackground,
   type CreationDraft,
   startingHitPoints,
+  creationSteps,
 } from './creation'
 import { parseItemCatalog } from './items'
 import { parseRulesData } from './rulesData'
+import { emptySpellChoice } from './magic'
+import spellsJson from '../data/spells.json'
+import spellSlotsJson from '../data/rules/spell-slots.json'
 import { CUSTOM_BACKGROUND_ID } from './backgroundTemplate'
 
 const catalog = parseItemCatalog(itemsJson)
+const WIZARD_SPELLS = {
+  ...emptySpellChoice(),
+  cantrips: ['fire-bolt', 'light', 'mage-hand'],
+  spellbook: ['magic-missile', 'shield', 'sleep', 'detect-magic', 'mage-armor', 'identify'],
+  prepared: ['magic-missile', 'shield', 'sleep', 'mage-armor'],
+}
 const data = parseRulesData(
-  { classes: classesJson, backgrounds: backgroundsJson, species: speciesJson, feats: featsJson, packs: packsJson },
+  { classes: classesJson, backgrounds: backgroundsJson, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson },
   catalog,
 )
 
@@ -120,7 +130,7 @@ describe('данные правил SRD 5.2', () => {
     const brokenBackgrounds = structuredClone(backgroundsJson)
     brokenBackgrounds[0].feat = 'flight'
     expect(() =>
-      parseRulesData({ classes: brokenClasses, backgrounds: brokenBackgrounds, species: speciesJson, feats: featsJson, packs: packsJson }, catalog),
+      parseRulesData({ classes: brokenClasses, backgrounds: brokenBackgrounds, species: speciesJson, feats: featsJson, packs: packsJson, spells: spellsJson, spellSlots: spellSlotsJson }, catalog),
     ).toThrow(
       /classes "barbarian": вариант A: неизвестный предмет "laser-sword"[\s\S]*неизвестный набор "magic-pack"[\s\S]*backgrounds "acolyte": неизвестная черта "flight"/,
     )
@@ -334,8 +344,38 @@ describe('готовый лист персонажа', () => {
   it('хиты: кость хитов + ТЕЛ, у Дварфа +1', () => {
     const base = { ...fighterDraft(), speciesId: 'dwarf', originFeat: null, speciesSkills: [] }
     expect(buildCharacterSheet(base, data, catalog, 'x').character.maxHp).toBe(10 + abilityModifier(14) + 1)
-    const wizard = { ...base, classId: 'wizard', classSkills: ['arcana' as const, 'history' as const], classEquipment: 'A' }
+    const wizard = { ...base, classId: 'wizard', classSkills: ['arcana' as const, 'history' as const], classEquipment: 'A', spells: WIZARD_SPELLS }
     expect(buildCharacterSheet(wizard, data, catalog, 'x').character.maxHp).toBe(6 + 2 + 1)
+  })
+
+  it('шаг «Заклинания»: у воина без магии его нет, у волшебника — заклинания в листе', () => {
+    expect(creationSteps(fighterDraft(), data).map((s) => s.id)).not.toContain('spells')
+    const wizardDraft = { ...fighterDraft(), speciesId: 'dwarf', originFeat: null, speciesSkills: [], classId: 'wizard', classSkills: ['arcana' as const, 'history' as const], classEquipment: 'A' }
+    expect(creationSteps(wizardDraft, data).map((s) => s.id)).toContain('spells')
+    expect(stepProblems('spells', wizardDraft, data)).toEqual([
+      'Заговоры: выберите 3 (выбрано 0)',
+      'Книга заклинаний: выберите 6 (выбрано 0)',
+      'Подготовленные заклинания: выберите 4 (выбрано 0)',
+    ])
+    const sheet = buildCharacterSheet({ ...wizardDraft, spells: WIZARD_SPELLS }, data, catalog, 'w')
+    expect(sheet.character.magic).toEqual({
+      cantrips: WIZARD_SPELLS.cantrips,
+      prepared: WIZARD_SPELLS.prepared,
+      spellbook: WIZARD_SPELLS.spellbook,
+      slotsUsed: {},
+    })
+    expect(parseCharacterSheet(sheet, catalog)).toEqual(sheet)
+  })
+
+  it('Человек с «Посвящённым в магию»: 2 заговора и 1 заклинание из выбранного списка', () => {
+    const d = { ...fighterDraft(), originFeat: 'magic-initiate', featSkills: [] }
+    expect(creationSteps(d, data).map((s) => s.id)).toContain('spells')
+    expect(stepProblems('spells', d, data)).toContain('«Посвящённый в магию»: выберите список заклинаний')
+    const spells = { ...emptySpellChoice(), initiateList: 'wizard' as const, initiateCantrips: ['fire-bolt', 'light'], initiateSpell: 'sleep' }
+    expect(stepProblems('spells', { ...d, spells }, data)).toEqual([])
+    const sheet = buildCharacterSheet({ ...d, spells }, data, catalog, 'h')
+    // Характеристика по умолчанию — лучшая из Инт/Мдр/Хар.
+    expect(sheet.character.magic?.initiate).toEqual({ list: 'wizard', ability: 'int', cantrips: ['fire-bolt', 'light'], spell: 'sleep' })
   })
 
   it('Плут: компетентность записывается в навыки', () => {

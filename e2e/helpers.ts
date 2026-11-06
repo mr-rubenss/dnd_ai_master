@@ -184,3 +184,18 @@ export function withEndTurn(route: { request(): { postDataJSON(): unknown } }, p
   }
   return payload.includes('data: [DONE]') ? payload.replace('data: [DONE]', `data: ${JSON.stringify(call)}\n\ndata: [DONE]`) : `${payload}data: ${JSON.stringify(call)}\n\n`
 }
+
+/**
+ * Шаг «Заклинания» при создании: в каждом списке выбрать первые доступные заклинания в нужном количестве
+ * (список «Посвящённого в магию», если он на выбор, — волшебник).
+ */
+export async function fillSpellStep(page: Page) {
+  const list = page.getByTestId('initiate-list')
+  if ((await list.count()) > 0 && (await list.isEnabled()) && !(await list.inputValue())) await list.selectOption('wizard')
+  const slots = page.locator('.spell-choice [data-slot]')
+  for (let i = 0; i < (await slots.count()); i++) {
+    const slot = slots.nth(i)
+    const [chosen, total] = ((await slot.locator('.slot-count').textContent()) ?? '0 из 0').split(' из ').map(Number)
+    for (let k = chosen; k < total; k++) await slot.locator('.spell-option-toggle[aria-checked="false"]:not([disabled])').first().click()
+  }
+}

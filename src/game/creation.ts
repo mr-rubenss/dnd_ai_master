@@ -18,6 +18,7 @@ import {
 import type { BackgroundProposal } from './backgroundFromStory'
 import { MAX_BACKSTORY_LENGTH } from './character'
 import { coinsFromGold } from './coins'
+import { emptySpellChoice, hasMagic, magicFromChoice, magicProblems, type MagicSubject, type SpellChoice } from './magic'
 
 export const CREATION_STEPS = [
   { id: 'class', title: 'Класс' },
@@ -25,6 +26,7 @@ export const CREATION_STEPS = [
   { id: 'species', title: 'Вид' },
   { id: 'abilities', title: 'Характеристики' },
   { id: 'skills', title: 'Навыки' },
+  { id: 'spells', title: 'Заклинания' },
   { id: 'equipment', title: 'Снаряжение' },
   { id: 'details', title: 'Имя и внешность' },
   { id: 'summary', title: 'Итог' },
@@ -78,6 +80,8 @@ export interface CreationDraft {
   backgroundSource: 'manual' | 'story'
   /** Последнее предложение ИИ «по моей истории»: объяснения выбора и дописанные детали. */
   backgroundProposal: BackgroundProposal | null
+  /** Шаг «Заклинания»: заговоры и заклинания класса, книга Волшебника, «Посвящённый в магию», характеристика вида. */
+  spells: SpellChoice
 }
 
 export function emptyDraft(): CreationDraft {
@@ -108,6 +112,7 @@ export function emptyDraft(): CreationDraft {
     backstory: '',
     backgroundSource: 'manual',
     backgroundProposal: null,
+    spells: emptySpellChoice(),
   }
 }
 
@@ -136,7 +141,8 @@ export function decideProposalDetail(draft: CreationDraft, index: number, accept
 
 export function chooseClass(draft: CreationDraft, classId: string): CreationDraft {
   if (draft.classId === classId) return draft
-  return { ...draft, classId, fightingStyle: null, classTools: [], classSkills: [], expertise: [], classEquipment: null }
+  const spells = { ...draft.spells, cantrips: [], prepared: [], spellbook: [] }
+  return { ...draft, classId, fightingStyle: null, classTools: [], classSkills: [], expertise: [], classEquipment: null, spells }
 }
 
 /** Навыки предыстории даются автоматически — убираем их из выбранных в других местах. */
@@ -190,7 +196,7 @@ export function toolsOfKinds(kinds: ToolKind[], data: RulesData): string[] {
 
 export function chooseSpecies(draft: CreationDraft, speciesId: string): CreationDraft {
   if (draft.speciesId === speciesId) return draft
-  return { ...draft, speciesId, speciesOption: null, originFeat: null, speciesSkills: [], featSkills: [], expertise: [] }
+  return { ...draft, speciesId, speciesOption: null, originFeat: null, speciesSkills: [], featSkills: [], expertise: [], spells: { ...draft.spells, speciesAbility: null } }
 }
 
 export function chooseAbilityMethod(draft: CreationDraft, method: AbilityMethod, rng?: Rng): CreationDraft {
@@ -405,6 +411,35 @@ export function startingHitPoints(draft: CreationDraft, data: RulesData, con: nu
   return Math.max(1, cls.hitDie + abilityModifier(con) + (species?.hpPerLevel ?? 0))
 }
 
+// ---------- Заклинания ----------
+
+/** Герой черновика — для правил магии (характеристики — итоговые или все 10, пока не назначены). */
+export function draftMagicSubject(draft: CreationDraft, data: RulesData): Omit<MagicSubject, 'magic'> {
+  return {
+    classId: draft.classId ?? '',
+    level: 1,
+    abilities: finalScores(draft, data) ?? { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    feats: chosenFeats(draft, data),
+    speciesId: draft.speciesId ?? '',
+    speciesOption: draft.speciesOption,
+    backgroundId: draft.backgroundId ?? '',
+  }
+}
+
+/** Нужен ли шаг «Заклинания»: класс-заклинатель, черта «Посвящённый в магию» или врождённые заклинания вида. */
+export const needsSpellStep = (draft: CreationDraft, data: RulesData) => hasMagic(draftMagicSubject(draft, data), data)
+
+/** Шаги для этого героя: без «Заклинаний», если магии нет. */
+export function creationSteps(draft: CreationDraft, data: RulesData) {
+  return CREATION_STEPS.filter((s) => s.id !== 'spells' || needsSpellStep(draft, data))
+}
+
+/** Магия будущего героя из шага «Заклинания» (нет магии — undefined). */
+export function draftMagic(draft: CreationDraft, data: RulesData) {
+  const subject = draftMagicSubject(draft, data)
+  return hasMagic(subject, data) ? magicFromChoice(subject, draft.spells, data) : undefined
+}
+
 // ---------- Проверка шагов ----------
 
 /** Что ещё нужно выбрать на шаге. Пустой список — шаг завершён. */
@@ -497,6 +532,11 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
       }
       break
     }
+    case 'spells': {
+      const magic = draftMagic(draft, data)
+      if (magic) problems.push(...magicProblems(draftMagicSubject(draft, data), magic, data))
+      break
+    }
     case 'equipment':
       if (!findOption(cls?.equipment, draft.classEquipment)) problems.push('Выберите снаряжение класса')
       if (!findOption(background?.equipment, draft.backgroundEquipment)) problems.push('Выберите снаряжение предыстории')
@@ -538,6 +578,7 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
   const species = data.species[draft.speciesId!]
   const abilities = finalScores(draft, data)!
   const hp = startingHitPoints(draft, data, abilities.con)
+  const magic = draftMagic(draft, data)
 
   const skills: Proficiencies['skills'] = {}
   for (const skill of proficientSkills(draft, data)) skills[skill] = 'proficient'
@@ -563,6 +604,7 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
       feats: chosenFeats(draft, data),
       appearance: draft.appearance.trim(),
       ...(draft.backstory.trim() ? { backstory: draft.backstory.trim() } : {}),
+      ...(magic ? { magic } : {}),
     },
     inventory: startingInventory(draft, data, catalog),
   }

@@ -15,6 +15,7 @@ function browserStorage() {
 export const appStore = createAppStore({
   repo: new StoryRepository(new AiMasterDb()),
   catalog: itemCatalog,
+  rules: rulesData,
   locations,
   adventures,
   legacyStorage: browserStorage(),

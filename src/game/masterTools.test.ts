@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AiToolCall } from '../ai/types'
-import { itemCatalog, priceList } from '../data'
+import { itemCatalog, priceList, rulesData } from '../data'
 import adventureJson from '../data/adventures/drunken-griffin.json'
 import fighterJson from '../data/characters/fighter-ratibor.json'
 import drunkenGriffinJson from '../data/locations/drunken-griffin.json'
@@ -22,7 +22,7 @@ const face = (value: number, sides = 20) => (value - 0.5) / sides
 
 function context(rolls: number[] = []): ToolContext {
   let n = 0
-  return { catalog: itemCatalog, prices: priceList, rng: () => rolls.shift() ?? 0.5, now: () => 1000, newId: () => `id${++n}` }
+  return { catalog: itemCatalog, rules: rulesData, prices: priceList, rng: () => rolls.shift() ?? 0.5, now: () => 1000, newId: () => `id${++n}` }
 }
 
 const fresh = (): StoryState => newStorySeed({ id: 's1', title: 'Тест', tone: 'detective', adventure, locations, party: [ratibor], now: 1 })
@@ -52,6 +52,7 @@ describe('описания инструментов', () => {
       'remove_item',
       'change_gold',
       'use_item',
+      'cast_spell',
       'change_hp',
       'move_npc',
       'add_npc',
@@ -292,5 +293,63 @@ describe('допустимые вызовы меняют игру через д�
     expect(s.world.doors[LOC].entrance).toBe('open')
     s = run(s, 'note_fact', { text: 'Люстра рухнула посреди зала.' }).state
     expect(s.world.facts.at(-1)?.text).toBe('Люстра рухнула посреди зала.')
+  })
+})
+
+describe('cast_spell: заклинания героя', () => {
+  /** Ратибор — волшебник с выбранными заклинаниями (Инт 16: Сл 13, атака +5). */
+  const mage = (): StoryState => {
+    const s = fresh()
+    const m = s.party[0]
+    m.character = {
+      ...m.character,
+      classId: 'wizard',
+      className: 'Волшебник',
+      abilities: { ...m.character.abilities, int: 16 },
+      hp: 5,
+      maxHp: 8,
+      magic: {
+        cantrips: ['fire-bolt', 'light', 'mage-hand'],
+        spellbook: ['magic-missile', 'shield', 'sleep', 'detect-magic', 'mage-armor', 'identify'],
+        prepared: ['magic-missile', 'shield', 'sleep', 'mage-armor'],
+        slotsUsed: {},
+      },
+    }
+    return s
+  }
+
+  it('заговор — без ячейки, движок бросает атаку и урон', () => {
+    const { outcome, state } = run(mage(), 'cast_spell', { spell: 'Огненный снаряд', target: 'Гуннар' }, context([face(15), face(7, 10)]))
+    expect(outcome.ok).toBe(true)
+    expect(outcome.result).toMatchObject({ spent: 'заговор (без ячейки)', attack: { total: 20, natural: 15 }, damage: { total: 7, type: 'fire' }, slots_left: '1-й круг: 2/2' })
+    expect(state.party[0].character.magic?.slotsUsed).toEqual({})
+  })
+
+  it('заклинание 1-го круга тратит ячейку; без ячеек — отказ', () => {
+    let s = mage()
+    for (let i = 0; i < 2; i++) {
+      const r = run(s, 'cast_spell', { spell: 'magic-missile' })
+      expect(r.outcome.ok).toBe(true)
+      s = r.state
+    }
+    expect(s.party[0].character.magic?.slotsUsed).toEqual({ 1: 2 })
+    expect(rejected(s, 'cast_spell', { spell: 'sleep' })).toMatch(/нет свободных ячеек/)
+    // Ритуал — без ячейки, прямо из книги.
+    expect(run(s, 'cast_spell', { spell: 'identify', ritual: true }).outcome.result).toMatchObject({ spent: 'ритуал (без ячейки, +10 минут)' })
+  })
+
+  it('отказ на неизвестное заклинание и у героя без магии', () => {
+    expect(rejected(mage(), 'cast_spell', { spell: 'Лечение ран' })).toMatch(/не знает заклинания «Лечение ран»/)
+    expect(rejected(mage(), 'cast_spell', { spell: 'Огненный шар' })).toMatch(/нет в справочнике/)
+    expect(rejected(fresh(), 'cast_spell', { spell: 'fire-bolt' })).toMatch(/не знает/)
+    expect(rejected(mage(), 'cast_spell', { spell: 'magic-missile', slot_level: 2 })).toMatch(/нет ячеек 2-го круга/)
+  })
+
+  it('лечение на себя: бросок движка + модификатор, хиты растут', () => {
+    const s = mage()
+    s.party[0].character = { ...s.party[0].character, classId: 'cleric', className: 'Жрец', abilities: { ...s.party[0].character.abilities, wis: 16 }, magic: { cantrips: ['guidance', 'light', 'thaumaturgy'], prepared: ['cure-wounds', 'bless', 'command', 'sanctuary'], slotsUsed: {} } }
+    const { outcome, state } = run(s, 'cast_spell', { spell: 'cure-wounds' }, context([face(1, 8), face(1, 8)]))
+    expect(outcome.result).toMatchObject({ healing: 5, hp: '8/8' })
+    expect(state.party[0].character.hp).toBe(8)
   })
 })

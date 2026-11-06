@@ -57,7 +57,6 @@ export function carryingCapacity(abilities: AbilityScores): number {
   return abilities.str * 15
 }
 
-/** Проверяет лист персонажа (персонаж + инвентарь) по справочнику предметов. */
 /** Самая длинная «История героя» (символов). */
 export const MAX_BACKSTORY_LENGTH = 2000
 
@@ -75,6 +74,25 @@ export function migrateSheet<T>(sheet: T): T {
   return isObject(sheet) && isObject(sheet.inventory) ? ({ ...sheet, inventory: migrateInventory(sheet.inventory) } as T) : sheet
 }
 
+const isIdList = (v: unknown) => Array.isArray(v) && v.every((x) => isNonEmptyString(x))
+const isCounter = (v: unknown) => isObject(v) && Object.values(v).every((n) => isInt(n) && n >= 0)
+
+/** Форма Character.magic (правила — magicProblems в src/game/magic.ts). */
+export function magicShapeProblems(magic: unknown): string[] {
+  if (!isObject(magic)) return ['объект { cantrips, prepared, slotsUsed }']
+  const problems: string[] = []
+  if (!isIdList(magic.cantrips) || !isIdList(magic.prepared)) problems.push('cantrips и prepared — списки id заклинаний')
+  if (magic.spellbook !== undefined && !isIdList(magic.spellbook)) problems.push('spellbook — список id заклинаний')
+  if (!isCounter(magic.slotsUsed)) problems.push('slotsUsed — { круг: потрачено }')
+  if (magic.freeUsed !== undefined && !isCounter(magic.freeUsed)) problems.push('freeUsed — { источник:заклинание: потрачено }')
+  const i = magic.initiate
+  if (i !== undefined && (!isObject(i) || !isNonEmptyString(i.list) || !isNonEmptyString(i.ability) || !isIdList(i.cantrips) || typeof i.spell !== 'string'))
+    problems.push('initiate — { list, ability, cantrips, spell }')
+  if (magic.speciesAbility !== undefined && !(ABILITIES as readonly unknown[]).includes(magic.speciesAbility)) problems.push('speciesAbility — характеристика')
+  return problems
+}
+
+/** Проверяет лист персонажа (персонаж + инвентарь) по справочнику предметов. */
 export function parseCharacterSheet(input: unknown, catalog: ItemCatalog): CharacterSheet {
   const problems: string[] = []
   const fail = (message: string) => problems.push(message)
@@ -123,6 +141,8 @@ export function parseCharacterSheet(input: unknown, catalog: ItemCatalog): Chara
         })
       }
     }
+
+    if (ch.magic !== undefined) for (const problem of magicShapeProblems(ch.magic)) fail(`character.magic: ${problem}`)
 
     const prof = ch.proficiencies
     if (!isObject(prof)) {

@@ -6,7 +6,9 @@ import type { CharacterSheet } from '../types/character'
 import type { HallOfFameEntry, HeroFate, HeroRecord, HeroRoster } from '../types/heroes'
 import type { ItemCatalog } from '../types/items'
 import type { PartyMember, StoryMeta, StoryState } from '../types/story'
-import { parseCharacterSheet } from './character'
+import { magicShapeProblems, parseCharacterSheet } from './character'
+import { magicProblems, needsSpellChoice, type MagicRules } from './magic'
+import type { CharacterMagic } from '../types/spells'
 import { isNonEmptyString, isNumber, isObject, isOneOf, ValidationError } from './validation'
 
 export const EMPTY_ROSTER: HeroRoster = { heroes: [], hallOfFame: [] }
@@ -67,6 +69,22 @@ export function renameHero(roster: HeroRoster, heroId: string, name: string): Ro
   const problem = heroNameProblem(name)
   if (problem) return { ok: false, reason: problem }
   const sheet = { ...hero.sheet, character: { ...hero.sheet.character, name: name.trim() } }
+  return { ok: true, roster: replaceHero(roster, { ...hero, sheet }) }
+}
+
+/**
+ * Выбрать заклинания герою из «Моих героев» (старое сохранение заклинателя). Герой в незавершённой истории
+ * выбирает их в самой истории (действие spellsChosen).
+ */
+export function chooseHeroSpells(roster: HeroRoster, heroId: string, magic: CharacterMagic, rules: MagicRules): RosterResult {
+  const hero = findHero(roster, heroId)
+  if (!hero) return notFound()
+  if (hero.storyId) return { ok: false, reason: 'Герой в истории — заклинания выбираются в ней.' }
+  const c = hero.sheet.character
+  if (!needsSpellChoice(c, rules)) return { ok: false, reason: 'Заклинания этого героя уже выбраны.' }
+  const problem = magicShapeProblems(magic)[0] ?? magicProblems(c, magic, rules)[0]
+  if (problem) return { ok: false, reason: problem }
+  const sheet = { ...hero.sheet, character: { ...c, magic: structuredClone(magic) } }
   return { ok: true, roster: replaceHero(roster, { ...hero, sheet }) }
 }
 

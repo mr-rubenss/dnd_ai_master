@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
-import { collectPageErrors, continueGame, expectNoHorizontalScroll, face, flushSaves, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
+import { collectPageErrors, continueGame, expectNoHorizontalScroll, face, fillSpellStep, flushSaves, installRngQueue, openCharacterCreation, queueRolls } from './helpers'
 
 const next = (page: Page) => page.getByRole('button', { name: 'Далее', exact: true })
 const option = (page: Page, group: string, id: string) => page.getByRole('radiogroup', { name: group }).locator(`[data-option="${id}"]`)
@@ -93,21 +93,29 @@ test('полный путь: плут-эльф с предысторией пр�
   await expectNoHorizontalScroll(page)
   await next(page).click()
 
-  // 6. Снаряжение: набор плута A, золото преступника B
-  await expect(stepTitle(page)).toHaveText('6. Снаряжение')
+  // 6. Заклинания: у плута своих нет, но лесной эльф знает «Искусство друидов» — выбрать характеристику.
+  await expect(stepTitle(page)).toHaveText('6. Заклинания')
+  await expect(page.getByTestId('species-magic')).toContainText('Искусство друидов')
+  await page.getByTestId('species-ability').selectOption('wis')
+  await expect(next(page)).toBeEnabled()
+  await next(page).click()
+
+  // 7. Снаряжение: набор плута A, золото преступника B
+  await expect(stepTitle(page)).toHaveText('7. Снаряжение')
   await option(page, 'Снаряжение класса', 'class-A').click()
   await option(page, 'Снаряжение предыстории', 'background-B').click()
   await expectNoHorizontalScroll(page)
   await next(page).click()
 
-  // 7. Имя и внешность
-  await expect(stepTitle(page)).toHaveText('7. Имя и внешность')
+  // 8. Имя и внешность
+  await expect(stepTitle(page)).toHaveText('8. Имя и внешность')
   await page.getByLabel('Имя', { exact: true }).fill('Тень')
   await page.getByLabel('Внешность и характер').fill('Худощавая эльфийка в тёмном плаще.')
   await next(page).click()
 
-  // 8. Итог
-  await expect(stepTitle(page)).toHaveText('8. Итог')
+  // 9. Итог
+  await expect(stepTitle(page)).toHaveText('9. Итог')
+  await expect(page.getByTestId('summary-spells')).toHaveText('Искусство друидов (заговор) — Эльф')
   await expect(page.getByTestId('summary-name')).toHaveText('Тень')
   await expect(page.locator('.summary-head p')).toHaveText('Эльф (Лесной эльф) · Плут 1 ур. · Преступник')
   await expect(page.getByTestId('summary-hp')).toHaveText('11') // к8 + ТЕЛ 16 (+3)
@@ -213,6 +221,8 @@ test('своя предыстория по шаблону 2024: сборка, б
   await expect(page.locator('.hint').first()).toContainText('Атлетика, Внимательность')
   await chip(page, 'classSkills', 'arcana').click()
   await chip(page, 'classSkills', 'history').click()
+  await next(page).click()
+  await fillSpellStep(page)
   await next(page).click()
   await option(page, 'Снаряжение класса', 'class-A').click()
   await option(page, 'Снаряжение предыстории', 'background-A').click()

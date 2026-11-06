@@ -4,23 +4,11 @@
     "name": "Варвар",
     "description": "Свирепый воин, черпающий силу в первобытной ярости.",
     "hitDie": 12,
-    "primary": [
-      "str"
-    ],
-    "savingThrows": [
-      "str",
-      "con"
-    ],
+    "primary": ["str"],
+    "savingThrows": ["str", "con"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "animal-handling",
-        "athletics",
-        "intimidation",
-        "nature",
-        "perception",
-        "survival"
-      ]
+      "from": ["animal-handling", "athletics", "intimidation", "nature", "perception", "survival"]
     },
     "armorTraining": ["light", "medium", "shield"],
     "features": [
@@ -67,13 +55,8 @@
     "name": "Бард",
     "description": "Вдохновляющий исполнитель, чья музыка и слово творят магию.",
     "hitDie": 8,
-    "primary": [
-      "cha"
-    ],
-    "savingThrows": [
-      "dex",
-      "cha"
-    ],
+    "primary": ["cha"],
+    "savingThrows": ["dex", "cha"],
     "skillChoices": {
       "count": 3,
       "from": "any"
@@ -119,10 +102,15 @@
     "tools": {
       "choose": {
         "count": 3,
-        "kinds": [
-          "musical"
-        ]
+        "kinds": ["musical"]
       }
+    },
+    "spellcasting": {
+      "ability": "cha",
+      "progression": "full",
+      "cantrips": [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      "prepared": [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+      "swap": "level-one"
     }
   },
   {
@@ -130,22 +118,11 @@
     "name": "Жрец",
     "description": "Служитель божества, несущий его силу в мир.",
     "hitDie": 8,
-    "primary": [
-      "wis"
-    ],
-    "savingThrows": [
-      "wis",
-      "cha"
-    ],
+    "primary": ["wis"],
+    "savingThrows": ["wis", "cha"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "history",
-        "insight",
-        "medicine",
-        "persuasion",
-        "religion"
-      ]
+      "from": ["history", "insight", "medicine", "persuasion", "religion"]
     },
     "armorTraining": ["light", "medium", "shield"],
     "features": [
@@ -186,32 +163,25 @@
         "gold": 110
       }
     ],
-    "martialWeapons": "none"
+    "martialWeapons": "none",
+    "spellcasting": {
+      "ability": "wis",
+      "progression": "full",
+      "cantrips": [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+      "prepared": [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+      "swap": "long-rest-any"
+    }
   },
   {
     "id": "druid",
     "name": "Друид",
     "description": "Жрец древних сил природы, способный принимать облик зверей.",
     "hitDie": 8,
-    "primary": [
-      "wis"
-    ],
-    "savingThrows": [
-      "int",
-      "wis"
-    ],
+    "primary": ["wis"],
+    "savingThrows": ["int", "wis"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "arcana",
-        "animal-handling",
-        "insight",
-        "medicine",
-        "nature",
-        "perception",
-        "religion",
-        "survival"
-      ]
+      "from": ["arcana", "animal-handling", "insight", "medicine", "nature", "perception", "religion", "survival"]
     },
     "armorTraining": ["light", "shield"],
     "features": [
@@ -261,9 +231,14 @@
     ],
     "martialWeapons": "none",
     "tools": {
-      "fixed": [
-        "herbalism-kit"
-      ]
+      "fixed": ["herbalism-kit"]
+    },
+    "spellcasting": {
+      "ability": "wis",
+      "progression": "full",
+      "cantrips": [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      "prepared": [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+      "swap": "long-rest-any"
     }
   },
   {
@@ -271,27 +246,11 @@
     "name": "Воин",
     "description": "Мастер оружия и доспехов, готовый к любому бою.",
     "hitDie": 10,
-    "primary": [
-      "str",
-      "dex"
-    ],
-    "savingThrows": [
-      "str",
-      "con"
-    ],
+    "primary": ["str", "dex"],
+    "savingThrows": ["str", "con"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "acrobatics",
-        "animal-handling",
-        "athletics",
-        "history",
-        "insight",
-        "intimidation",
-        "persuasion",
-        "perception",
-        "survival"
-      ]
+      "from": ["acrobatics", "animal-handling", "athletics", "history", "insight", "intimidation", "persuasion", "perception", "survival"]
     },
     "armorTraining": ["light", "medium", "heavy", "shield"],
     "features": [
@@ -373,24 +332,11 @@
     "name": "Монах",
     "description": "Мастер боевых искусств, направляющий внутреннюю энергию.",
     "hitDie": 8,
-    "primary": [
-      "dex",
-      "wis"
-    ],
-    "savingThrows": [
-      "str",
-      "dex"
-    ],
+    "primary": ["dex", "wis"],
+    "savingThrows": ["str", "dex"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "acrobatics",
-        "athletics",
-        "history",
-        "insight",
-        "religion",
-        "stealth"
-      ]
+      "from": ["acrobatics", "athletics", "history", "insight", "religion", "stealth"]
     },
     "armorTraining": [],
     "features": [
@@ -433,10 +379,7 @@
     "tools": {
       "choose": {
         "count": 1,
-        "kinds": [
-          "artisan",
-          "musical"
-        ]
+        "kinds": ["artisan", "musical"]
       }
     }
   },
@@ -445,24 +388,11 @@
     "name": "Паладин",
     "description": "Святой воин, связанный священной клятвой.",
     "hitDie": 10,
-    "primary": [
-      "str",
-      "cha"
-    ],
-    "savingThrows": [
-      "wis",
-      "cha"
-    ],
+    "primary": ["str", "cha"],
+    "savingThrows": ["wis", "cha"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "athletics",
-        "insight",
-        "intimidation",
-        "medicine",
-        "persuasion",
-        "religion"
-      ]
+      "from": ["athletics", "insight", "intimidation", "medicine", "persuasion", "religion"]
     },
     "armorTraining": ["light", "medium", "heavy", "shield"],
     "features": [
@@ -511,33 +441,25 @@
         "gold": 150
       }
     ],
-    "martialWeapons": "all"
+    "martialWeapons": "all",
+    "spellcasting": {
+      "ability": "cha",
+      "progression": "half",
+      "cantrips": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "prepared": [2, 3, 4, 5, 6, 6, 7, 7, 9, 9, 10, 10, 11, 11, 12, 12, 14, 14, 15, 15],
+      "swap": "long-rest-one"
+    }
   },
   {
     "id": "ranger",
     "name": "Следопыт",
     "description": "Охотник и разведчик диких земель.",
     "hitDie": 10,
-    "primary": [
-      "dex",
-      "wis"
-    ],
-    "savingThrows": [
-      "str",
-      "dex"
-    ],
+    "primary": ["dex", "wis"],
+    "savingThrows": ["str", "dex"],
     "skillChoices": {
       "count": 3,
-      "from": [
-        "animal-handling",
-        "athletics",
-        "insight",
-        "investigation",
-        "nature",
-        "perception",
-        "stealth",
-        "survival"
-      ]
+      "from": ["animal-handling", "athletics", "insight", "investigation", "nature", "perception", "stealth", "survival"]
     },
     "armorTraining": ["light", "medium", "shield"],
     "features": [
@@ -592,34 +514,25 @@
         "gold": 150
       }
     ],
-    "martialWeapons": "all"
+    "martialWeapons": "all",
+    "spellcasting": {
+      "ability": "wis",
+      "progression": "half",
+      "cantrips": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "prepared": [2, 3, 4, 5, 6, 6, 7, 7, 9, 9, 10, 10, 11, 11, 12, 12, 14, 14, 15, 15],
+      "swap": "long-rest-one"
+    }
   },
   {
     "id": "rogue",
     "name": "Плут",
     "description": "Ловкач, полагающийся на скрытность, хитрость и точный удар.",
     "hitDie": 8,
-    "primary": [
-      "dex"
-    ],
-    "savingThrows": [
-      "dex",
-      "int"
-    ],
+    "primary": ["dex"],
+    "savingThrows": ["dex", "int"],
     "skillChoices": {
       "count": 4,
-      "from": [
-        "acrobatics",
-        "athletics",
-        "deception",
-        "insight",
-        "intimidation",
-        "investigation",
-        "perception",
-        "persuasion",
-        "sleight-of-hand",
-        "stealth"
-      ]
+      "from": ["acrobatics", "athletics", "deception", "insight", "intimidation", "investigation", "perception", "persuasion", "sleight-of-hand", "stealth"]
     },
     "expertise": 2,
     "armorTraining": ["light"],
@@ -682,9 +595,7 @@
     ],
     "martialWeapons": "finesse-or-light",
     "tools": {
-      "fixed": [
-        "thieves-tools"
-      ]
+      "fixed": ["thieves-tools"]
     }
   },
   {
@@ -692,23 +603,11 @@
     "name": "Чародей",
     "description": "Заклинатель, чья магия — врождённый дар крови.",
     "hitDie": 6,
-    "primary": [
-      "cha"
-    ],
-    "savingThrows": [
-      "con",
-      "cha"
-    ],
+    "primary": ["cha"],
+    "savingThrows": ["con", "cha"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "arcana",
-        "deception",
-        "insight",
-        "intimidation",
-        "persuasion",
-        "religion"
-      ]
+      "from": ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"]
     },
     "armorTraining": [],
     "features": [
@@ -747,31 +646,25 @@
         "gold": 50
       }
     ],
-    "martialWeapons": "none"
+    "martialWeapons": "none",
+    "spellcasting": {
+      "ability": "cha",
+      "progression": "full",
+      "cantrips": [4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+      "prepared": [2, 4, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+      "swap": "level-one"
+    }
   },
   {
     "id": "warlock",
     "name": "Колдун",
     "description": "Искатель тайного знания, заключивший договор с могущественным покровителем.",
     "hitDie": 8,
-    "primary": [
-      "cha"
-    ],
-    "savingThrows": [
-      "wis",
-      "cha"
-    ],
+    "primary": ["cha"],
+    "savingThrows": ["wis", "cha"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "arcana",
-        "deception",
-        "history",
-        "intimidation",
-        "investigation",
-        "nature",
-        "religion"
-      ]
+      "from": ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"]
     },
     "armorTraining": ["light"],
     "features": [
@@ -816,31 +709,25 @@
         "gold": 100
       }
     ],
-    "martialWeapons": "none"
+    "martialWeapons": "none",
+    "spellcasting": {
+      "ability": "cha",
+      "progression": "pact",
+      "cantrips": [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      "prepared": [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15],
+      "swap": "level-one"
+    }
   },
   {
     "id": "wizard",
     "name": "Волшебник",
     "description": "Учёный маг, постигающий тайны мироздания по книгам.",
     "hitDie": 6,
-    "primary": [
-      "int"
-    ],
-    "savingThrows": [
-      "int",
-      "wis"
-    ],
+    "primary": ["int"],
+    "savingThrows": ["int", "wis"],
     "skillChoices": {
       "count": 2,
-      "from": [
-        "arcana",
-        "history",
-        "insight",
-        "investigation",
-        "medicine",
-        "nature",
-        "religion"
-      ]
+      "from": ["arcana", "history", "insight", "investigation", "medicine", "nature", "religion"]
     },
     "armorTraining": [],
     "features": [
@@ -886,6 +773,17 @@
         "gold": 55
       }
     ],
-    "martialWeapons": "none"
+    "martialWeapons": "none",
+    "spellcasting": {
+      "ability": "int",
+      "progression": "full",
+      "cantrips": [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+      "prepared": [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 18, 19, 21, 22, 23, 24, 25],
+      "swap": "long-rest-any",
+      "spellbook": {
+        "start": 6,
+        "perLevel": 2
+      }
+    }
   }
 ]

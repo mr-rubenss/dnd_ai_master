@@ -20,6 +20,9 @@ interface HeroLedger {
   items: Map<string, number>
   hp: number
   conditions: Set<ConditionId>
+  /** Потрачено ячеек по кругам и бесплатных сотворений (ключ «источник:заклинание»). */
+  slots: Map<string, number>
+  free: Map<string, number>
 }
 
 export type TurnLedger = Map<string, HeroLedger>
@@ -34,6 +37,8 @@ function heroLedger(m: PartyMember, catalog: ItemCatalog): HeroLedger {
     items: new Map(m.inventory.items.map((e) => [e.itemId, units(e, catalog[e.itemId]?.use?.charges)])),
     hp: m.character.hp,
     conditions: new Set(m.character.conditions.map((c) => c.id)),
+    slots: new Map(Object.entries(m.character.magic?.slotsUsed ?? {})),
+    free: new Map(Object.entries(m.character.magic?.freeUsed ?? {})),
   }
 }
 
@@ -46,11 +51,24 @@ export interface TurnDelta {
   hp: Map<string, number>
   added: Map<string, ConditionId[]>
   removed: Map<string, ConditionId[]>
+  /** Потрачено (плюс) или восстановлено (минус) ячеек по кругам за ход. */
+  slots: Map<string, Map<string, number>>
+  /** Бесплатные сотворения врождённых заклинаний за ход. */
+  free: Map<string, Map<string, number>>
+}
+
+const counterDiff = (a: Map<string, number>, b: Map<string, number>) => {
+  const diff = new Map<string, number>()
+  for (const k of new Set([...a.keys(), ...b.keys()])) {
+    const d = (a.get(k) ?? 0) - (b.get(k) ?? 0)
+    if (d) diff.set(k, d)
+  }
+  return diff
 }
 
 /** Что изменилось между двумя снимками. */
 export function turnDelta(before: TurnLedger, after: TurnLedger): TurnDelta {
-  const d: TurnDelta = { money: new Map(), items: new Map(), hp: new Map(), added: new Map(), removed: new Map() }
+  const d: TurnDelta = { money: new Map(), items: new Map(), hp: new Map(), added: new Map(), removed: new Map(), slots: new Map(), free: new Map() }
   for (const [heroId, a] of after) {
     const b = before.get(heroId)
     if (!b) continue
@@ -66,6 +84,10 @@ export function turnDelta(before: TurnLedger, after: TurnLedger): TurnDelta {
     const removed = [...b.conditions].filter((c) => !a.conditions.has(c))
     if (added.length) d.added.set(heroId, added)
     if (removed.length) d.removed.set(heroId, removed)
+    const slots = counterDiff(a.slots ?? new Map(), b.slots ?? new Map())
+    const free = counterDiff(a.free ?? new Map(), b.free ?? new Map())
+    if (slots.size) d.slots.set(heroId, slots)
+    if (free.size) d.free.set(heroId, free)
   }
   return d
 }
@@ -84,7 +106,14 @@ const signed = (n: number) => `${n > 0 ? '+' : '−'}${Math.abs(n)}`
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 
 /** Строка изменений для ленты. reasons — за что платили/получали (из change_gold), по героям. */
-export function changeList(delta: TurnDelta, story: StoryState, catalog: ItemCatalog, reasons: Map<string, string[]> = new Map()): TurnChange[] {
+export function changeList(
+  delta: TurnDelta,
+  story: StoryState,
+  catalog: ItemCatalog,
+  reasons: Map<string, string[]> = new Map(),
+  /** Названия заклинаний по id — для строки о бесплатном сотворении. */
+  spellNames?: Record<string, string>,
+): TurnChange[] {
   const multi = story.party.length > 1
   const changes: TurnChange[] = []
   for (const m of story.party) {
@@ -104,6 +133,12 @@ export function changeList(delta: TurnDelta, story: StoryState, catalog: ItemCat
     if (hp) push('hp', `${signed(hp)} ${plural(hp, ['хит', 'хита', 'хитов'])}`, hp > 0)
     for (const c of delta.added.get(m.heroId) ?? []) push('condition', `состояние: ${CONDITION_DEFINITIONS[c].name}`, false)
     for (const c of delta.removed.get(m.heroId) ?? []) push('condition', `снято: ${CONDITION_DEFINITIONS[c].name}`, true)
+    for (const [level, n] of delta.slots.get(m.heroId) ?? [])
+      push('spell', `${signed(-n)} ${plural(n, ['ячейка', 'ячейки', 'ячеек'])} ${level}-го круга`, n < 0)
+    for (const [key, n] of delta.free.get(m.heroId) ?? []) {
+      const spellName = spellNames?.[key.split(':')[1] ?? ''] ?? key
+      push('spell', `${signed(-n)} ${plural(n, ['бесплатное сотворение', 'бесплатных сотворения', 'бесплатных сотворений'])} («${spellName}»)`, n < 0)
+    }
   }
   return changes
 }

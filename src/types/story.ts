@@ -5,6 +5,7 @@
 import type { ActiveCondition } from '../engine/conditions'
 import type { Character, Equipment, Inventory } from './character'
 import type { Coins } from '../game/coins'
+import type { CharacterMagic } from './spells'
 import type { ChatMessage, CheckCard, RollRecord, TurnChange } from './game'
 import type { CellPosition, DoorState, LocationData, MapObject, Npc } from './location'
 
@@ -153,6 +154,12 @@ export type StoryEvent =
   | { type: 'moneyChanged'; heroId: string; delta: number; coins: Coins }
   /** Потрачены применения предмета с зарядами (набор целителя); закончились — предмет уходит. */
   | { type: 'itemChargesUsed'; heroId: string; itemId: string; uses: number; perItem: number }
+  /** Игрок выбрал заклинания (старое сохранение заклинателя или «Посвящённый в магию» без выбора). */
+  | { type: 'spellsChosen'; heroId: string; magic: CharacterMagic }
+  /** Игрок изменил подготовленные заклинания (в пределах лимита класса; у Волшебника — из книги). */
+  | { type: 'preparedSpellsChanged'; heroId: string; prepared: string[] }
+  /** Герой сотворил заклинание: потрачена ячейка (slotLevel), бесплатное сотворение (freeKey) или ритуал; у заговора — ничего. */
+  | { type: 'spellCast'; heroId: string; spellId: string; slotLevel: number | null; freeKey: string | null; ritual: boolean }
   /** Строка изменений за ход ведущего — системное сообщение в ленте. */
   | { type: 'turnSummarized'; messageId: string; changes: TurnChange[] }
   /** Урон (с типом) или лечение; хиты не уходят ниже 0 и выше максимума. */

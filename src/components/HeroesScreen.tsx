@@ -7,6 +7,10 @@ import type { CharacterSheet } from '../types/character'
 import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
 import type { StoryMeta, StoryState } from '../types/story'
 import { CharacterStats, Chronicle } from './CharacterStats'
+import { SpellChoiceDialog } from './MagicPanel'
+import { needsSpellChoice } from '../game/magic'
+import { rulesData } from '../data'
+import type { CharacterMagic } from '../types/spells'
 
 type Tab = 'heroes' | 'hall'
 
@@ -23,10 +27,13 @@ interface Props {
   /** Возвращают причину отказа или null. */
   onRename: (heroId: string, name: string) => Promise<string | null>
   onDelete: (heroId: string) => Promise<string | null>
+  /** Выбрать заклинания герою из старого сохранения; причина отказа или null. */
+  onChooseSpells?: (heroId: string, magic: CharacterMagic) => Promise<string | null>
 }
 
 /** «Мои герои»: все созданные персонажи и «Зал славы» тех, чей путь закончен. */
-export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes', onCreate, onStart, onContinue, onRename, onDelete }: Props) {
+export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes', onCreate, onStart, onContinue, onRename, onDelete, onChooseSpells }: Props) {
+  const [choosing, setChoosing] = useState<HeroRecord | null>(null)
   const [tab, setTab] = useState<Tab>(initialTab)
   const [viewing, setViewing] = useState<{ hero: HeroRecord; sheet: CharacterSheet } | null>(null)
   const storyOf = (hero: HeroRecord) => (hero.storyId ? stories.find((s) => s.id === hero.storyId) : undefined)
@@ -73,6 +80,7 @@ export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes'
                   onContinue={() => hero.storyId && onContinue(hero.storyId)}
                   onRename={(name) => onRename(hero.id, name)}
                   onDelete={() => onDelete(hero.id)}
+                  onChooseSpells={onChooseSpells && !hero.storyId && needsSpellChoice(hero.sheet.character, rulesData) ? () => setChoosing(hero) : undefined}
                 />
               ))}
             </ul>
@@ -87,6 +95,9 @@ export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes'
           </ul>
         )}
       </section>
+      {choosing && onChooseSpells && (
+        <SpellChoiceDialog character={choosing.sheet.character} onSubmit={(magic) => onChooseSpells(choosing.id, magic)} onClose={() => setChoosing(null)} />
+      )}
       {viewing && <HeroSheetDialog hero={viewing.hero} sheet={viewing.sheet} onClose={() => setViewing(null)} />}
     </main>
   )
@@ -102,9 +113,11 @@ interface HeroCardProps {
   onContinue: () => void
   onRename: (name: string) => Promise<string | null>
   onDelete: () => Promise<string | null>
+  /** Есть, если герою нужно выбрать заклинания (старое сохранение). */
+  onChooseSpells?: () => void
 }
 
-function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, onDelete }: HeroCardProps) {
+function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, onDelete, onChooseSpells }: HeroCardProps) {
   // Имя и уровень героя в истории — из её отряда (они могут меняться только там).
   const member = story?.party.find((m) => m.heroId === hero.id)
   const character = { ...sheet.character, ...(member ? { name: member.name, level: member.level } : {}) }
@@ -177,6 +190,11 @@ function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, o
           ) : (
             <button type="button" className="item-action is-primary" onClick={onStart}>
               Начать историю
+            </button>
+          )}
+          {onChooseSpells && (
+            <button type="button" className="item-action is-primary" onClick={onChooseSpells} data-testid="hero-choose-spells">
+              Выбрать заклинания
             </button>
           )}
           <button type="button" className="item-action" onClick={onView}>

@@ -3,6 +3,7 @@
 import type { Ability } from '../engine/abilities'
 import type { SkillId } from '../engine/skills'
 import type { ArmorType, ItemCatalog, ToolKind } from './items'
+import type { ClassSpellcasting, InitiateList, InnateSpellGrant, SpellCatalog, SpellSlotTables } from './spells'
 
 export interface NamedText {
   name: string
@@ -54,6 +55,8 @@ export interface ClassDefinition {
   fightingStyle?: boolean
   features: NamedText[]
   equipment: EquipmentOption[]
+  /** Использование заклинаний (нет — класс без магии на 1-м уровне). */
+  spellcasting?: ClassSpellcasting
 }
 
 /** Воинское оружие: всё, никакое, только лёгкое (Монах), фехтовальное или лёгкое (Плут). */
@@ -71,6 +74,8 @@ export interface BackgroundDefinition {
   feat: string
   /** Уточнение к черте, например «список жреца». */
   featNote?: string
+  /** Список заклинаний для черты «Посвящённый в магию» (Послушник — жрец, Мудрец — волшебник); нет — на выбор игрока. */
+  featSpellList?: InitiateList
   skills: SkillId[]
   tool: ToolGrant
   equipment: EquipmentOption[]
@@ -82,6 +87,8 @@ export interface SpeciesOption {
   description: string
   speed?: number
   darkvision?: number
+  /** Врождённые заклинания ветви (заговоры наследия, «Разговор с животными» лесного гнома). */
+  innateSpells?: InnateSpellGrant[]
 }
 
 export interface SpeciesDefinition {
@@ -99,6 +106,8 @@ export interface SpeciesDefinition {
   skillChoice?: SkillChoice
   /** Даёт черту происхождения на выбор (Человек). */
   originFeat?: boolean
+  /** Врождённые заклинания вида для всех ветвей (Тифлинг — «Чудотворство»). */
+  innateSpells?: InnateSpellGrant[]
 }
 
 export const FEAT_CATEGORIES = ['origin', 'fighting-style'] as const
@@ -126,6 +135,9 @@ export interface RulesData {
   species: Record<string, SpeciesDefinition>
   feats: Record<string, FeatDefinition>
   packs: Record<string, PackDefinition>
+  /** Справочник заклинаний и таблицы ячеек (src/data/spells.json, rules/spell-slots.json). */
+  spells: SpellCatalog
+  spellSlots: SpellSlotTables
   /** Справочник предметов, на который ссылаются данные. */
   catalog: ItemCatalog
 }
