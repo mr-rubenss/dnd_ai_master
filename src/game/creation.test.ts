@@ -522,7 +522,7 @@ describe('своя предыстория', () => {
   })
 
   it('дорогое снаряжение не пропускает шаг', () => {
-    const d = updateCustomBackground(customDraft(), { items: [{ itemId: 'spellbook', quantity: 2 }] }, data)
+    const d = updateCustomBackground(customDraft(), { items: [{ itemId: 'greatsword', quantity: 2 }] }, data)
     expect(stepProblems('background', d, data)).toEqual(['Снаряжение стоит 100 зм — больше 50 зм'])
   })
 

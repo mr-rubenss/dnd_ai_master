@@ -32,6 +32,7 @@ export function parseItemCatalog(raw: unknown): ItemCatalog {
     for (const key of ['name', 'icon', 'description'] as const) {
       if (!isNonEmptyString(item[key])) fail(`${where}: "${key}" должно быть непустой строкой`)
     }
+    if (item.nameEn !== undefined && !isNonEmptyString(item.nameEn)) fail(`${where}: "nameEn" — непустая строка`)
     if (!isOneOf(ITEM_CATEGORIES, item.category)) fail(`${where}: "category" должно быть одним из: ${ITEM_CATEGORIES.join(', ')}`)
     if (!isNumber(item.weight) || item.weight < 0) fail(`${where}: "weight" должно быть неотрицательным числом`)
     if (item.cost !== undefined && (!isNumber(item.cost) || item.cost <= 0)) fail(`${where}: "cost" — положительное число (в зм)`)

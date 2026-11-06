@@ -32,7 +32,17 @@ export interface CheckSubject {
   abilities: AbilityScores
   proficiencies: Proficiencies
   conditions: ActiveCondition[]
+  /** Особые бонусы к проверкам навыков (Чудотворец жреца: +Мдр к Интеллекту (Магия или Религия)). */
+  skillBonuses?: SkillBonus[]
 }
+
+export interface SkillBonus {
+  skills: SkillId[]
+  label: string
+  value: number
+}
+
+const bonusesFor = (subject: CheckSubject, skill: SkillId) => (subject.skillBonuses ?? []).filter((b) => b.skills.includes(skill))
 
 export const MIN_DC = 1
 export const MAX_DC = 30
@@ -59,7 +69,8 @@ export function isSaveProficient(subject: CheckSubject, ability: Ability): boole
 export function skillModifier(subject: CheckSubject, skill: SkillId): number {
   const { ability } = SKILL_DEFINITIONS[skill]
   const multiplier = PROFICIENCY_MULTIPLIER[skillProficiency(subject, skill)]
-  return abilityModifier(subject.abilities[ability]) + multiplier * proficiencyBonus(subject.level)
+  const extra = bonusesFor(subject, skill).reduce((sum, b) => sum + b.value, 0)
+  return abilityModifier(subject.abilities[ability]) + multiplier * proficiencyBonus(subject.level) + extra
 }
 
 /** Модификатор спасброска: модификатор характеристики + БМ при владении. */
@@ -144,6 +155,7 @@ export function abilityCheck(subject: CheckSubject, target: CheckTarget, options
     const level = skillProficiency(subject, skill)
     if (level === 'proficient') modifiers.push({ label: 'Владение', value: pb })
     if (level === 'expertise') modifiers.push({ label: 'Компетентность', value: 2 * pb })
+    for (const b of bonusesFor(subject, skill)) modifiers.push({ label: b.label, value: b.value })
   }
   const label = skill ? `${ABILITY_NAMES[ability]} (${SKILL_DEFINITIONS[skill].name})` : `Проверка ${ABILITY_NAMES_GENITIVE[ability]}`
   return resolveD20Test(subject, { kind: 'check', ability, skill, label, modifiers }, options)

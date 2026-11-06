@@ -2,6 +2,7 @@
   {
     "id": "acolyte",
     "name": "Прислужник",
+    "nameEn": "Acolyte",
     "description": "Вы служили в храме, помогая жрецам в обрядах и изучая священные тексты.",
     "abilities": ["int", "wis", "cha"],
     "feat": "magic-initiate",
@@ -44,6 +45,7 @@
   {
     "id": "criminal",
     "name": "Преступник",
+    "nameEn": "Criminal",
     "description": "Вы зарабатывали на жизнь в тёмных переулках: обчищали карманы, вскрывали замки и знали нужных людей.",
     "abilities": ["dex", "con", "int"],
     "feat": "alert",
@@ -85,6 +87,7 @@
   {
     "id": "sage",
     "name": "Мудрец",
+    "nameEn": "Sage",
     "description": "Годы среди книг и свитков в библиотеках и университетах научили вас многому о мире и магии.",
     "abilities": ["con", "int", "wis"],
     "feat": "magic-initiate",
@@ -127,6 +130,7 @@
   {
     "id": "soldier",
     "name": "Солдат",
+    "nameEn": "Soldier",
     "description": "Вы начали военную службу, едва повзрослев, и знаете цену дисциплине и боевому братству.",
     "abilities": ["str", "dex", "con"],
     "feat": "savage-attacker",

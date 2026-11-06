@@ -48,6 +48,7 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
       const where = `${file} "${entry.id}"`
       if (result[entry.id]) fail(`${where}: повторяющийся id`)
       if (!isNonEmptyString(entry.name)) fail(`${where}: нет "name"`)
+      if (file !== 'backgrounds' && !isNonEmptyString(entry.nameEn)) fail(`${where}: нет "nameEn" — английского названия из SRD`)
       check(entry, where)
       result[entry.id] = entry as T
     })
@@ -138,6 +139,30 @@ export function parseRulesData(raw: RawRulesData, catalog: ItemCatalog): RulesDa
     const usesChosenTool = (cls.equipment as EquipmentOption[] | undefined)?.some((o) => o.items?.some((l) => l.chosenTool === 'class'))
     if (usesChosenTool && !tools?.choose) fail(`${where}: снаряжение ссылается на выбранный инструмент, но выбора инструмента нет`)
     checkEquipment(cls.equipment, where)
+    const order = cls.order as ClassDefinition['order']
+    if (order !== undefined) {
+      if (!isObject(order) || !isNonEmptyString(order.feature) || !Array.isArray(order.options) || order.options.length < 2) fail(`${where}: "order" — { feature, options (минимум 2) }`)
+      else
+        for (const o of order.options) {
+          if (!isNonEmptyString(o.id) || !isNonEmptyString(o.name) || !isNonEmptyString(o.nameEn) || !isNonEmptyString(o.description)) fail(`${where}: вариант порядка — id, name, nameEn, description`)
+          if (o.skillBonus && (!o.skillBonus.skills.every(isSkill) || !isAbility(o.skillBonus.ability))) fail(`${where}: "${o.id}": skillBonus — навыки и характеристика`)
+          if (o.armor && !o.armor.every((t) => (ARMOR_TYPES as readonly unknown[]).includes(t))) fail(`${where}: "${o.id}": armor — виды доспехов`)
+          if (o.extraCantrip && !(cls.spellcasting as ClassSpellcasting | undefined)) fail(`${where}: дополнительный заговор у класса без заклинаний`)
+        }
+    }
+    for (const fs of (cls.featureSpells as ClassDefinition['featureSpells']) ?? []) {
+      if (!spells[fs.spellId]) fail(`${where}: featureSpells: неизвестное заклинание "${fs.spellId}"`)
+      else if (!spells[fs.spellId].classes.includes(cls.id as string)) fail(`${where}: "${fs.spellId}" — не из списка класса`)
+      if (!isNonEmptyString(fs.feature)) fail(`${where}: featureSpells: нужно название умения`)
+      if (fs.freeUses !== undefined && !twenty(fs.freeUses)) fail(`${where}: featureSpells.freeUses — 20 целых`)
+    }
+    for (const r of (cls.resources as ClassDefinition['resources']) ?? []) {
+      if (!isNonEmptyString(r.id) || !isNonEmptyString(r.name) || !isNonEmptyString(r.description)) fail(`${where}: умение с применениями — id, name, description`)
+      if (!r.uses === !r.usesAbility) fail(`${where}: "${r.id}": нужно ровно одно — uses (по уровням) или usesAbility`)
+      if (r.uses && !twenty(r.uses)) fail(`${where}: "${r.id}": uses — 20 целых`)
+      if (r.shortRest !== undefined && (!isInt(r.shortRest) || r.shortRest < 1)) fail(`${where}: "${r.id}": shortRest — положительное целое`)
+      if (r.pool && r.effect) fail(`${where}: "${r.id}": у запаса лечение — само количество`)
+    }
     const sc = cls.spellcasting as ClassSpellcasting | undefined
     if (sc !== undefined) {
       if (!isObject(sc) || !isAbility(sc.ability)) fail(`${where}: spellcasting.ability — характеристика`)

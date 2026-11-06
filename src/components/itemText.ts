@@ -56,6 +56,29 @@ const MASTERY_LABELS: Record<WeaponMastery, string> = {
   vex: 'Досаждение',
 }
 
+/** Английские названия свойств и приёмов из SRD 5.2.1 (русские — наш перевод). */
+export const PROPERTY_NAMES_EN: Record<WeaponProperty, string> = {
+  ammunition: 'Ammunition',
+  finesse: 'Finesse',
+  heavy: 'Heavy',
+  light: 'Light',
+  loading: 'Loading',
+  reach: 'Reach',
+  thrown: 'Thrown',
+  'two-handed': 'Two-Handed',
+  versatile: 'Versatile',
+}
+export const MASTERY_NAMES_EN: Record<WeaponMastery, string> = {
+  cleave: 'Cleave',
+  graze: 'Graze',
+  nick: 'Nick',
+  push: 'Push',
+  sap: 'Sap',
+  slow: 'Slow',
+  topple: 'Topple',
+  vex: 'Vex',
+}
+
 const ARMOR_TYPE_LABELS = { light: 'Лёгкий доспех', medium: 'Средний доспех', heavy: 'Тяжёлый доспех', shield: 'Щит' }
 
 /** «2d6» → «2к6», как принято в русских изданиях. */
@@ -82,7 +105,7 @@ export function itemStatLines(item: ItemDefinition): [string, string][] {
     lines.push(['Урон', damage])
     if (w.properties.length > 0) lines.push(['Свойства', w.properties.map((p) => PROPERTY_LABELS[p]).join(', ')])
     if (w.range) lines.push(['Дистанция', `${w.range.normal}/${w.range.long} фт.`])
-    if (w.mastery) lines.push(['Приём', MASTERY_LABELS[w.mastery]])
+    if (w.mastery) lines.push(['Приём', `${MASTERY_LABELS[w.mastery]} (${MASTERY_NAMES_EN[w.mastery]})`])
   }
   const a = item.armor
   if (a) {

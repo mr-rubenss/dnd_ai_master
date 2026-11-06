@@ -6,6 +6,7 @@ import type { ActiveCondition } from '../engine/conditions'
 import type { Character, Equipment, Inventory } from './character'
 import type { Coins } from '../game/coins'
 import type { CharacterMagic } from './spells'
+import type { ArmorType } from './items'
 import type { ChatMessage, CheckCard, RollRecord, TurnChange } from './game'
 import type { CellPosition, DoorState, LocationData, MapObject, Npc } from './location'
 
@@ -184,6 +185,9 @@ export type StoryEvent =
   | { type: 'moneyChanged'; heroId: string; delta: number; coins: Coins }
   /** Потрачены применения предмета с зарядами (набор целителя); закончились — предмет уходит. */
   | { type: 'itemChargesUsed'; heroId: string; itemId: string; uses: number; perItem: number }
+  /** Игрок выбрал «Божественный порядок» жреца или «Изначальный порядок» друида (старое сохранение). */
+  | { type: 'classOrderChosen'; heroId: string; order: string; armor: ArmorType[] }
+  /** Герой применил умение класса из запаса («Наложение рук»): потрачено amount. */
   /** Игрок выбрал заклинания (старое сохранение заклинателя или «Посвящённый в магию» без выбора). */
   | { type: 'spellsChosen'; heroId: string; magic: CharacterMagic }
   /** Игрок изменил подготовленные заклинания (в пределах лимита класса; у Волшебника — из книги). */
@@ -197,7 +201,7 @@ export type StoryEvent =
   /** Отдых окончен: что восстановилось у каждого героя (броски — в diceRolled перед этим). */
   | { type: 'restCompleted'; messageId: string; kind: RestKind; heroes: RestHeroResult[] }
   /** Герой применил умение класса («Второе дыхание»). */
-  | { type: 'featureUsed'; heroId: string; featureId: string }
+  | { type: 'featureUsed'; heroId: string; featureId: string; amount?: number }
   /** Строка изменений за ход ведущего — системное сообщение в ленте. */
   | { type: 'turnSummarized'; messageId: string; changes: TurnChange[] }
   /** Урон (с типом) или лечение; хиты не уходят ниже 0 и выше максимума. */

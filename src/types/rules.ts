@@ -7,6 +7,8 @@ import type { ClassSpellcasting, InitiateList, InnateSpellGrant, SpellCatalog, S
 
 export interface NamedText {
   name: string
+  /** Английское название из SRD 5.2.1 (русское — наш перевод). */
+  nameEn?: string
   description: string
 }
 
@@ -37,6 +39,7 @@ export interface SkillChoice {
 export interface ClassDefinition {
   id: string
   name: string
+  nameEn: string
   description: string
   hitDie: number
   /** Основные характеристики класса. */
@@ -55,10 +58,27 @@ export interface ClassDefinition {
   fightingStyle?: boolean
   features: NamedText[]
   equipment: EquipmentOption[]
+  /** Выбор роли на 1-м уровне: «Божественный порядок» жреца, «Изначальный порядок» друида. */
+  order?: { feature: string; options: ClassOrderOption[] }
+  /** Заклинания от умений класса: всегда подготовлены (не входят в лимит), иногда — бесплатные сотворения по уровням. */
+  featureSpells?: { spellId: string; feature: string; freeUses?: number[] }[]
   /** Умения с ограниченным числом применений («Второе дыхание», «Ярость»), восстанавливаются отдыхом. */
   resources?: ClassResource[]
   /** Использование заклинаний (нет — класс без магии на 1-м уровне). */
   spellcasting?: ClassSpellcasting
+}
+
+/** Вариант порядка: дополнительный заговор и бонус к навыкам или владение оружием и доспехами. */
+export interface ClassOrderOption {
+  id: string
+  name: string
+  nameEn: string
+  description: string
+  extraCantrip?: boolean
+  /** Бонус к проверкам этих навыков, равный модификатору характеристики (минимум +1). */
+  skillBonus?: { skills: SkillId[]; ability: Ability }
+  martialWeapons?: boolean
+  armor?: ArmorType[]
 }
 
 /**
@@ -73,6 +93,9 @@ export interface ClassResource {
   uses?: number[]
   usesAbility?: Ability
   shortRest?: number
+  /** Запас (Наложение рук): применение тратит произвольное количество, лечит на это количество. */
+  pool?: boolean
+  nameEn?: string
   effect?: { healing: string; addLevel?: boolean }
 }
 
@@ -85,6 +108,7 @@ export type ToolGrant = { itemId: string; choose?: undefined } | { choose: ToolK
 export interface BackgroundDefinition {
   id: string
   name: string
+  nameEn?: string
   description: string
   /** Три характеристики, к которым можно применить прибавки +2/+1 или +1/+1/+1. */
   abilities: [Ability, Ability, Ability]
@@ -101,6 +125,7 @@ export interface BackgroundDefinition {
 export interface SpeciesOption {
   id: string
   name: string
+  nameEn?: string
   description: string
   speed?: number
   darkvision?: number
@@ -111,6 +136,7 @@ export interface SpeciesOption {
 export interface SpeciesDefinition {
   id: string
   name: string
+  nameEn: string
   description: string
   size: string
   speed: number
@@ -133,6 +159,7 @@ export type FeatCategory = (typeof FEAT_CATEGORIES)[number]
 export interface FeatDefinition {
   id: string
   name: string
+  nameEn: string
   /** Черта происхождения или черта боевого стиля. */
   category: FeatCategory
   description: string
@@ -143,6 +170,7 @@ export interface FeatDefinition {
 export interface PackDefinition {
   id: string
   name: string
+  nameEn: string
   contents: { itemId: string; quantity: number }[]
 }
 

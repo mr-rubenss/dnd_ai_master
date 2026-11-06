@@ -6,13 +6,12 @@ import { DiceTray } from './components/DiceTray'
 import { EpilogueDialog } from './components/EpilogueDialog'
 import { HeroesScreen } from './components/HeroesScreen'
 import { InventoryPanel } from './components/InventoryPanel'
-import { SpellChoiceDialog } from './components/MagicPanel'
+import { SpellChoiceDialog, type SheetCompletion } from './components/MagicPanel'
 import { RestButton, RestDialog } from './components/RestPanel'
 import { changeNames, REST_NAMES, restBlocker, restEvents } from './game/rest'
 import { changeList, ledgerOf, turnDelta } from './game/turnChanges'
 import type { RestKind } from './types/story'
-import { needsSpellChoice } from './game/magic'
-import type { CharacterMagic } from './types/spells'
+import { needsSheetCompletion } from './game/classOrder'
 import { MapPanel } from './components/MapPanel'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
@@ -243,7 +242,7 @@ function App() {
           onContinue={openStory}
           onRename={(heroId, name) => appStore.renameHero(heroId, name)}
           onDelete={(heroId) => appStore.deleteHero(heroId)}
-          onChooseSpells={(heroId, magic) => appStore.chooseHeroSpells(heroId, magic)}
+          onChooseSpells={(heroId, completion) => appStore.chooseHeroSpells(heroId, completion)}
         />
       )}
       {current === 'creation' && (
@@ -535,8 +534,15 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   }
 
   // Старое сохранение заклинателя: магия теперь часть листа — при загрузке предлагаем выбрать заклинания.
-  const [spellDialog, setSpellDialog] = useState(() => !readOnly && needsSpellChoice(lead.character, rulesData))
-  const chooseSpells = (magic: CharacterMagic) => appStore.dispatch({ type: 'spellsChosen', heroId: lead.heroId, magic }, player(lead.heroId))
+  const [spellDialog, setSpellDialog] = useState(() => !readOnly && needsSheetCompletion(lead.character, rulesData))
+  const chooseSpells = ({ order, magic }: SheetCompletion): string | null => {
+    if (order) {
+      const armor = rulesData.classes[lead.character.classId]?.order?.options.find((o) => o.id === order)?.armor ?? []
+      const reason = appStore.dispatch({ type: 'classOrderChosen', heroId: lead.heroId, order, armor: [...armor] }, player(lead.heroId))
+      if (reason) return reason
+    }
+    return magic ? appStore.dispatch({ type: 'spellsChosen', heroId: lead.heroId, magic }, player(lead.heroId)) : null
+  }
   const prepareSpells = (prepared: string[]) => appStore.dispatch({ type: 'preparedSpellsChanged', heroId: lead.heroId, prepared }, player(lead.heroId))
 
   const handleEquipChange = (change: EquipmentChange): string | null => {
@@ -614,7 +620,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         />
       </div>
       {restOpen && !readOnly && <RestDialog character={lead.character} onRest={handleRest} onClose={() => setRestOpen(false)} />}
-      {spellDialog && !readOnly && needsSpellChoice(lead.character, rulesData) && (
+      {spellDialog && !readOnly && needsSheetCompletion(lead.character, rulesData) && (
         <SpellChoiceDialog character={lead.character} onSubmit={chooseSpells} onClose={() => setSpellDialog(false)} />
       )}
       {animatedRoll && <DiceRollOverlay key={animatedRoll.id} roll={animatedRoll} onDone={hideRoll} />}

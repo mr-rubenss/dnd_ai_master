@@ -10,8 +10,9 @@ import { ITEM_CATEGORIES, type ItemCatalog, type ItemDefinition } from '../types
 import type { StoryMemory, WorldFact } from '../types/story'
 import { AdventureJournal } from './AdventureJournal'
 import { MagicPanel } from './MagicPanel'
+import { needsSheetCompletion, weaponTraining } from '../game/classOrder'
 import { ResourcesSection } from './RestPanel'
-import { hasMagic, needsSpellChoice } from '../game/magic'
+import { hasMagic } from '../game/magic'
 import { CharacterStats } from './CharacterStats'
 import { Flash } from './Flash'
 import { formatCoins } from '../game/coins'
@@ -112,7 +113,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
   const weight = inventoryWeight(inventory, catalog)
   const capacity = carryingCapacity(character.abilities)
   const hpPercent = Math.round((character.hp / character.maxHp) * 100)
-  const training = rulesData.classes[character.classId]?.martialWeapons ?? 'all'
+  const training = weaponTraining(character, rulesData)
   const attacks = weaponAttacks(character, inventory.equipped, catalog, training)
   const twoHands = wieldedTwoHanded(inventory.equipped, catalog)
   const mainItem = inventory.equipped.mainHand ? catalog[inventory.equipped.mainHand] : undefined
@@ -311,7 +312,7 @@ export function InventoryPanel({ character, inventory, catalog, onEquipChange, j
                 character={character}
                 onPrepare={onPrepareSpells}
                 onChooseSpells={onChooseSpells}
-                needsChoice={needsSpellChoice(character, rulesData)}
+                needsChoice={needsSheetCompletion(character, rulesData)}
               />
             )}
           </div>

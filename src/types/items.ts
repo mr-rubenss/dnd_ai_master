@@ -53,6 +53,8 @@ export interface ArmorStats {
 export interface ItemDefinition {
   id: string
   name: string
+  /** Английское название из SRD 5.2.1 (у предметов приключений его нет). */
+  nameEn?: string
   category: ItemCategory
   /** Эмодзи-иконка. */
   icon: string

@@ -24,7 +24,7 @@ export const MAGIC_INITIATE = 'magic-initiate'
 export const INITIATE_CANTRIPS = 2
 
 /** Что о герое нужно правилам магии. */
-export type MagicSubject = Pick<Character, 'classId' | 'level' | 'abilities' | 'feats' | 'speciesId' | 'speciesOption' | 'backgroundId' | 'magic'>
+export type MagicSubject = Pick<Character, 'classId' | 'level' | 'abilities' | 'feats' | 'speciesId' | 'speciesOption' | 'backgroundId' | 'magic' | 'classOrder'>
 
 const levelIndex = (level: number) => Math.min(20, Math.max(1, level)) - 1
 
@@ -94,14 +94,19 @@ export interface SpellLimits {
   maxLevel: number
 }
 
-export function spellLimits(classId: string, level: number, rules: MagicRules): SpellLimits {
+/** Лимиты по таблице класса; order — выбранный порядок (Чудотворец и Маг знают на один заговор больше). */
+export function spellLimits(classId: string, level: number, rules: MagicRules, order?: string | null): SpellLimits {
   const sc = classSpellcasting(classId, rules)
   if (!sc) return { cantrips: 0, prepared: 0, spellbook: 0, maxLevel: 0 }
   const i = levelIndex(level)
   const levels = Object.keys(slotTotals(classId, level, rules)).map(Number)
   const book = sc.spellbook ? sc.spellbook.start + sc.spellbook.perLevel * i : 0
-  return { cantrips: sc.cantrips[i], prepared: sc.prepared[i], spellbook: book, maxLevel: Math.max(0, ...levels) }
+  const extra = rules.classes[classId]?.order?.options.find((o) => o.id === order)?.extraCantrip ? 1 : 0
+  return { cantrips: sc.cantrips[i] + extra, prepared: sc.prepared[i], spellbook: book, maxLevel: Math.max(0, ...levels) }
 }
+
+/** Заклинания, всегда подготовленные умениями класса («Друидический язык», «Избранный враг»). */
+export const featureSpellIds = (classId: string, rules: MagicRules) => (rules.classes[classId]?.featureSpells ?? []).map((f) => f.spellId)
 
 /** Заклинания списка класса заданного круга (по названию). */
 export function classSpellList(listId: string, spellLevel: number, rules: MagicRules): SpellDefinition[] {
@@ -112,7 +117,7 @@ export function classSpellList(listId: string, spellLevel: number, rules: MagicR
 
 // ---------- Врождённые заклинания: вид и «Посвящённый в магию» ----------
 
-export type InnateSource = 'species' | 'initiate'
+export type InnateSource = 'species' | 'initiate' | 'feature'
 
 export interface InnateSpell {
   spellId: string
@@ -166,6 +171,14 @@ export function innateSpells(subject: MagicSubject, rules: MagicRules): InnateSp
       key,
     })
   }
+  // Умения класса: заклинание всегда подготовлено; у «Избранного врага» — ещё и бесплатные сотворения.
+  const sc = classSpellcasting(subject.classId, rules)
+  for (const fs of rules.classes[subject.classId]?.featureSpells ?? []) {
+    if (!sc) break
+    const key = freeKey('feature', fs.spellId)
+    const freeMax = fs.freeUses ? fs.freeUses[levelIndex(subject.level)] : null
+    result.push({ spellId: fs.spellId, source: 'feature', sourceName: fs.feature, ability: sc.ability, freeMax, freeUsed: used[key] ?? 0, key })
+  }
   const initiate = subject.magic?.initiate
   if (initiate && hasInitiate(subject)) {
     const sourceName = `Посвящённый в магию (${INITIATE_LIST_NAMES[initiate.list]})`
@@ -184,10 +197,15 @@ export function hasMagic(subject: MagicSubject, rules: MagicRules): boolean {
   return Boolean(classSpellcasting(subject.classId, rules)) || hasInitiate(subject) || speciesSpellGrants(subject.speciesId, subject.speciesOption, rules).length > 0
 }
 
-/** Нужно ли игроку выбрать заклинания (класс-заклинатель или «Посвящённый в магию» без выбора — старое сохранение). */
+/**
+ * Нужно ли игроку выбрать заклинания: заклинатель без выбора (старое сохранение), выбор больше не сходится с правилами
+ * (заклинание убрано из справочника, «Чудотворцу» положен ещё заговор) или «Посвящённый в магию» без выбора.
+ */
 export function needsSpellChoice(subject: MagicSubject, rules: MagicRules): boolean {
-  if (classSpellcasting(subject.classId, rules) && !subject.magic) return true
-  return hasInitiate(subject) && !subject.magic?.initiate
+  const magic = subject.magic
+  if (classSpellcasting(subject.classId, rules) && (!magic || classChoiceProblems(subject.classId, subject.level, magic, rules, subject.classOrder).length > 0)) return true
+  if (hasInitiate(subject) && (!magic?.initiate || initiateProblems(magic.initiate, fixedInitiateList(subject.backgroundId, rules), rules).length > 0)) return true
+  return false
 }
 
 /** Пустая магия: ничего не выбрано и не потрачено. */
@@ -196,14 +214,20 @@ export const emptyMagic = (): CharacterMagic => ({ cantrips: [], prepared: [], s
 const dupes = (list: string[]) => new Set(list).size !== list.length
 
 /** Проверка выбора заклинаний класса: число по таблице, заклинания из списка класса, книга Волшебника. */
-export function classChoiceProblems(classId: string, level: number, magic: Pick<CharacterMagic, 'cantrips' | 'prepared' | 'spellbook'>, rules: MagicRules): string[] {
+export function classChoiceProblems(
+  classId: string,
+  level: number,
+  magic: Pick<CharacterMagic, 'cantrips' | 'prepared' | 'spellbook'>,
+  rules: MagicRules,
+  order?: string | null,
+): string[] {
   const sc = classSpellcasting(classId, rules)
   const problems: string[] = []
   if (!sc) {
     if (magic.cantrips.length || magic.prepared.length || magic.spellbook?.length) problems.push('У этого класса нет своих заклинаний.')
     return problems
   }
-  const limits = spellLimits(classId, level, rules)
+  const limits = spellLimits(classId, level, rules, order)
   const inList = (id: string, spellLevel: 'cantrip' | 'leveled') => {
     const s = rules.spells[id]
     return Boolean(s && s.classes.includes(classId) && (spellLevel === 'cantrip' ? s.level === 0 : s.level >= 1 && s.level <= limits.maxLevel))
@@ -228,6 +252,8 @@ export function preparedProblems(classId: string, level: number, prepared: strin
   if (!sc) return prepared.length ? ['У этого класса нет своих заклинаний.'] : []
   const limits = spellLimits(classId, level, rules)
   const problems: string[] = []
+  const always = featureSpellIds(classId, rules)
+  for (const id of prepared) if (always.includes(id)) problems.push(`«${rules.spells[id]?.name ?? id}» и так всегда подготовлено — выберите другое`)
   if (prepared.length !== limits.prepared) problems.push(`Подготовленные заклинания: выберите ${limits.prepared} (выбрано ${prepared.length})`)
   for (const id of prepared) {
     const s = rules.spells[id]
@@ -256,7 +282,7 @@ export function initiateProblems(initiate: InitiateMagic | undefined, fixedList:
 
 /** Полная проверка магии героя (выбор заклинаний при создании и для старых сохранений). */
 export function magicProblems(subject: Omit<MagicSubject, 'magic'>, magic: CharacterMagic, rules: MagicRules): string[] {
-  const problems = classChoiceProblems(subject.classId, subject.level, magic, rules)
+  const problems = classChoiceProblems(subject.classId, subject.level, magic, rules, subject.classOrder)
   if (hasInitiate(subject)) problems.push(...initiateProblems(magic.initiate, fixedInitiateList(subject.backgroundId, rules), rules))
   else if (magic.initiate) problems.push('Без черты «Посвящённый в магию» её заклинаний нет')
   if (magic.speciesAbility !== undefined && !(INNATE_ABILITIES as readonly string[]).includes(magic.speciesAbility))

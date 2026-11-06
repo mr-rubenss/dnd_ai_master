@@ -27,11 +27,17 @@ export function ResourcesSection({ character }: { character: Character }) {
       {features.map((f) => (
         <div key={f.resource.id} className="slot-row" data-testid={`feature-${f.resource.id}`} title={f.resource.description}>
           <span className="slot-row-label">{f.resource.name}</span>
-          <span className="slot-dots" role="img" aria-label={`${f.resource.name}: осталось ${f.left} из ${f.max}`}>
-            {Array.from({ length: f.max }, (_, i) => (
-              <span key={i} className={`slot-dot${i < f.used ? ' is-spent' : ''}`} />
-            ))}
-          </span>
+          {f.resource.pool ? (
+            <span className="slot-pool" role="img" aria-label={`${f.resource.name}: в запасе ${f.left} из ${f.max}`}>
+              запас
+            </span>
+          ) : (
+            <span className="slot-dots" role="img" aria-label={`${f.resource.name}: осталось ${f.left} из ${f.max}`}>
+              {Array.from({ length: f.max }, (_, i) => (
+                <span key={i} className={`slot-dot${i < f.used ? ' is-spent' : ''}`} />
+              ))}
+            </span>
+          )}
           <span className="slot-row-left">
             {f.left}/{f.max} · {f.resource.shortRest ? 'короткий отдых' : 'долгий отдых'}
           </span>

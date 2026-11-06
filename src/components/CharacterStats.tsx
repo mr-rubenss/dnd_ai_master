@@ -10,6 +10,7 @@ import { CONDITION_DEFINITIONS } from '../engine/conditions'
 import { SKILL_DEFINITIONS, SKILLS, type ProficiencyLevel } from '../engine/skills'
 import { itemCatalog, rulesData } from '../data'
 import { armorTrainingText } from './itemText'
+import { checkSubjectOf, classOrderOf } from '../game/classOrder'
 import type { Character, ChronicleEntry } from '../types/character'
 
 const PROFICIENCY_TITLES: Record<ProficiencyLevel, string> = {
@@ -26,6 +27,9 @@ function ProficiencyMark({ level }: { level: ProficiencyLevel }) {
 
 /** Вкладка «Характеристики»: характеристики, спасброски, навыки, пассивное Восприятие и состояния. */
 export function CharacterStats({ character }: { character: Character }) {
+  // Бонусы порядка (Чудотворец, Маг) к проверкам навыков.
+  const subject = checkSubjectOf(character, rulesData)
+  const order = classOrderOf(character, rulesData)
   return (
     <div className="character-sheet">
       <dl className="sheet-summary">
@@ -78,7 +82,7 @@ export function CharacterStats({ character }: { character: Character }) {
                   {definition.name}
                   <span className="stat-ability">{ABILITY_ABBREVIATIONS[definition.ability]}</span>
                 </span>
-                <span className="stat-mod">{formatModifier(skillModifier(character, skill))}</span>
+                <span className="stat-mod">{formatModifier(skillModifier(subject, skill))}</span>
               </li>
             )
           })}
@@ -97,6 +101,14 @@ export function CharacterStats({ character }: { character: Character }) {
           <dd data-testid="tool-proficiencies">
             {character.proficiencies.tools.length === 0 ? 'нет' : character.proficiencies.tools.map((id) => itemCatalog[id]?.name ?? id).join(', ')}
           </dd>
+          {order && (
+            <>
+              <dt>{rulesData.classes[character.classId]?.order?.feature}</dt>
+              <dd data-testid="class-order-value">
+                {order.name} ({order.nameEn})
+              </dd>
+            </>
+          )}
           <dt>Черты</dt>
           <dd data-testid="feats">{character.feats.length === 0 ? 'нет' : character.feats.map((id) => rulesData.feats[id]?.name ?? id).join(', ')}</dd>
         </dl>

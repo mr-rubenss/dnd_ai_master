@@ -7,10 +7,9 @@ import type { CharacterSheet } from '../types/character'
 import type { HallOfFameEntry, HeroRecord, HeroRoster } from '../types/heroes'
 import type { StoryMeta, StoryState } from '../types/story'
 import { CharacterStats, Chronicle } from './CharacterStats'
-import { SpellChoiceDialog } from './MagicPanel'
-import { needsSpellChoice } from '../game/magic'
+import { SpellChoiceDialog, type SheetCompletion } from './MagicPanel'
+import { needsSheetCompletion } from '../game/classOrder'
 import { rulesData } from '../data'
-import type { CharacterMagic } from '../types/spells'
 
 type Tab = 'heroes' | 'hall'
 
@@ -28,7 +27,7 @@ interface Props {
   onRename: (heroId: string, name: string) => Promise<string | null>
   onDelete: (heroId: string) => Promise<string | null>
   /** Выбрать заклинания герою из старого сохранения; причина отказа или null. */
-  onChooseSpells?: (heroId: string, magic: CharacterMagic) => Promise<string | null>
+  onChooseSpells?: (heroId: string, completion: SheetCompletion) => Promise<string | null>
 }
 
 /** «Мои герои»: все созданные персонажи и «Зал славы» тех, чей путь закончен. */
@@ -80,7 +79,7 @@ export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes'
                   onContinue={() => hero.storyId && onContinue(hero.storyId)}
                   onRename={(name) => onRename(hero.id, name)}
                   onDelete={() => onDelete(hero.id)}
-                  onChooseSpells={onChooseSpells && !hero.storyId && needsSpellChoice(hero.sheet.character, rulesData) ? () => setChoosing(hero) : undefined}
+                  onChooseSpells={onChooseSpells && !hero.storyId && needsSheetCompletion(hero.sheet.character, rulesData) ? () => setChoosing(hero) : undefined}
                 />
               ))}
             </ul>
@@ -96,7 +95,7 @@ export function HeroesScreen({ roster, stories, readStory, initialTab = 'heroes'
         )}
       </section>
       {choosing && onChooseSpells && (
-        <SpellChoiceDialog character={choosing.sheet.character} onSubmit={(magic) => onChooseSpells(choosing.id, magic)} onClose={() => setChoosing(null)} />
+        <SpellChoiceDialog character={choosing.sheet.character} onSubmit={(completion) => onChooseSpells(choosing.id, completion)} onClose={() => setChoosing(null)} />
       )}
       {viewing && <HeroSheetDialog hero={viewing.hero} sheet={viewing.sheet} onClose={() => setViewing(null)} />}
     </main>
@@ -194,7 +193,7 @@ function HeroCard({ hero, sheet, story, onView, onStart, onContinue, onRename, o
           )}
           {onChooseSpells && (
             <button type="button" className="item-action is-primary" onClick={onChooseSpells} data-testid="hero-choose-spells">
-              Выбрать заклинания
+              Дополнить лист
             </button>
           )}
           <button type="button" className="item-action" onClick={onView}>

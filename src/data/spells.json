@@ -2,6 +2,7 @@
   {
     "id": "acid-splash",
     "name": "Брызги кислоты",
+    "nameEn": "Acid Splash",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -30,6 +31,7 @@
   {
     "id": "chill-touch",
     "name": "Леденящее прикосновение",
+    "nameEn": "Chill Touch",
     "level": 0,
     "school": "necromancy",
     "castingTime": "1 действие",
@@ -58,6 +60,7 @@
   {
     "id": "dancing-lights",
     "name": "Пляшущие огоньки",
+    "nameEn": "Dancing Lights",
     "level": 0,
     "school": "illusion",
     "castingTime": "1 действие",
@@ -83,6 +86,7 @@
   {
     "id": "druidcraft",
     "name": "Искусство друидов",
+    "nameEn": "Druidcraft",
     "level": 0,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -102,6 +106,7 @@
   {
     "id": "eldritch-blast",
     "name": "Мистический заряд",
+    "nameEn": "Eldritch Blast",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -126,8 +131,31 @@
     }
   },
   {
+    "id": "elementalism",
+    "name": "Элементализм",
+    "nameEn": "Elementalism",
+    "level": 0,
+    "school": "transmutation",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Малая власть над стихиями: ветерок в кубе 5 футов, тонкий слой пыли или слово на песке, безвредные угольки и цветной ароматный дым, морось или туман, мелкая фигурка из земли или воды."
+  },
+  {
     "id": "fire-bolt",
     "name": "Огненный снаряд",
+    "nameEn": "Fire Bolt",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -155,6 +183,7 @@
   {
     "id": "guidance",
     "name": "Указание",
+    "nameEn": "Guidance",
     "level": 0,
     "school": "divination",
     "castingTime": "1 действие",
@@ -175,6 +204,7 @@
   {
     "id": "light",
     "name": "Свет",
+    "nameEn": "Light",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -201,6 +231,7 @@
   {
     "id": "mage-hand",
     "name": "Волшебная рука",
+    "nameEn": "Mage Hand",
     "level": 0,
     "school": "conjuration",
     "castingTime": "1 действие",
@@ -223,6 +254,7 @@
   {
     "id": "mending",
     "name": "Починка",
+    "nameEn": "Mending",
     "level": 0,
     "school": "transmutation",
     "castingTime": "1 минута",
@@ -247,6 +279,7 @@
   {
     "id": "message",
     "name": "Сообщение",
+    "nameEn": "Message",
     "level": 0,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -270,6 +303,7 @@
   {
     "id": "minor-illusion",
     "name": "Малая иллюзия",
+    "nameEn": "Minor Illusion",
     "level": 0,
     "school": "illusion",
     "castingTime": "1 действие",
@@ -293,6 +327,7 @@
   {
     "id": "poison-spray",
     "name": "Ядовитые брызги",
+    "nameEn": "Poison Spray",
     "level": 0,
     "school": "necromancy",
     "castingTime": "1 действие",
@@ -322,6 +357,7 @@
   {
     "id": "prestidigitation",
     "name": "Фокусы",
+    "nameEn": "Prestidigitation",
     "level": 0,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -344,6 +380,7 @@
   {
     "id": "produce-flame",
     "name": "Сотворение пламени",
+    "nameEn": "Produce Flame",
     "level": 0,
     "school": "conjuration",
     "castingTime": "1 бонусное действие",
@@ -371,6 +408,7 @@
   {
     "id": "ray-of-frost",
     "name": "Луч холода",
+    "nameEn": "Ray of Frost",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -398,6 +436,7 @@
   {
     "id": "resistance",
     "name": "Сопротивление",
+    "nameEn": "Resistance",
     "level": 0,
     "school": "abjuration",
     "castingTime": "1 действие",
@@ -418,6 +457,7 @@
   {
     "id": "sacred-flame",
     "name": "Священное пламя",
+    "nameEn": "Sacred Flame",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -445,6 +485,7 @@
   {
     "id": "shillelagh",
     "name": "Дубинка",
+    "nameEn": "Shillelagh",
     "level": 0,
     "school": "transmutation",
     "castingTime": "1 бонусное действие",
@@ -465,6 +506,7 @@
   {
     "id": "shocking-grasp",
     "name": "Шокирующая хватка",
+    "nameEn": "Shocking Grasp",
     "level": 0,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -490,8 +532,36 @@
     }
   },
   {
+    "id": "sorcerous-burst",
+    "name": "Чародейский взрыв",
+    "nameEn": "Sorcerous Burst",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "120 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer"
+    ],
+    "description": "Сгусток чародейской энергии — дальнобойная атака заклинанием, 1к8 урона выбранного типа (кислота, холод, огонь, электричество, яд, психический или звук). Выпала 8 — бросьте ещё к8 (не больше раз, чем модификатор характеристики заклинаний).",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d8",
+        "type": "acid"
+      }
+    }
+  },
+  {
     "id": "spare-the-dying",
     "name": "Пощада умирающим",
+    "nameEn": "Spare the Dying",
     "level": 0,
     "school": "necromancy",
     "castingTime": "1 действие",
@@ -510,8 +580,38 @@
     "description": "Существо с 0 хитов становится стабилизированным."
   },
   {
+    "id": "starry-wisp",
+    "name": "Звёздная искра",
+    "nameEn": "Starry Wisp",
+    "level": 0,
+    "school": "evocation",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "druid"
+    ],
+    "description": "Искорка света — дальнобойная атака заклинанием, 1к8 урона излучением; до конца вашего следующего хода цель испускает тусклый свет в радиусе 10 футов и не может быть Невидимой.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d8",
+        "type": "radiant"
+      },
+      "light": true
+    }
+  },
+  {
     "id": "thaumaturgy",
     "name": "Чудотворство",
+    "nameEn": "Thaumaturgy",
     "level": 0,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -531,6 +631,7 @@
   {
     "id": "true-strike",
     "name": "Меткий удар",
+    "nameEn": "True Strike",
     "level": 0,
     "school": "divination",
     "castingTime": "1 действие",
@@ -538,7 +639,7 @@
     "components": {
       "verbal": false,
       "somatic": true,
-      "material": "оружие, которым вы владеете"
+      "material": "оружие, которым вы владеете, стоимостью не меньше 1 мм"
     },
     "duration": "Мгновенная",
     "concentration": false,
@@ -554,6 +655,7 @@
   {
     "id": "vicious-mockery",
     "name": "Злая насмешка",
+    "nameEn": "Vicious Mockery",
     "level": 0,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -581,6 +683,7 @@
   {
     "id": "alarm",
     "name": "Тревога",
+    "nameEn": "Alarm",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 минута",
@@ -602,6 +705,7 @@
   {
     "id": "animal-friendship",
     "name": "Дружба с животными",
+    "nameEn": "Animal Friendship",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -628,6 +732,7 @@
   {
     "id": "bane",
     "name": "Порча",
+    "nameEn": "Bane",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -642,7 +747,8 @@
     "ritual": false,
     "classes": [
       "bard",
-      "cleric"
+      "cleric",
+      "warlock"
     ],
     "description": "До трёх существ совершают спасбросок Харизмы; при провале вычитают 1к4 из бросков атаки и спасбросков.",
     "effect": {
@@ -653,6 +759,7 @@
   {
     "id": "bless",
     "name": "Благословение",
+    "nameEn": "Bless",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -660,7 +767,7 @@
     "components": {
       "verbal": true,
       "somatic": true,
-      "material": "святая вода"
+      "material": "священный символ стоимостью не меньше 5 зм"
     },
     "duration": "Концентрация, до 1 минуты",
     "concentration": true,
@@ -674,10 +781,11 @@
   {
     "id": "burning-hands",
     "name": "Огненные ладони",
+    "nameEn": "Burning Hands",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 действие",
-    "range": "На себя (конус 15 футов)",
+    "range": "На себя",
     "components": {
       "verbal": true,
       "somatic": true
@@ -689,7 +797,7 @@
       "sorcerer",
       "wizard"
     ],
-    "description": "Веер пламени: существа в конусе совершают спасбросок Ловкости, 3к6 урона огнём при провале или половина при успехе.",
+    "description": "Веер пламени: существа в конусе 15 футов совершают спасбросок Ловкости, 3к6 урона огнём при провале или половина при успехе.",
     "effect": {
       "save": "dex",
       "onSave": "half",
@@ -702,6 +810,7 @@
   {
     "id": "charm-person",
     "name": "Очарование личности",
+    "nameEn": "Charm Person",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -729,6 +838,7 @@
   {
     "id": "chromatic-orb",
     "name": "Цветной шарик",
+    "nameEn": "Chromatic Orb",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -745,7 +855,7 @@
       "sorcerer",
       "wizard"
     ],
-    "description": "Шар энергии — дальнобойная атака заклинанием, 3к8 урона выбранного типа: кислота, холод, огонь, электричество, яд или звук.",
+    "description": "Шар энергии — дальнобойная атака заклинанием, 3к8 урона выбранного типа: кислота, холод, огонь, электричество, яд или звук. Совпали две кости — шар перескакивает на другую цель в пределах 30 футов.",
     "effect": {
       "attack": "ranged",
       "damage": {
@@ -757,16 +867,17 @@
   {
     "id": "color-spray",
     "name": "Сверкающие брызги",
+    "nameEn": "Color Spray",
     "level": 1,
     "school": "illusion",
     "castingTime": "1 действие",
-    "range": "На себя (конус 15 футов)",
+    "range": "На себя",
     "components": {
       "verbal": true,
       "somatic": true,
       "material": "щепотка цветного песка"
     },
-    "duration": "1 раунд",
+    "duration": "Мгновенная",
     "concentration": false,
     "ritual": false,
     "classes": [
@@ -774,7 +885,7 @@
       "sorcerer",
       "wizard"
     ],
-    "description": "Ослепительные разноцветные вспышки: существа в конусе совершают спасбросок Телосложения, при провале ослеплены до конца вашего следующего хода.",
+    "description": "Ослепительные разноцветные вспышки: существа в конусе 15 футов совершают спасбросок Телосложения, при провале Ослеплены до конца вашего следующего хода.",
     "effect": {
       "save": "con",
       "onSave": "none"
@@ -783,6 +894,7 @@
   {
     "id": "command",
     "name": "Приказ",
+    "nameEn": "Command",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -791,7 +903,7 @@
       "verbal": true,
       "somatic": false
     },
-    "duration": "1 раунд",
+    "duration": "Мгновенная",
     "concentration": false,
     "ritual": false,
     "classes": [
@@ -808,6 +920,7 @@
   {
     "id": "comprehend-languages",
     "name": "Понимание языков",
+    "nameEn": "Comprehend Languages",
     "level": 1,
     "school": "divination",
     "castingTime": "1 действие",
@@ -831,6 +944,7 @@
   {
     "id": "create-or-destroy-water",
     "name": "Сотворение или уничтожение воды",
+    "nameEn": "Create or Destroy Water",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -838,7 +952,7 @@
     "components": {
       "verbal": true,
       "somatic": true,
-      "material": "капля воды или несколько песчинок"
+      "material": "смесь воды и песка"
     },
     "duration": "Мгновенная",
     "concentration": false,
@@ -852,6 +966,7 @@
   {
     "id": "cure-wounds",
     "name": "Лечение ран",
+    "nameEn": "Cure Wounds",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 действие",
@@ -879,6 +994,7 @@
   {
     "id": "detect-evil-and-good",
     "name": "Обнаружение добра и зла",
+    "nameEn": "Detect Evil and Good",
     "level": 1,
     "school": "divination",
     "castingTime": "1 действие",
@@ -894,11 +1010,12 @@
       "cleric",
       "paladin"
     ],
-    "description": "Вы чувствуете аберраций, исчадий, небожителей, нежить и фей в пределах 30 футов и места, освящённые или осквернённые магией."
+    "description": "Вы чувствуете аберраций, небожителей, элементалей, фей, исчадий и нежить в пределах 30 футов, а также действует ли там заклинание «Святилище». Преграда: 1 фут камня, земли или дерева, 1 дюйм металла или тонкий лист свинца."
   },
   {
     "id": "detect-magic",
     "name": "Обнаружение магии",
+    "nameEn": "Detect Magic",
     "level": 1,
     "school": "divination",
     "castingTime": "1 действие",
@@ -917,6 +1034,7 @@
       "paladin",
       "ranger",
       "sorcerer",
+      "warlock",
       "wizard"
     ],
     "description": "Вы чувствуете магию в пределах 30 футов, видите ауру магических существ и предметов и узнаёте школу магии."
@@ -924,6 +1042,7 @@
   {
     "id": "detect-poison-and-disease",
     "name": "Обнаружение болезней и яда",
+    "nameEn": "Detect Poison and Disease",
     "level": 1,
     "school": "divination",
     "castingTime": "1 действие",
@@ -947,6 +1066,7 @@
   {
     "id": "disguise-self",
     "name": "Маскировка",
+    "nameEn": "Disguise Self",
     "level": 1,
     "school": "illusion",
     "castingTime": "1 действие",
@@ -966,8 +1086,37 @@
     "description": "Вы меняете внешность, одежду и снаряжение иллюзией. Распознать — проверка Интеллекта (Анализ) против Сл заклинания."
   },
   {
+    "id": "dissonant-whispers",
+    "name": "Диссонирующий шёпот",
+    "nameEn": "Dissonant Whispers",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "bard"
+    ],
+    "description": "Существо слышит в разуме нестройную мелодию: спасбросок Мудрости, при провале 3к6 психического урона, и оно реакцией отходит от вас как можно дальше; при успехе — половина урона.",
+    "effect": {
+      "save": "wis",
+      "onSave": "half",
+      "damage": {
+        "dice": "3d6",
+        "type": "psychic"
+      }
+    }
+  },
+  {
     "id": "divine-favor",
     "name": "Божественное благоволение",
+    "nameEn": "Divine Favor",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 бонусное действие",
@@ -987,6 +1136,7 @@
   {
     "id": "divine-smite",
     "name": "Божественная кара",
+    "nameEn": "Divine Smite",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 бонусное действие сразу после попадания",
@@ -1010,8 +1160,33 @@
     }
   },
   {
+    "id": "ensnaring-strike",
+    "name": "Опутывающий удар",
+    "nameEn": "Ensnaring Strike",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 бонусное действие сразу после попадания оружием",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "ranger"
+    ],
+    "description": "Цель удара опутывают лозы: спасбросок Силы (Большие и крупнее — с преимуществом), при провале цель Опутана и в начале каждого своего хода получает 1к6 колющего урона. Освободиться — проверка Силы (Атлетика) против Сл заклинания.",
+    "effect": {
+      "save": "str",
+      "onSave": "none"
+    }
+  },
+  {
     "id": "entangle",
     "name": "Опутывание",
+    "nameEn": "Entangle",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 действие",
@@ -1036,6 +1211,7 @@
   {
     "id": "expeditious-retreat",
     "name": "Поспешное отступление",
+    "nameEn": "Expeditious Retreat",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 бонусное действие",
@@ -1057,6 +1233,7 @@
   {
     "id": "faerie-fire",
     "name": "Огонь фей",
+    "nameEn": "Faerie Fire",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -1082,6 +1259,7 @@
   {
     "id": "false-life",
     "name": "Ложная жизнь",
+    "nameEn": "False Life",
     "level": 1,
     "school": "necromancy",
     "castingTime": "1 действие",
@@ -1103,6 +1281,7 @@
   {
     "id": "feather-fall",
     "name": "Падение пёрышком",
+    "nameEn": "Feather Fall",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 реакция",
@@ -1125,6 +1304,7 @@
   {
     "id": "find-familiar",
     "name": "Поиск фамильяра",
+    "nameEn": "Find Familiar",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 час",
@@ -1132,7 +1312,7 @@
     "components": {
       "verbal": true,
       "somatic": true,
-      "material": "горящие благовония стоимостью 10 зм, расходуются"
+      "material": "горящие благовония стоимостью не меньше 10 зм, расходуются"
     },
     "duration": "Мгновенная",
     "concentration": false,
@@ -1145,6 +1325,7 @@
   {
     "id": "floating-disk",
     "name": "Парящий диск",
+    "nameEn": "Floating Disk",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 действие",
@@ -1165,6 +1346,7 @@
   {
     "id": "fog-cloud",
     "name": "Туманное облако",
+    "nameEn": "Fog Cloud",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 действие",
@@ -1187,6 +1369,7 @@
   {
     "id": "goodberry",
     "name": "Чудо-ягоды",
+    "nameEn": "Goodberry",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 действие",
@@ -1208,6 +1391,7 @@
   {
     "id": "grease",
     "name": "Скользкая поверхность",
+    "nameEn": "Grease",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 действие",
@@ -1221,6 +1405,7 @@
     "concentration": false,
     "ritual": false,
     "classes": [
+      "sorcerer",
       "wizard"
     ],
     "description": "Квадрат 10 футов покрывается жиром: труднопроходимая местность, при провале спасброска Ловкости существо падает ничком.",
@@ -1232,6 +1417,7 @@
   {
     "id": "guiding-bolt",
     "name": "Направленный снаряд",
+    "nameEn": "Guiding Bolt",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -1258,6 +1444,7 @@
   {
     "id": "healing-word",
     "name": "Лечащее слово",
+    "nameEn": "Healing Word",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 бонусное действие",
@@ -1283,6 +1470,7 @@
   {
     "id": "hellish-rebuke",
     "name": "Адское возмездие",
+    "nameEn": "Hellish Rebuke",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 реакция, когда вас ранят",
@@ -1310,6 +1498,7 @@
   {
     "id": "heroism",
     "name": "Героизм",
+    "nameEn": "Heroism",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -1330,6 +1519,7 @@
   {
     "id": "hex",
     "name": "Сглаз",
+    "nameEn": "Hex",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 бонусное действие",
@@ -1348,8 +1538,36 @@
     "description": "Проклятие: при каждом попадании атакой цель получает дополнительно 1к6 некротического урона и совершает с помехой проверки выбранной характеристики."
   },
   {
+    "id": "hideous-laughter",
+    "name": "Жуткий смех",
+    "nameEn": "Hideous Laughter",
+    "level": 1,
+    "school": "enchantment",
+    "castingTime": "1 действие",
+    "range": "30 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true,
+      "material": "крошечный пирог и перо"
+    },
+    "duration": "Концентрация, до 1 минуты",
+    "concentration": true,
+    "ritual": false,
+    "classes": [
+      "bard",
+      "warlock",
+      "wizard"
+    ],
+    "description": "Существо совершает спасбросок Мудрости: при провале падает ничком от смеха и недееспособно.",
+    "effect": {
+      "save": "wis",
+      "onSave": "none"
+    }
+  },
+  {
     "id": "hunters-mark",
     "name": "Метка охотника",
+    "nameEn": "Hunter's Mark",
     "level": 1,
     "school": "divination",
     "castingTime": "1 бонусное действие",
@@ -1367,8 +1585,39 @@
     "description": "Вы метите добычу: попадая по ней атакой, наносите дополнительно 1к6 урона силовым полем; проверки Внимательности и Выживания, чтобы найти её, — с преимуществом."
   },
   {
+    "id": "ice-knife",
+    "name": "Ледяной кинжал",
+    "nameEn": "Ice Knife",
+    "level": 1,
+    "school": "conjuration",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": false,
+      "somatic": true,
+      "material": "капля воды или кусочек льда"
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "druid",
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Осколок льда — дальнобойная атака заклинанием, 1к10 колющего урона. Попал или нет, осколок взрывается: цель и все в пределах 5 футов совершают спасбросок Ловкости, при провале 2к6 урона холодом.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "1d10",
+        "type": "piercing"
+      }
+    }
+  },
+  {
     "id": "identify",
     "name": "Опознание",
+    "nameEn": "Identify",
     "level": 1,
     "school": "divination",
     "castingTime": "1 минута",
@@ -1390,6 +1639,7 @@
   {
     "id": "illusory-script",
     "name": "Невидимое письмо",
+    "nameEn": "Illusory Script",
     "level": 1,
     "school": "illusion",
     "castingTime": "1 минута",
@@ -1397,7 +1647,7 @@
     "components": {
       "verbal": false,
       "somatic": true,
-      "material": "чернила на основе свинца стоимостью 10 зм, расходуются"
+      "material": "чернила стоимостью не меньше 10 зм, расходуются"
     },
     "duration": "10 дней",
     "concentration": false,
@@ -1412,6 +1662,7 @@
   {
     "id": "inflict-wounds",
     "name": "Нанесение ран",
+    "nameEn": "Inflict Wounds",
     "level": 1,
     "school": "necromancy",
     "castingTime": "1 действие",
@@ -1439,6 +1690,7 @@
   {
     "id": "jump",
     "name": "Прыжок",
+    "nameEn": "Jump",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 бонусное действие",
@@ -1462,6 +1714,7 @@
   {
     "id": "longstrider",
     "name": "Скороход",
+    "nameEn": "Longstrider",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -1485,6 +1738,7 @@
   {
     "id": "mage-armor",
     "name": "Доспехи мага",
+    "nameEn": "Mage Armor",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 действие",
@@ -1506,6 +1760,7 @@
   {
     "id": "magic-missile",
     "name": "Волшебная стрела",
+    "nameEn": "Magic Missile",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 действие",
@@ -1532,6 +1787,7 @@
   {
     "id": "protection-from-evil-and-good",
     "name": "Защита от зла и добра",
+    "nameEn": "Protection from Evil and Good",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 действие",
@@ -1539,7 +1795,7 @@
     "components": {
       "verbal": true,
       "somatic": true,
-      "material": "фляга святой воды или порошок серебра и железа"
+      "material": "фляга святой воды стоимостью не меньше 25 зм, расходуется"
     },
     "duration": "Концентрация, до 10 минут",
     "concentration": true,
@@ -1556,6 +1812,7 @@
   {
     "id": "purify-food-and-drink",
     "name": "Очищение пищи и питья",
+    "nameEn": "Purify Food and Drink",
     "level": 1,
     "school": "transmutation",
     "castingTime": "1 действие",
@@ -1575,8 +1832,37 @@
     "description": "Вся немагическая еда и питьё в сфере 5 футов очищаются от ядов и гнили."
   },
   {
+    "id": "ray-of-sickness",
+    "name": "Луч болезни",
+    "nameEn": "Ray of Sickness",
+    "level": 1,
+    "school": "necromancy",
+    "castingTime": "1 действие",
+    "range": "60 футов",
+    "components": {
+      "verbal": true,
+      "somatic": true
+    },
+    "duration": "Мгновенная",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "sorcerer",
+      "wizard"
+    ],
+    "description": "Зеленоватый луч — дальнобойная атака заклинанием: 2к8 урона ядом, и цель Отравлена до конца вашего следующего хода.",
+    "effect": {
+      "attack": "ranged",
+      "damage": {
+        "dice": "2d8",
+        "type": "poison"
+      }
+    }
+  },
+  {
     "id": "sanctuary",
     "name": "Убежище",
+    "nameEn": "Sanctuary",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 бонусное действие",
@@ -1592,11 +1878,38 @@
     "classes": [
       "cleric"
     ],
-    "description": "Тот, кто хочет атаковать защищённое существо, сначала совершает спасбросок Мудрости, иначе выбирает другую цель. Защита пропадает, если существо атакует."
+    "description": "Кто хочет атаковать защищённое существо или направить на него вредящее заклинание, сначала совершает спасбросок Мудрости, иначе выбирает другую цель или теряет атаку. От площадных эффектов не защищает; заклинание кончается, если защищённый атакует, творит заклинание или наносит урон."
+  },
+  {
+    "id": "searing-smite",
+    "name": "Палящая кара",
+    "nameEn": "Searing Smite",
+    "level": 1,
+    "school": "evocation",
+    "castingTime": "1 бонусное действие сразу после попадания рукопашным оружием или безоружным ударом",
+    "range": "На себя",
+    "components": {
+      "verbal": true,
+      "somatic": false
+    },
+    "duration": "1 минута",
+    "concentration": false,
+    "ritual": false,
+    "classes": [
+      "paladin"
+    ],
+    "description": "Цель удара получает дополнительно 1к6 урона огнём, а в начале каждого своего хода — ещё 1к6 огнём и спасбросок Телосложения; при успехе заклинание заканчивается.",
+    "effect": {
+      "damage": {
+        "dice": "1d6",
+        "type": "fire"
+      }
+    }
   },
   {
     "id": "shield",
     "name": "Щит",
+    "nameEn": "Shield",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 реакция, когда по вам попадают",
@@ -1617,6 +1930,7 @@
   {
     "id": "shield-of-faith",
     "name": "Щит веры",
+    "nameEn": "Shield of Faith",
     "level": 1,
     "school": "abjuration",
     "castingTime": "1 бонусное действие",
@@ -1638,6 +1952,7 @@
   {
     "id": "silent-image",
     "name": "Безмолвный образ",
+    "nameEn": "Silent Image",
     "level": 1,
     "school": "illusion",
     "castingTime": "1 действие",
@@ -1660,6 +1975,7 @@
   {
     "id": "sleep",
     "name": "Усыпление",
+    "nameEn": "Sleep",
     "level": 1,
     "school": "enchantment",
     "castingTime": "1 действие",
@@ -1677,7 +1993,7 @@
       "sorcerer",
       "wizard"
     ],
-    "description": "Существа в сфере 5 футов совершают спасбросок Мудрости: при провале недееспособны, а в конце следующего хода засыпают (Без сознания).",
+    "description": "Существа на ваш выбор в сфере 5 футов совершают спасбросок Мудрости: при провале Недееспособны до конца своего следующего хода, затем повторный спасбросок — при провале Без сознания. Не действует на тех, кто не спит (эльфы).",
     "effect": {
       "save": "wis",
       "onSave": "none"
@@ -1686,6 +2002,7 @@
   {
     "id": "speak-with-animals",
     "name": "Разговор с животными",
+    "nameEn": "Speak with Animals",
     "level": 1,
     "school": "divination",
     "castingTime": "1 действие",
@@ -1700,42 +2017,19 @@
     "classes": [
       "bard",
       "druid",
-      "ranger"
+      "ranger",
+      "warlock"
     ],
     "description": "Вы понимаете зверей и можете говорить с ними; их знания ограничены их умом."
   },
   {
-    "id": "hideous-laughter",
-    "name": "Жуткий смех",
-    "level": 1,
-    "school": "enchantment",
-    "castingTime": "1 действие",
-    "range": "30 футов",
-    "components": {
-      "verbal": true,
-      "somatic": true,
-      "material": "крошечный пирог и перо"
-    },
-    "duration": "Концентрация, до 1 минуты",
-    "concentration": true,
-    "ritual": false,
-    "classes": [
-      "bard",
-      "wizard"
-    ],
-    "description": "Существо совершает спасбросок Мудрости: при провале падает ничком от смеха и недееспособно.",
-    "effect": {
-      "save": "wis",
-      "onSave": "none"
-    }
-  },
-  {
     "id": "thunderwave",
     "name": "Волна грома",
+    "nameEn": "Thunderwave",
     "level": 1,
     "school": "evocation",
     "castingTime": "1 действие",
-    "range": "На себя (куб 15 футов)",
+    "range": "На себя",
     "components": {
       "verbal": true,
       "somatic": true
@@ -1749,7 +2043,7 @@
       "sorcerer",
       "wizard"
     ],
-    "description": "Волна силы: существа в кубе совершают спасбросок Телосложения, 2к8 урона звуком и отталкивание на 10 футов при провале или половина урона при успехе.",
+    "description": "Волна силы: существа в кубе 15 футов от вас совершают спасбросок Телосложения, 2к8 урона звуком и отталкивание на 10 футов при провале или половина урона при успехе.",
     "effect": {
       "save": "con",
       "onSave": "half",
@@ -1762,6 +2056,7 @@
   {
     "id": "unseen-servant",
     "name": "Невидимый слуга",
+    "nameEn": "Unseen Servant",
     "level": 1,
     "school": "conjuration",
     "castingTime": "1 действие",

@@ -27,6 +27,7 @@ import { placementProblem } from './mapPlacement'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { magicShapeProblems, migrateInventory } from './character'
+import { needsOrderChoice, orderProblem } from './classOrder'
 import { applyRestResult, featureResources, restRequestProblem, restResultProblem, restSummaryText } from './rest'
 import { castProblem, emptyMagic, magicProblems, needsSpellChoice, preparedProblems, spendCast, type MagicRules } from './magic'
 import { changeCoins, coinsFromCp, coinsValue, formatCoins, formatCp, gpToCp, isCoins } from './coins'
@@ -229,6 +230,11 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         const equipped = { mainHand: has(eq.mainHand) ? eq.mainHand : null, offHand: has(eq.offHand) ? eq.offHand : null, armor: has(eq.armor) ? eq.armor : null }
         return { ...m, inventory: { ...m.inventory, items, equipped } }
       })
+    case 'classOrderChosen':
+      return updateMember(state, action.heroId, (m) => {
+        const armor = [...new Set([...m.character.proficiencies.armor, ...action.armor])]
+        return { ...m, character: { ...m.character, classOrder: action.order, proficiencies: { ...m.character.proficiencies, armor } } }
+      })
     case 'spellsChosen':
       return updateMember(state, action.heroId, (m) => ({ ...m, character: { ...m.character, magic: structuredClone(action.magic) } }))
     case 'preparedSpellsChanged':
@@ -255,7 +261,7 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     case 'featureUsed':
       return updateMember(state, action.heroId, (m) => ({
         ...m,
-        character: { ...m.character, featureUses: { ...m.character.featureUses, [action.featureId]: (m.character.featureUses?.[action.featureId] ?? 0) + 1 } },
+        character: { ...m.character, featureUses: { ...m.character.featureUses, [action.featureId]: (m.character.featureUses?.[action.featureId] ?? 0) + (action.amount ?? 1) } },
       }))
     case 'turnSummarized': {
       const text = `Изменения: ${action.changes.map((c) => c.text).join(', ')}`
@@ -430,6 +436,18 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const left = (entry.quantity - 1) * max + (entry.charges ?? max)
       return left < action.uses ? `У «${name}» осталось применений: ${left}, а нужно ${action.uses}.` : null
     }
+    case 'classOrderChosen': {
+      const hero = member(action.heroId)
+      if (!hero) return 'Этого героя нет в отряде истории.'
+      if (!rules) return 'Нет данных правил.'
+      if (action.author.kind !== 'player' && action.author.kind !== 'system') return 'Порядок выбирает игрок.'
+      if (!needsOrderChoice(hero.character, rules)) return 'Порядок уже выбран.'
+      const problem = orderProblem(hero.character.classId, action.order, rules)
+      if (problem) return problem
+      const option = rules.classes[hero.character.classId]?.order?.options.find((o) => o.id === action.order)
+      const expected = [...(option?.armor ?? [])].sort().join()
+      return [...(action.armor ?? [])].sort().join() === expected ? null : 'Владение доспехами не совпадает с выбранным порядком.'
+    }
     case 'spellsChosen': {
       const hero = member(action.heroId)
       if (!hero) return 'Этого героя нет в отряде истории.'
@@ -486,7 +504,10 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (hero.fallen) return 'Герой погиб.'
       const r = featureResources(hero.character, rules).find((x) => x.resource.id === action.featureId)
       if (!r) return `У ${hero.character.name} нет умения «${action.featureId}».`
-      return r.left > 0 ? null : `«${r.resource.name}» уже потрачено — восстанавливается отдыхом.`
+      const amount = action.amount ?? 1
+      if (!Number.isInteger(amount) || amount < 1) return 'Сколько потратить — целое не меньше 1.'
+      if (amount > 1 && !r.resource.pool) return `«${r.resource.name}» тратится по одному применению.`
+      return r.left >= amount ? null : r.left > 0 ? `В запасе «${r.resource.name}» осталось ${r.left}.` : `«${r.resource.name}» уже потрачено — восстанавливается отдыхом.`
     }
     case 'turnSummarized':
       if (action.author.kind !== 'engine') return 'Итог хода записывает движок.'

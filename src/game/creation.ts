@@ -18,6 +18,7 @@ import {
 import type { BackgroundProposal } from './backgroundFromStory'
 import { MAX_BACKSTORY_LENGTH } from './character'
 import { coinsFromGold } from './coins'
+import { armorWithOrder, orderProblem } from './classOrder'
 import { emptySpellChoice, hasMagic, magicFromChoice, magicProblems, type MagicSubject, type SpellChoice } from './magic'
 
 export const CREATION_STEPS = [
@@ -45,6 +46,8 @@ export interface CreationDraft {
   classId: string | null
   /** Черта боевого стиля (Воин). */
   fightingStyle: string | null
+  /** «Божественный порядок» жреца или «Изначальный порядок» друида. */
+  classOrder: string | null
   /** Инструменты, выбранные для класса (Бард — 3 музыкальных, Монах — 1). */
   classTools: string[]
   /** Инструмент предыстории, если он на выбор (Солдат — игровой набор). */
@@ -88,6 +91,7 @@ export function emptyDraft(): CreationDraft {
   return {
     classId: null,
     fightingStyle: null,
+    classOrder: null,
     classTools: [],
     backgroundTool: null,
     customBackground: emptyCustomBackground(),
@@ -142,7 +146,7 @@ export function decideProposalDetail(draft: CreationDraft, index: number, accept
 export function chooseClass(draft: CreationDraft, classId: string): CreationDraft {
   if (draft.classId === classId) return draft
   const spells = { ...draft.spells, cantrips: [], prepared: [], spellbook: [] }
-  return { ...draft, classId, fightingStyle: null, classTools: [], classSkills: [], expertise: [], classEquipment: null, spells }
+  return { ...draft, classId, fightingStyle: null, classOrder: null, classTools: [], classSkills: [], expertise: [], classEquipment: null, spells }
 }
 
 /** Навыки предыстории даются автоматически — убираем их из выбранных в других местах. */
@@ -423,6 +427,7 @@ export function draftMagicSubject(draft: CreationDraft, data: RulesData): Omit<M
     speciesId: draft.speciesId ?? '',
     speciesOption: draft.speciesOption,
     backgroundId: draft.backgroundId ?? '',
+    ...(draft.classOrder ? { classOrder: draft.classOrder } : {}),
   }
 }
 
@@ -457,6 +462,10 @@ export function stepProblems(step: CreationStep, draft: CreationDraft, data: Rul
       }
       if (cls.fightingStyle && (!draft.fightingStyle || data.feats[draft.fightingStyle]?.category !== 'fighting-style')) {
         problems.push('Выберите боевой стиль')
+      }
+      {
+        const problem = orderProblem(cls.id, draft.classOrder, data)
+        if (problem) problems.push(problem)
       }
       if (cls.tools?.choose) {
         const { count, kinds } = cls.tools.choose
@@ -599,7 +608,13 @@ export function buildCharacterSheet(draft: CreationDraft, data: RulesData, catal
       abilities,
       maxHp: hp,
       hp,
-      proficiencies: { savingThrows: [...cls.savingThrows], skills, armor: [...cls.armorTraining], tools: toolProficiencies(draft, data) },
+      proficiencies: {
+        savingThrows: [...cls.savingThrows],
+        skills,
+        armor: armorWithOrder(cls.armorTraining, cls.order?.options.find((o) => o.id === draft.classOrder)),
+        tools: toolProficiencies(draft, data),
+      },
+      ...(draft.classOrder ? { classOrder: draft.classOrder } : {}),
       conditions: [],
       feats: chosenFeats(draft, data),
       appearance: draft.appearance.trim(),

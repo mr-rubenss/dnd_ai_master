@@ -44,6 +44,8 @@ export interface SpellEffect {
 export interface SpellDefinition {
   id: string
   name: string
+  /** Английское название из SRD 5.2.1 (русское — наш перевод). */
+  nameEn: string
   /** Круг: 0 — заговор. */
   level: number
   school: SpellSchool

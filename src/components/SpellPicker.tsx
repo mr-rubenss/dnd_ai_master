@@ -6,6 +6,7 @@ import { ABILITY_NAMES, formatModifier, type Ability } from '../engine/abilities
 import {
   classSpellcasting,
   classSpellList,
+  featureSpellIds,
   fixedInitiateList,
   INITIATE_CANTRIPS,
   INITIATE_LIST_NAMES,
@@ -153,14 +154,15 @@ export function SpellChoiceForm({
 }) {
   const needs = spellChoiceNeeds(subject, rules)
   const sc = classSpellcasting(subject.classId, rules)
-  const limits = spellLimits(subject.classId, subject.level, rules)
+  const limits = spellLimits(subject.classId, subject.level, rules, subject.classOrder)
+  const alwaysPrepared = featureSpellIds(subject.classId, rules)
   const className = rules.classes[subject.classId]?.name ?? ''
   const set = (patch: Partial<SpellChoice>) => onChange({ ...choice, ...patch })
   const fixedList = fixedInitiateList(subject.backgroundId, rules)
   const initiateList = initiateListOf(subject, choice, rules)
   const initiateAbility = choice.initiateAbility ?? bestInnateAbility(subject.abilities)
   const speciesAbility = choice.speciesAbility ?? bestInnateAbility(subject.abilities)
-  const classLevelOne = classSpellList(subject.classId, 1, rules)
+  const classLevelOne = classSpellList(subject.classId, 1, rules).filter((sp) => !alwaysPrepared.includes(sp.id))
   const book = choice.spellbook
   const species = rules.species[subject.speciesId]
   const grants = speciesSpellGrants(subject.speciesId, subject.speciesOption, rules)
@@ -169,6 +171,12 @@ export function SpellChoiceForm({
     <div className="spell-choice">
       {needs.classSpells && sc && (
         <>
+          {alwaysPrepared.length > 0 && (
+            <p className="hint" data-testid="feature-spells">
+              Всегда подготовлено умениями класса (не входит в число подготовленных):{' '}
+              {(rules.classes[subject.classId]?.featureSpells ?? []).map((f) => `«${rules.spells[f.spellId]?.name}» (${f.feature})`).join(', ')}.
+            </p>
+          )}
           <p className="hint" data-testid="spell-stats">
             Характеристика заклинаний — <strong>{ABILITY_NAMES[sc.ability]}</strong>: Сл спасброска{' '}
             <strong>{spellcastingStats(subject, sc.ability).saveDc}</strong>, бонус атаки заклинанием{' '}

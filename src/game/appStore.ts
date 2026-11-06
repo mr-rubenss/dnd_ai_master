@@ -289,9 +289,9 @@ export function createAppStore(options: AppStoreOptions) {
     },
 
     /** Выбрать заклинания герою из «Моих героев» (старое сохранение заклинателя). */
-    async chooseHeroSpells(heroId: string, magic: CharacterMagic): Promise<CommandResult> {
+    async chooseHeroSpells(heroId: string, completion: { order?: string; magic?: CharacterMagic }): Promise<CommandResult> {
       if (!rules) return 'Нет данных правил магии.'
-      const reason = applyRoster(chooseHeroSpells(state.roster, heroId, magic, rules))
+      const reason = applyRoster(chooseHeroSpells(state.roster, heroId, completion, rules))
       if (!reason) await saveRoster()
       return reason
     },

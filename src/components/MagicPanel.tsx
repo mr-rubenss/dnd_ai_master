@@ -8,9 +8,11 @@ import {
   choiceFromMagic,
   classSpellcasting,
   classSpellList,
+  featureSpellIds,
   knownSpells,
   magicFromChoice,
   magicProblems,
+  needsSpellChoice,
   preparedProblems,
   spellcastingStats,
   spellLimits,
@@ -22,6 +24,8 @@ import {
 import type { Character } from '../types/character'
 import type { CharacterMagic } from '../types/spells'
 import { Flash } from './Flash'
+import { ClassOrderPicker } from './ClassOrderPicker'
+import { needsOrderChoice, orderProblem } from '../game/classOrder'
 import { SpellChoiceForm, SpellDetails, SpellOptionList } from './SpellPicker'
 import { spellLevelText, spellMeta } from './spellText'
 
@@ -74,8 +78,9 @@ function PreparedEditor({ character, onSave, onCancel }: { character: Character;
   const magic = character.magic!
   const [prepared, setPrepared] = useState(magic.prepared)
   const [error, setError] = useState<string | null>(null)
-  const limits = spellLimits(character.classId, character.level, rules)
-  const options = classSpellList(character.classId, 1, rules).filter((s) => !magic.spellbook || magic.spellbook.includes(s.id))
+  const limits = spellLimits(character.classId, character.level, rules, character.classOrder)
+  const always = featureSpellIds(character.classId, rules)
+  const options = classSpellList(character.classId, 1, rules).filter((s) => (!magic.spellbook || magic.spellbook.includes(s.id)) && !always.includes(s.id))
   const problem = preparedProblems(character.classId, character.level, prepared, rules, magic.spellbook)[0]
   return (
     <div className="prepared-editor" data-testid="prepared-editor">
@@ -132,7 +137,7 @@ export function MagicPanel({ character, onPrepare, onChooseSpells, needsChoice }
     <div className="magic-panel">
       {needsChoice && (
         <div className="magic-choice-banner" role="status">
-          <p>Заклинания героя ещё не выбраны — так было в старых сохранениях.</p>
+          <p>Лист героя нужно дополнить: выберите заклинания{rules.classes[character.classId]?.order ? ` и ${rules.classes[character.classId]!.order!.feature.toLowerCase()}` : ''} — так было в старых сохранениях.</p>
           {onChooseSpells && (
             <button type="button" className="primary-button" onClick={onChooseSpells} data-testid="choose-spells">
               Выбрать заклинания
@@ -226,29 +231,44 @@ export function MagicPanel({ character, onPrepare, onChooseSpells, needsChoice }
   )
 }
 
-/** Окно выбора заклинаний для героя из старого сохранения. */
+/** Что дополняет игрок в листе старого героя: порядок класса и (или) заклинания. */
+export interface SheetCompletion {
+  order?: string
+  magic?: CharacterMagic
+}
+
+/**
+ * Окно «Дополните лист» для героя из старого сохранения: «Божественный/Изначальный порядок» и заклинания.
+ * Выбор порядка сразу меняет нужное число заговоров (Чудотворец, Маг — на один больше).
+ */
 export function SpellChoiceDialog({
   character,
   onSubmit,
   onClose,
 }: {
   character: Character
-  onSubmit: (magic: CharacterMagic) => string | null | Promise<string | null>
+  onSubmit: (completion: SheetCompletion) => string | null | Promise<string | null>
   onClose: () => void
 }) {
   const titleId = useId()
+  const orderNeeded = needsOrderChoice(character, rules)
+  const [order, setOrder] = useState<string | null>(null)
   const [choice, setChoice] = useState<SpellChoice>(() => choiceFromMagic(character.magic))
   const [error, setError] = useState<string | null>(null)
-  const magic = { ...magicFromChoice(character, choice, rules), slotsUsed: character.magic?.slotsUsed ?? {} }
-  const problems = magicProblems(character, magic, rules)
+  const subject: Character = orderNeeded && order ? { ...character, classOrder: order } : character
+  const spellsNeeded = needsSpellChoice(subject, rules)
+  const magic = { ...magicFromChoice(subject, choice, rules), slotsUsed: character.magic?.slotsUsed ?? {}, ...(character.magic?.freeUsed ? { freeUsed: character.magic.freeUsed } : {}) }
+  const problems = [
+    ...(orderNeeded ? [orderProblem(character.classId, order, rules)].filter((p): p is string => Boolean(p)) : []),
+    ...(spellsNeeded ? magicProblems(subject, magic, rules) : []),
+  ]
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (problems.length) return
-    const reason = await onSubmit(magic)
+    const reason = await onSubmit({ ...(orderNeeded && order ? { order } : {}), ...(spellsNeeded ? { magic } : {}) })
     setError(reason)
     if (!reason) onClose()
   }
-  const left = problems.length
   return (
     <div className="hero-dialog-backdrop">
       <form className="panel hero-dialog spell-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} onSubmit={submit} data-testid="spell-dialog">
@@ -257,14 +277,15 @@ export function SpellChoiceDialog({
             ✨
           </span>
           <div>
-            <h3 id={titleId}>Заклинания: {character.name}</h3>
+            <h3 id={titleId}>Дополните лист: {character.name}</h3>
             <p className="hero-meta">
-              {character.className} {character.level} ур. Теперь магия — часть листа персонажа: выберите, что знает герой.
+              {character.className} {character.level} ур. В лист добавились правила SRD 5.2.1 — выберите, что положено герою.
             </p>
           </div>
         </header>
         <div className="spell-dialog-body">
-          <SpellChoiceForm subject={character} choice={choice} onChange={setChoice} />
+          {orderNeeded && <ClassOrderPicker classId={character.classId} value={order} onChange={setOrder} />}
+          {spellsNeeded && <SpellChoiceForm subject={subject} choice={choice} onChange={setChoice} />}
         </div>
         <footer className="spell-dialog-footer">
           <p className="creation-problems" role="status">
@@ -274,7 +295,7 @@ export function SpellChoiceDialog({
             <button type="button" className="secondary-button" onClick={onClose}>
               Позже
             </button>
-            <button type="submit" className="primary-button" disabled={left > 0}>
+            <button type="submit" className="primary-button" disabled={problems.length > 0}>
               Сохранить
             </button>
           </div>

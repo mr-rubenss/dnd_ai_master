@@ -2,6 +2,7 @@
   {
     "id": "greatsword",
     "name": "Двуручный меч",
+    "nameEn": "Greatsword",
     "category": "weapon",
     "icon": "⚔️",
     "weight": 6,
@@ -21,6 +22,7 @@
   {
     "id": "flail",
     "name": "Цеп",
+    "nameEn": "Flail",
     "category": "weapon",
     "icon": "🔨",
     "weight": 2,
@@ -37,6 +39,7 @@
   {
     "id": "javelin",
     "name": "Метательное копьё",
+    "nameEn": "Javelin",
     "category": "weapon",
     "icon": "🎯",
     "weight": 2,
@@ -59,6 +62,7 @@
   {
     "id": "spear",
     "name": "Копьё",
+    "nameEn": "Spear",
     "category": "weapon",
     "icon": "🔱",
     "weight": 3,
@@ -83,6 +87,7 @@
   {
     "id": "shortbow",
     "name": "Короткий лук",
+    "nameEn": "Shortbow",
     "category": "weapon",
     "icon": "🏹",
     "weight": 2,
@@ -106,6 +111,7 @@
   {
     "id": "arrow",
     "name": "Стрела",
+    "nameEn": "Arrow",
     "category": "ammunition",
     "icon": "🪶",
     "weight": 0.05,
@@ -115,6 +121,7 @@
   {
     "id": "quiver",
     "name": "Колчан",
+    "nameEn": "Quiver",
     "category": "gear",
     "icon": "🧺",
     "weight": 1,
@@ -124,6 +131,7 @@
   {
     "id": "chain-mail",
     "name": "Кольчуга",
+    "nameEn": "Chain Mail",
     "category": "armor",
     "icon": "⛓️",
     "weight": 55,
@@ -139,6 +147,7 @@
   {
     "id": "shield",
     "name": "Щит",
+    "nameEn": "Shield",
     "category": "armor",
     "icon": "🛡️",
     "weight": 6,
@@ -152,6 +161,7 @@
   {
     "id": "backpack",
     "name": "Рюкзак",
+    "nameEn": "Backpack",
     "category": "gear",
     "icon": "🎒",
     "weight": 5,
@@ -161,6 +171,7 @@
   {
     "id": "caltrops",
     "name": "Калтропы (мешочек)",
+    "nameEn": "Caltrops",
     "category": "gear",
     "icon": "📌",
     "weight": 2,
@@ -170,6 +181,7 @@
   {
     "id": "crowbar",
     "name": "Ломик",
+    "nameEn": "Crowbar",
     "category": "gear",
     "icon": "🔧",
     "weight": 5,
@@ -179,6 +191,7 @@
   {
     "id": "oil",
     "name": "Масло (фляга)",
+    "nameEn": "Oil",
     "category": "consumable",
     "icon": "🛢️",
     "weight": 1,
@@ -188,6 +201,7 @@
   {
     "id": "rations",
     "name": "Рацион (1 день)",
+    "nameEn": "Rations",
     "category": "consumable",
     "icon": "🍖",
     "weight": 2,
@@ -197,6 +211,7 @@
   {
     "id": "rope",
     "name": "Верёвка (50 футов)",
+    "nameEn": "Rope",
     "category": "gear",
     "icon": "🪢",
     "weight": 5,
@@ -206,6 +221,7 @@
   {
     "id": "tinderbox",
     "name": "Трутница",
+    "nameEn": "Tinderbox",
     "category": "gear",
     "icon": "🔥",
     "weight": 1,
@@ -215,6 +231,7 @@
   {
     "id": "torch",
     "name": "Факел",
+    "nameEn": "Torch",
     "category": "consumable",
     "icon": "🔦",
     "weight": 1,
@@ -224,6 +241,7 @@
   {
     "id": "healers-kit",
     "name": "Набор целителя",
+    "nameEn": "Healer's Kit",
     "category": "tool",
     "icon": "🩹",
     "weight": 3,
@@ -236,6 +254,7 @@
   {
     "id": "dice-set",
     "name": "Игровой набор (кости)",
+    "nameEn": "Gaming Set (Dice)",
     "category": "tool",
     "icon": "🎲",
     "weight": 0,
@@ -246,6 +265,7 @@
   {
     "id": "travelers-clothes",
     "name": "Дорожная одежда",
+    "nameEn": "Clothes, Traveler's",
     "category": "gear",
     "icon": "👕",
     "weight": 4,
@@ -263,6 +283,7 @@
   {
     "id": "greataxe",
     "name": "Секира",
+    "nameEn": "Greataxe",
     "category": "weapon",
     "icon": "🪓",
     "weight": 7,
@@ -282,6 +303,7 @@
   {
     "id": "handaxe",
     "name": "Ручной топор",
+    "nameEn": "Handaxe",
     "category": "weapon",
     "icon": "🪓",
     "weight": 2,
@@ -305,6 +327,7 @@
   {
     "id": "dagger",
     "name": "Кинжал",
+    "nameEn": "Dagger",
     "category": "weapon",
     "icon": "🗡️",
     "weight": 1,
@@ -329,6 +352,7 @@
   {
     "id": "mace",
     "name": "Булава",
+    "nameEn": "Mace",
     "category": "weapon",
     "icon": "🔨",
     "weight": 4,
@@ -345,6 +369,7 @@
   {
     "id": "sickle",
     "name": "Серп",
+    "nameEn": "Sickle",
     "category": "weapon",
     "icon": "🌙",
     "weight": 2,
@@ -363,6 +388,7 @@
   {
     "id": "quarterstaff",
     "name": "Боевой посох",
+    "nameEn": "Quarterstaff",
     "category": "weapon",
     "icon": "🦯",
     "weight": 4,
@@ -382,6 +408,7 @@
   {
     "id": "scimitar",
     "name": "Скимитар",
+    "nameEn": "Scimitar",
     "category": "weapon",
     "icon": "🗡️",
     "weight": 3,
@@ -401,6 +428,7 @@
   {
     "id": "shortsword",
     "name": "Короткий меч",
+    "nameEn": "Shortsword",
     "category": "weapon",
     "icon": "🗡️",
     "weight": 2,
@@ -420,6 +448,7 @@
   {
     "id": "longsword",
     "name": "Длинный меч",
+    "nameEn": "Longsword",
     "category": "weapon",
     "icon": "⚔️",
     "weight": 3,
@@ -439,6 +468,7 @@
   {
     "id": "longbow",
     "name": "Длинный лук",
+    "nameEn": "Longbow",
     "category": "weapon",
     "icon": "🏹",
     "weight": 2,
@@ -463,6 +493,7 @@
   {
     "id": "leather-armor",
     "name": "Кожаный доспех",
+    "nameEn": "Leather Armor",
     "category": "armor",
     "icon": "🦺",
     "weight": 10,
@@ -476,6 +507,7 @@
   {
     "id": "studded-leather",
     "name": "Проклёпанный кожаный доспех",
+    "nameEn": "Studded Leather Armor",
     "category": "armor",
     "icon": "🦺",
     "weight": 13,
@@ -489,6 +521,7 @@
   {
     "id": "chain-shirt",
     "name": "Кольчужная рубаха",
+    "nameEn": "Chain Shirt",
     "category": "armor",
     "icon": "⛓️",
     "weight": 20,
@@ -502,6 +535,7 @@
   {
     "id": "padded-armor",
     "name": "Стёганый доспех",
+    "nameEn": "Padded Armor",
     "category": "armor",
     "icon": "🦺",
     "weight": 8,
@@ -516,6 +550,7 @@
   {
     "id": "hide-armor",
     "name": "Шкурный доспех",
+    "nameEn": "Hide Armor",
     "category": "armor",
     "icon": "⛓️",
     "weight": 12,
@@ -529,6 +564,7 @@
   {
     "id": "scale-mail",
     "name": "Чешуйчатый доспех",
+    "nameEn": "Scale Mail",
     "category": "armor",
     "icon": "⛓️",
     "weight": 45,
@@ -543,6 +579,7 @@
   {
     "id": "breastplate",
     "name": "Кираса",
+    "nameEn": "Breastplate",
     "category": "armor",
     "icon": "⛓️",
     "weight": 20,
@@ -556,6 +593,7 @@
   {
     "id": "half-plate",
     "name": "Полулаты",
+    "nameEn": "Half Plate Armor",
     "category": "armor",
     "icon": "⛓️",
     "weight": 40,
@@ -570,6 +608,7 @@
   {
     "id": "ring-mail",
     "name": "Колечный доспех",
+    "nameEn": "Ring Mail",
     "category": "armor",
     "icon": "🪖",
     "weight": 40,
@@ -584,6 +623,7 @@
   {
     "id": "splint-armor",
     "name": "Наборный доспех",
+    "nameEn": "Splint Armor",
     "category": "armor",
     "icon": "🪖",
     "weight": 60,
@@ -599,6 +639,7 @@
   {
     "id": "plate-armor",
     "name": "Латы",
+    "nameEn": "Plate Armor",
     "category": "armor",
     "icon": "🪖",
     "weight": 65,
@@ -614,6 +655,7 @@
   {
     "id": "holy-symbol",
     "name": "Священный символ",
+    "nameEn": "Holy Symbol (Amulet)",
     "category": "gear",
     "icon": "✝️",
     "weight": 1,
@@ -623,6 +665,7 @@
   {
     "id": "druidic-focus",
     "name": "Друидическая фокусировка",
+    "nameEn": "Druidic Focus (Sprig of Mistletoe)",
     "category": "gear",
     "icon": "🌿",
     "weight": 0,
@@ -632,6 +675,7 @@
   {
     "id": "arcane-focus-crystal",
     "name": "Магическая фокусировка (кристалл)",
+    "nameEn": "Arcane Focus (Crystal)",
     "category": "gear",
     "icon": "🔮",
     "weight": 1,
@@ -641,6 +685,7 @@
   {
     "id": "arcane-focus-orb",
     "name": "Магическая фокусировка (сфера)",
+    "nameEn": "Arcane Focus (Orb)",
     "category": "gear",
     "icon": "🔮",
     "weight": 3,
@@ -650,6 +695,7 @@
   {
     "id": "book",
     "name": "Книга",
+    "nameEn": "Book",
     "category": "gear",
     "icon": "📕",
     "weight": 5,
@@ -659,15 +705,16 @@
   {
     "id": "spellbook",
     "name": "Книга заклинаний",
+    "nameEn": "Spellbook",
     "category": "gear",
     "icon": "📖",
     "weight": 3,
-    "description": "Книга волшебника с записанными заклинаниями.",
-    "cost": 50
+    "description": "Книга волшебника с записанными заклинаниями."
   },
   {
     "id": "robe",
     "name": "Мантия",
+    "nameEn": "Robe",
     "category": "gear",
     "icon": "🥻",
     "weight": 4,
@@ -677,6 +724,7 @@
   {
     "id": "parchment",
     "name": "Пергамент (лист)",
+    "nameEn": "Parchment",
     "category": "consumable",
     "icon": "📜",
     "weight": 0,
@@ -686,6 +734,7 @@
   {
     "id": "pouch",
     "name": "Поясной кошель",
+    "nameEn": "Pouch",
     "category": "gear",
     "icon": "👝",
     "weight": 1,
@@ -695,6 +744,7 @@
   {
     "id": "bedroll",
     "name": "Спальник",
+    "nameEn": "Bedroll",
     "category": "gear",
     "icon": "🛏️",
     "weight": 7,
@@ -704,6 +754,7 @@
   {
     "id": "waterskin",
     "name": "Бурдюк",
+    "nameEn": "Waterskin",
     "category": "gear",
     "icon": "💧",
     "weight": 5,
@@ -713,6 +764,7 @@
   {
     "id": "ball-bearings",
     "name": "Шарики (мешочек)",
+    "nameEn": "Ball Bearings",
     "category": "gear",
     "icon": "⚪",
     "weight": 2,
@@ -722,6 +774,7 @@
   {
     "id": "bell",
     "name": "Колокольчик",
+    "nameEn": "Bell",
     "category": "gear",
     "icon": "🔔",
     "weight": 0,
@@ -731,6 +784,7 @@
   {
     "id": "candle",
     "name": "Свеча",
+    "nameEn": "Candle",
     "category": "consumable",
     "icon": "🕯️",
     "weight": 0,
@@ -740,6 +794,7 @@
   {
     "id": "hooded-lantern",
     "name": "Закрытый фонарь",
+    "nameEn": "Lantern, Hooded",
     "category": "gear",
     "icon": "🏮",
     "weight": 2,
@@ -749,6 +804,7 @@
   {
     "id": "bullseye-lantern",
     "name": "Направленный фонарь",
+    "nameEn": "Lantern, Bullseye",
     "category": "gear",
     "icon": "🔦",
     "weight": 2,
@@ -758,6 +814,7 @@
   {
     "id": "costume",
     "name": "Костюм",
+    "nameEn": "Costume",
     "category": "gear",
     "icon": "🎭",
     "weight": 4,
@@ -767,6 +824,7 @@
   {
     "id": "mirror",
     "name": "Зеркальце",
+    "nameEn": "Mirror",
     "category": "gear",
     "icon": "🪞",
     "weight": 0.5,
@@ -776,6 +834,7 @@
   {
     "id": "blanket",
     "name": "Одеяло",
+    "nameEn": "Blanket",
     "category": "gear",
     "icon": "🧣",
     "weight": 3,
@@ -785,6 +844,7 @@
   {
     "id": "holy-water",
     "name": "Святая вода (фляга)",
+    "nameEn": "Holy Water",
     "category": "consumable",
     "icon": "💧",
     "weight": 1,
@@ -794,6 +854,7 @@
   {
     "id": "lamp",
     "name": "Лампа",
+    "nameEn": "Lamp",
     "category": "gear",
     "icon": "🪔",
     "weight": 1,
@@ -803,6 +864,7 @@
   {
     "id": "ink",
     "name": "Чернила (флакон)",
+    "nameEn": "Ink",
     "category": "consumable",
     "icon": "🖋️",
     "weight": 0,
@@ -812,6 +874,7 @@
   {
     "id": "ink-pen",
     "name": "Перо",
+    "nameEn": "Ink Pen",
     "category": "gear",
     "icon": "🪶",
     "weight": 0,
@@ -821,6 +884,7 @@
   {
     "id": "calligraphers-supplies",
     "name": "Каллиграфические принадлежности",
+    "nameEn": "Calligrapher's Supplies",
     "category": "tool",
     "icon": "✒️",
     "weight": 5,
@@ -831,6 +895,7 @@
   {
     "id": "thieves-tools",
     "name": "Воровские инструменты",
+    "nameEn": "Thieves' Tools",
     "category": "tool",
     "icon": "🗝️",
     "weight": 1,
@@ -841,6 +906,7 @@
   {
     "id": "herbalism-kit",
     "name": "Набор травника",
+    "nameEn": "Herbalism Kit",
     "category": "tool",
     "icon": "🌱",
     "weight": 3,
@@ -851,6 +917,7 @@
   {
     "id": "woodcarvers-tools",
     "name": "Инструменты резчика по дереву",
+    "nameEn": "Woodcarver's Tools",
     "category": "tool",
     "icon": "🪵",
     "weight": 5,
@@ -861,6 +928,7 @@
   {
     "id": "lute",
     "name": "Лютня",
+    "nameEn": "Lute",
     "category": "tool",
     "icon": "🪕",
     "weight": 2,
@@ -871,6 +939,7 @@
   {
     "id": "alchemists-supplies",
     "name": "Инструменты алхимика",
+    "nameEn": "Alchemist's Supplies",
     "category": "tool",
     "icon": "⚗️",
     "weight": 8,
@@ -881,6 +950,7 @@
   {
     "id": "brewers-supplies",
     "name": "Инструменты пивовара",
+    "nameEn": "Brewer's Supplies",
     "category": "tool",
     "icon": "🍺",
     "weight": 9,
@@ -891,6 +961,7 @@
   {
     "id": "carpenters-tools",
     "name": "Инструменты плотника",
+    "nameEn": "Carpenter's Tools",
     "category": "tool",
     "icon": "🪚",
     "weight": 6,
@@ -901,6 +972,7 @@
   {
     "id": "cartographers-tools",
     "name": "Инструменты картографа",
+    "nameEn": "Cartographer's Tools",
     "category": "tool",
     "icon": "🗺️",
     "weight": 6,
@@ -911,6 +983,7 @@
   {
     "id": "cobblers-tools",
     "name": "Инструменты сапожника",
+    "nameEn": "Cobbler's Tools",
     "category": "tool",
     "icon": "👢",
     "weight": 5,
@@ -921,6 +994,7 @@
   {
     "id": "cooks-utensils",
     "name": "Инструменты повара",
+    "nameEn": "Cook's Utensils",
     "category": "tool",
     "icon": "🍳",
     "weight": 8,
@@ -931,6 +1005,7 @@
   {
     "id": "glassblowers-tools",
     "name": "Инструменты стеклодува",
+    "nameEn": "Glassblower's Tools",
     "category": "tool",
     "icon": "🫙",
     "weight": 5,
@@ -941,6 +1016,7 @@
   {
     "id": "jewelers-tools",
     "name": "Инструменты ювелира",
+    "nameEn": "Jeweler's Tools",
     "category": "tool",
     "icon": "💍",
     "weight": 2,
@@ -951,6 +1027,7 @@
   {
     "id": "leatherworkers-tools",
     "name": "Инструменты кожевника",
+    "nameEn": "Leatherworker's Tools",
     "category": "tool",
     "icon": "🧵",
     "weight": 5,
@@ -961,6 +1038,7 @@
   {
     "id": "masons-tools",
     "name": "Инструменты каменщика",
+    "nameEn": "Mason's Tools",
     "category": "tool",
     "icon": "🧱",
     "weight": 8,
@@ -971,6 +1049,7 @@
   {
     "id": "painters-supplies",
     "name": "Инструменты художника",
+    "nameEn": "Painter's Supplies",
     "category": "tool",
     "icon": "🎨",
     "weight": 5,
@@ -981,6 +1060,7 @@
   {
     "id": "potters-tools",
     "name": "Инструменты гончара",
+    "nameEn": "Potter's Tools",
     "category": "tool",
     "icon": "🏺",
     "weight": 3,
@@ -991,6 +1071,7 @@
   {
     "id": "smiths-tools",
     "name": "Инструменты кузнеца",
+    "nameEn": "Smith's Tools",
     "category": "tool",
     "icon": "⚒️",
     "weight": 8,
@@ -1001,6 +1082,7 @@
   {
     "id": "tinkers-tools",
     "name": "Инструменты ремонтника",
+    "nameEn": "Tinker's Tools",
     "category": "tool",
     "icon": "🔩",
     "weight": 10,
@@ -1011,6 +1093,7 @@
   {
     "id": "weavers-tools",
     "name": "Инструменты ткача",
+    "nameEn": "Weaver's Tools",
     "category": "tool",
     "icon": "🧶",
     "weight": 5,
@@ -1021,9 +1104,10 @@
   {
     "id": "dragonchess-set",
     "name": "Игровой набор (драконьи шахматы)",
+    "nameEn": "Gaming Set (Dragonchess)",
     "category": "tool",
     "icon": "♟️",
-    "weight": 0.5,
+    "weight": 0,
     "cost": 1,
     "toolKind": "gaming",
     "description": "Доска и фигурки для драконьих шахмат."
@@ -1031,6 +1115,7 @@
   {
     "id": "playing-cards",
     "name": "Игровой набор (карты)",
+    "nameEn": "Gaming Set (Playing Cards)",
     "category": "tool",
     "icon": "🃏",
     "weight": 0,
@@ -1041,6 +1126,7 @@
   {
     "id": "three-dragon-ante",
     "name": "Игровой набор («Ставка трёх драконов»)",
+    "nameEn": "Gaming Set (Three-Dragon Ante)",
     "category": "tool",
     "icon": "🐉",
     "weight": 0,
@@ -1051,6 +1137,7 @@
   {
     "id": "bagpipes",
     "name": "Волынка",
+    "nameEn": "Bagpipes",
     "category": "tool",
     "icon": "🎶",
     "weight": 6,
@@ -1061,6 +1148,7 @@
   {
     "id": "drum",
     "name": "Барабан",
+    "nameEn": "Drum",
     "category": "tool",
     "icon": "🥁",
     "weight": 3,
@@ -1071,6 +1159,7 @@
   {
     "id": "dulcimer",
     "name": "Цимбалы",
+    "nameEn": "Dulcimer",
     "category": "tool",
     "icon": "🎶",
     "weight": 10,
@@ -1081,6 +1170,7 @@
   {
     "id": "flute",
     "name": "Флейта",
+    "nameEn": "Flute",
     "category": "tool",
     "icon": "🎶",
     "weight": 1,
@@ -1091,6 +1181,7 @@
   {
     "id": "horn",
     "name": "Рожок",
+    "nameEn": "Horn",
     "category": "tool",
     "icon": "📯",
     "weight": 2,
@@ -1101,6 +1192,7 @@
   {
     "id": "lyre",
     "name": "Лира",
+    "nameEn": "Lyre",
     "category": "tool",
     "icon": "🎶",
     "weight": 2,
@@ -1111,6 +1203,7 @@
   {
     "id": "pan-flute",
     "name": "Свирель",
+    "nameEn": "Pan Flute",
     "category": "tool",
     "icon": "🎶",
     "weight": 2,
@@ -1121,6 +1214,7 @@
   {
     "id": "shawm",
     "name": "Шалмей",
+    "nameEn": "Shawm",
     "category": "tool",
     "icon": "🎶",
     "weight": 1,
@@ -1131,6 +1225,7 @@
   {
     "id": "viol",
     "name": "Виола",
+    "nameEn": "Viol",
     "category": "tool",
     "icon": "🎻",
     "weight": 1,
@@ -1141,6 +1236,7 @@
   {
     "id": "disguise-kit",
     "name": "Набор для грима",
+    "nameEn": "Disguise Kit",
     "category": "tool",
     "icon": "🎭",
     "weight": 3,
@@ -1151,6 +1247,7 @@
   {
     "id": "forgery-kit",
     "name": "Набор для фальсификации",
+    "nameEn": "Forgery Kit",
     "category": "tool",
     "icon": "📝",
     "weight": 5,
@@ -1161,6 +1258,7 @@
   {
     "id": "navigators-tools",
     "name": "Инструменты навигатора",
+    "nameEn": "Navigator's Tools",
     "category": "tool",
     "icon": "🧭",
     "weight": 2,
@@ -1171,6 +1269,7 @@
   {
     "id": "poisoners-kit",
     "name": "Набор отравителя",
+    "nameEn": "Poisoner's Kit",
     "category": "tool",
     "icon": "☠️",
     "weight": 2,
@@ -1181,6 +1280,7 @@
   {
     "id": "potion-of-healing",
     "name": "Зелье лечения",
+    "nameEn": "Potion of Healing",
     "category": "consumable",
     "icon": "🧪",
     "weight": 0.5,

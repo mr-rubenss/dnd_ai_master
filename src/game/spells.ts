@@ -31,7 +31,7 @@ export function parseSpellCatalog(raw: unknown): SpellCatalog {
     if (!isObject(spell) || !isNonEmptyString(spell.id)) return fail(`${where}: нужен объект с непустым "id"`)
     where += ` "${spell.id}"`
     if (catalog[spell.id]) fail(`${where}: повторяющийся id`)
-    for (const key of ['name', 'castingTime', 'range', 'duration', 'description'] as const) {
+    for (const key of ['name', 'nameEn', 'castingTime', 'range', 'duration', 'description'] as const) {
       if (!isNonEmptyString(spell[key])) fail(`${where}: "${key}" — непустая строка`)
     }
     if (!isInt(spell.level) || spell.level < 0 || spell.level > MAX_SPELL_LEVEL) fail(`${where}: "level" — от 0 (заговор) до ${MAX_SPELL_LEVEL}`)

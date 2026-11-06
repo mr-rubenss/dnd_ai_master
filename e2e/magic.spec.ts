@@ -2,7 +2,7 @@
 // выбор заклинаний старому заклинателю. На телефоне — без горизонтальной прокрутки (широкий шрифт — фикстура).
 import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
-import { act, addHeroCopy, collectPageErrors, expectNoHorizontalScroll, MASTER, openCharacterCreation, startQuickGame } from './helpers'
+import { act, addHeroCopy, collectPageErrors, expectNoHorizontalScroll, fillSpellStep, MASTER, openCharacterCreation, startQuickGame } from './helpers'
 
 const next = (page: Page) => page.getByRole('button', { name: 'Далее', exact: true })
 const option = (page: Page, group: string, id: string) => page.getByRole('radiogroup', { name: group }).locator(`[data-option="${id}"]`)
@@ -139,7 +139,7 @@ test('у воина без магии вкладки «Магия» нет', asy
   await expect(page.getByTestId('spell-dialog')).toHaveCount(0)
 })
 
-test('старый заклинатель: в «Моих героях» и в игре предлагается выбрать заклинания', async ({ page }, testInfo) => {
+test('старый жрец: в «Моих героях» и в игре предлагается дополнить лист — порядок и заклинания', async ({ page }, testInfo) => {
   const errors = collectPageErrors(page)
   await page.goto('./')
   await startQuickGame(page)
@@ -162,9 +162,13 @@ test('старый заклинатель: в «Моих героях» и в и
   await page.getByRole('button', { name: 'Начать историю' }).click()
   const dialog = page.getByTestId('spell-dialog')
   await expect(dialog).toBeVisible()
-  await expect(dialog).toContainText('Заклинания: Ведана')
+  await expect(dialog).toContainText('Дополните лист: Ведана')
   await expect(dialog.getByRole('button', { name: 'Сохранить' })).toBeDisabled()
-  for (const id of ['guidance', 'light', 'thaumaturgy']) await dialog.locator(`[data-slot="cantrips"] [data-spell="${id}"] .spell-option-toggle`).click()
+  // «Божественный порядок» (SRD 5.2.1): Чудотворец — на один заговор больше.
+  await expect(page.locator('.creation-problems')).toHaveText('Выберите: божественный порядок')
+  await dialog.getByRole('radiogroup', { name: 'Божественный порядок' }).locator('[data-option="thaumaturge"]').click()
+  await expect(dialog.locator('[data-slot="cantrips"] .slot-count')).toHaveText('0 из 4')
+  for (const id of ['guidance', 'light', 'thaumaturgy', 'sacred-flame']) await dialog.locator(`[data-slot="cantrips"] [data-spell="${id}"] .spell-option-toggle`).click()
   for (const id of ['cure-wounds', 'bless', 'command', 'sanctuary']) await dialog.locator(`[data-slot="prepared"] [data-spell="${id}"] .spell-option-toggle`).click()
   await expectNoHorizontalScroll(page)
   await testInfo.attach('выбор заклинаний старому герою', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
@@ -177,5 +181,47 @@ test('старый заклинатель: в «Моих героях» и в и
   await expect(page.locator('#sheet-panel-magic').getByTestId('magic-source')).toContainText('Жрец: Мудрость · Сл спасброска 11 · атака заклинанием +3')
   await expect(page.locator('#sheet-panel-magic')).toContainText('Лечение ран')
   await expect(page.getByTestId('choose-spells')).toHaveCount(0)
+  // Бонус Чудотворца к Религии: Инт 8 (−1) + Мдр (+1, минимум +1) = +0.
+  await page.getByRole('tab', { name: 'Характеристики' }).click()
+  await expect(page.getByTestId('class-order-value')).toHaveText('Чудотворец (Thaumaturge)')
+  await expect(page.locator('[data-skill="religion"] .stat-mod')).toHaveText('+0')
+  expect(errors).toEqual([])
+})
+
+test('создание жреца: «Божественный порядок» — Защитник получает тяжёлые доспехи и воинское оружие', async ({ page }) => {
+  const errors = collectPageErrors(page)
+  await page.goto('./')
+  await openCharacterCreation(page)
+  await option(page, 'Класс', 'cleric').click()
+  await expect(page.locator('.creation-problems')).toHaveText('Выберите: божественный порядок')
+  await expect(page.getByTestId('class-order')).toContainText('Thaumaturge')
+  await page.getByRole('radiogroup', { name: 'Божественный порядок' }).locator('[data-option="protector"]').click()
+  await expect(next(page)).toBeEnabled()
+  await expectNoHorizontalScroll(page)
+  await next(page).click()
+  await option(page, 'Предыстория', 'soldier').click()
+  await page.getByRole('radiogroup', { name: 'Прибавка +2' }).locator('[data-value="str"]').click()
+  await page.getByRole('radiogroup', { name: 'Прибавка +1' }).locator('[data-value="con"]').click()
+  await page.getByLabel('Ваш инструмент').selectOption('dice-set')
+  await next(page).click()
+  await option(page, 'Вид', 'dwarf').click()
+  await next(page).click()
+  await page.getByRole('button', { name: /Расставить под класс/ }).click()
+  await next(page).click()
+  for (const skill of ['insight', 'medicine']) await page.locator(`[data-slot="classSkills"] [data-value="${skill}"]`).click()
+  await next(page).click()
+  await expect(stepTitle(page)).toHaveText('6. Заклинания')
+  await expect(slotCount(page, 'cantrips')).toHaveText('0 из 3')
+  await fillSpellStep(page)
+  await next(page).click()
+  await option(page, 'Снаряжение класса', 'class-A').click()
+  await option(page, 'Снаряжение предыстории', 'background-B').click()
+  await next(page).click()
+  await page.getByLabel('Имя', { exact: true }).fill('Ольгерд')
+  await next(page).click()
+  await page.getByRole('button', { name: 'Сохранить в «Мои герои»' }).click()
+  await page.getByTestId('hero-' + (await page.evaluate(() => (window as unknown as { __aiMaster: { getState(): { roster: { heroes: { id: string }[] } } } }).__aiMaster.getState().roster.heroes[0].id))).getByRole('button', { name: 'Лист персонажа' }).click()
+  await expect(page.getByTestId('armor-training')).toHaveText('Все доспехи, щиты')
+  await expect(page.getByTestId('class-order-value')).toHaveText('Защитник (Protector)')
   expect(errors).toEqual([])
 })

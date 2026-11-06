@@ -16,6 +16,7 @@ import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
 import type { PriceList } from './prices'
 import { END_TURN_TOOL } from './turnChanges'
+import { checkSubjectOf } from './classOrder'
 import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
 import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
@@ -151,7 +152,16 @@ export const MASTER_TOOLS: AiTool[] = [
     description:
       'Герой применил умение класса с ограниченным числом применений («Второе дыхание», «Ярость», «Бардовское вдохновение» — список в листе героя). ' +
       'Движок спишет применение и, если умение лечит, сам бросит лечение. Применений нет — откажет.',
-    parameters: object({ hero: HERO, feature: str('id или название умения.'), reason: str('Зачем.') }, ['feature']),
+    parameters: object(
+      {
+        hero: HERO,
+        feature: str('id или название умения.'),
+        amount: int('Для запаса («Наложение рук»): сколько хитов потратить (столько и вылечится).', 1, 100),
+        target: str('Кого лечит запас — имя героя (по умолчанию сам герой).'),
+        reason: str('Зачем.'),
+      },
+      ['feature'],
+    ),
   },
   {
     name: 'change_hp',
@@ -412,7 +422,8 @@ const HANDLERS: Record<string, Handler> = {
     try {
       check = save
         ? savingThrow(member.character, ability!, { dc, mode, rng: ctx.rng })
-        : abilityCheck(member.character, skill ? { skill } : { ability: ability! }, { dc, mode, rng: ctx.rng })
+        
+        : abilityCheck(ctx.rules ? checkSubjectOf(member.character, ctx.rules) : member.character, skill ? { skill } : { ability: ability! }, { dc, mode, rng: ctx.rng })
     } catch (error) {
       if (error instanceof CheckError) return reject(error.message)
       throw error
@@ -682,6 +693,18 @@ const HANDLERS: Record<string, Handler> = {
       reject(`У ${member.character.name} нет умения «${query}» с применениями.${states.length ? ` Есть: ${states.map((r) => `${r.resource.name} (${r.resource.id})`).join(', ')}.` : ''}`)
     const { resource, left, max } = found!
     if (left <= 0) reject(`«${resource.name}» у ${member.character.name} потрачено (0/${max}) — восстанавливается ${resource.shortRest ? 'коротким или долгим' : 'долгим'} отдыхом.`)
+    if (resource.pool) {
+      const amount = integer(args, 'amount') ?? reject(`«${resource.name}» — запас: укажи amount (в запасе ${left}).`)
+      if (amount! > left) reject(`В запасе «${resource.name}» осталось ${left}, а нужно ${amount}.`)
+      const targetName = text(args, 'target')
+      const patient = targetName ? state.party.find((m) => !m.fallen && (m.heroId === targetName || norm(m.character.name) === norm(targetName))) : member
+      if (!patient) reject(`«${targetName}» — не герой отряда: опиши лечение НПС в рассказе, запас всё равно тратится только на героев.`)
+      const hp = hpEvents(patient!, 'healing', amount!, undefined, ENGINE)
+      return {
+        events: [{ event: { type: 'featureUsed', heroId: member.heroId, featureId: resource.id, amount: amount! }, author: MASTER }, ...hp.events],
+        result: { left: left - amount!, max, message: `${member.character.name}: «${resource.name}» — ${patient!.character.name} восстанавливает ${amount} хитов (${hp.hp}/${patient!.character.maxHp}); в запасе ${left - amount!}/${max}.` },
+      }
+    }
     const events: ToolEvent[] = [{ event: { type: 'featureUsed', heroId: member.heroId, featureId: resource.id }, author: MASTER }]
     let healing = ''
     if (resource.effect?.healing) {

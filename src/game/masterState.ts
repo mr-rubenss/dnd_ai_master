@@ -13,6 +13,7 @@ import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
 import { armorClass } from './character'
 import { currentLocation } from './storyActions'
+import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
 import { classSpellcasting, hasMagic, knownSpells, needsSpellChoice, spellcastingStats, spellSlots } from './magic'
 
@@ -35,12 +36,12 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
   const abilities = ABILITIES.map((a) => `${ABILITY_ABBREVIATIONS[a]} ${c.abilities[a]} (${formatModifier(abilityModifier(c.abilities[a]))})`).join(', ')
   const saves = ABILITIES.map((a) => `${ABILITY_ABBREVIATIONS[a]} ${formatModifier(savingThrowModifier(c, a))}${c.proficiencies.savingThrows.includes(a) ? '*' : ''}`).join(', ')
   const skills = SKILLS.filter((s) => c.proficiencies.skills[s])
-    .map((s) => `${SKILL_DEFINITIONS[s].name} ${formatModifier(skillModifier(c, s))}${c.proficiencies.skills[s] === 'expertise' ? ' (компетентность)' : ''}`)
+    .map((s) => `${SKILL_DEFINITIONS[s].name} ${formatModifier(skillModifier(checkSubjectOf(c, ctx.rules), s))}${c.proficiencies.skills[s] === 'expertise' ? ' (компетентность)' : ''}`)
     .join(', ')
   const conditions = c.conditions.map((x) => CONDITION_DEFINITIONS[x.id].name + (x.level ? ` ${x.level}` : '')).join(', ')
   const feats = c.feats.map((f) => ctx.rules.feats[f]?.name ?? f).join(', ')
   const speed = ctx.rules.species[c.speciesId]?.speed
-  const training = ctx.rules.classes[c.classId]?.martialWeapons ?? 'all'
+  const training = weaponTraining(c, ctx.rules)
   const attacks = weaponAttacks(c, inv.equipped, ctx.catalog, training).map(
     (a) => `${a.name}: атака ${formatModifier(a.attackBonus)}, урон ${a.damageDice}${a.damageBonus ? formatModifier(a.damageBonus) : ''}${a.notes.length ? ` (${a.notes.join('; ')})` : ''}`,
   )
@@ -54,6 +55,7 @@ export function heroSheetText(member: PartyMember, ctx: MasterStateContext): str
     `Спасброски (* — владение): ${saves}.`,
     `Навыки с владением: ${skills || 'нет'}.`,
     feats ? `Черты: ${feats}.` : '',
+    classOrderOf(c, ctx.rules) ? `${ctx.rules.classes[c.classId]?.order?.feature}: ${classOrderOf(c, ctx.rules)!.name} — ${classOrderOf(c, ctx.rules)!.description}` : '',
     `Состояния: ${conditions || 'нет'}.`,
     `Экипировка: основная рука — ${name(inv.equipped.mainHand)}, вторая рука — ${name(inv.equipped.offHand)}, доспех — ${name(inv.equipped.armor)}.`,
     attacks.length ? `Атаки: ${attacks.join('; ')}.` : '',

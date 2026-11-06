@@ -56,6 +56,7 @@ import { armorTrainingText } from '../itemText'
 import type { EquipmentOption } from '../../types/rules'
 import { ChoiceChip, OptionCard } from './OptionCard'
 import { SpellChoiceForm } from '../SpellPicker'
+import { ClassOrderPicker } from '../ClassOrderPicker'
 
 export interface StepProps {
   draft: CreationDraft
@@ -130,6 +131,8 @@ export function ClassStep({ draft, update }: StepProps) {
               </li>
             ))}
           </ul>
+
+          <ClassOrderPicker classId={selected.id} value={draft.classOrder} onChange={(classOrder) => update({ ...draft, classOrder })} />
 
           {selected.fightingStyle && (
             <>
