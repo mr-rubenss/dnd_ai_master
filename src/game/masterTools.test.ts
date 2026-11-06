@@ -405,3 +405,46 @@ describe('advance_time — игровое время', () => {
     expect(gameStateText(night, { catalog: itemCatalog, rules: rulesData })).toContain('лавки закрыты, улицы пусты')
   })
 })
+
+describe('скрытые и пассивные проверки', () => {
+  it('hidden: движок бросает, но карточки в ленте и броска в журнале бросков нет; ведущий знает результат', () => {
+    const s = fresh()
+    // к20 → 15: Внимательность Ратибора +3 → 18 против Сл 14.
+    const { outcome, state } = run(s, 'request_check', { skill: 'perception', dc: 14, reason: 'вор крадётся следом', hidden: true }, context([face(15)]))
+    expect(outcome.ok).toBe(true)
+    expect(outcome.result).toMatchObject({ hidden: true, total: 18, success: true })
+    expect(outcome.result.message).toBe('Скрытая проверка (игрок не видит): Мудрость (Внимательность), Сл 14: 18 — успех. Опиши, что герой заметил или понял.')
+    expect(state.messages).toEqual(s.messages)
+    expect(state.rolls).toEqual(s.rolls)
+    // Событие в журнале действий всё равно есть — с пометкой hidden.
+    expect(outcome.events[0].event).toMatchObject({ type: 'checkRolled', check: { hidden: true } })
+  })
+
+  it('hidden: провал — ведущий получает просьбу не озвучивать его', () => {
+    const { outcome } = run(fresh(), 'request_check', { skill: 'insight', dc: 20, reason: 'трактирщик лжёт', hidden: true }, context([face(2)]))
+    expect(outcome.result.success).toBe(false)
+    expect(outcome.result.message).toMatch(/Не озвучивай провал/)
+  })
+
+  it('обычная проверка по-прежнему видна игроку', () => {
+    const s = fresh()
+    const { state } = run(s, 'request_check', { skill: 'perception', dc: 14, reason: 'осмотреться' }, context([face(15)]))
+    expect(state.messages.length).toBe(s.messages.length + 1)
+    expect(state.messages.at(-1)?.check?.hidden).toBeUndefined()
+    expect(state.rolls.length).toBe(s.rolls.length + 1)
+  })
+
+  it('passive: без броска — пассивное значение против Сл; спасбросок пассивным не бывает', () => {
+    const s = fresh()
+    // Пассивная Внимательность Ратибора — 13.
+    const hit = run(s, 'request_check', { skill: 'perception', dc: 12, reason: 'засада в проулке', passive: true })
+    expect(hit.outcome.events).toEqual([])
+    expect(hit.outcome.result).toMatchObject({ passive: 13, success: true, hidden: true })
+    expect(hit.state).toEqual(s)
+    const miss = run(s, 'request_check', { skill: 'perception', dc: 15, reason: 'засада в проулке', passive: true })
+    expect(miss.outcome.result).toMatchObject({ passive: 13, success: false })
+    expect(miss.outcome.result.message).toMatch(/не говори об этом игроку/)
+    expect(rejected(s, 'request_check', { ability: 'dex', saving_throw: true, dc: 12, reason: 'x', passive: true })).toMatch(/Спасбросок пассивным не бывает/)
+    expect(rejected(s, 'request_check', { skill: 'perception', dc: 40, reason: 'x', passive: true })).toMatch(/Сл/)
+  })
+})

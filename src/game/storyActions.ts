@@ -304,6 +304,8 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         return { ...m, character: { ...c, hp } }
       })
     case 'checkRolled': {
+      // Скрытая проверка: ни карточки в ленте, ни броска в журнале бросков игрока — только журнал действий.
+      if (action.check.hidden) return state
       const message: ChatMessage = { id: action.messageId, author: 'system', text: formatD20Test(action.check.result), check: action.check }
       return { ...state, messages: [...state.messages, message], rolls: action.roll ? [...state.rolls, action.roll].slice(-MAX_ROLL_LOG) : state.rolls }
     }

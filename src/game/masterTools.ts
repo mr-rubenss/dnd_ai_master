@@ -4,7 +4,7 @@
 // ничего не меняя. Чистые функции; запись действий в историю делает вызывающий код (masterTurn.ts).
 import type { AiTool, AiToolCall } from '../ai/types'
 import { ABILITIES, ABILITY_NAMES, ABILITY_NAMES_GENITIVE, abilityModifier, proficiencyBonus, type Ability } from '../engine/abilities'
-import { abilityCheck, CheckError, MAX_DC, MIN_DC, savingThrow, type D20TestResult } from '../engine/checks'
+import { abilityCheck, CheckError, MAX_DC, MIN_DC, passiveScore, savingThrow, type D20TestResult } from '../engine/checks'
 import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition, type ConditionId } from '../engine/conditions'
 import { roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
@@ -49,7 +49,9 @@ export const MASTER_TOOLS: AiTool[] = [
     name: 'request_check',
     description:
       'Попросить движок бросить проверку навыка или характеристики (или спасбросок) героя против Сл. Вызывай, когда исход действия неочевиден. ' +
-      'Движок бросит кубик сам и вернёт результат — по нему опиши исход. Укажи ровно одно: skill или ability.',
+      'Движок бросит кубик сам и вернёт результат — по нему опиши исход. Укажи ровно одно: skill или ability. ' +
+      'hidden: true — скрытая проверка (Внимательность против скрытности вора, Проницательность против лжи НПС, поиск ловушки): игрок не видит бросок, провал не озвучивай. ' +
+      'passive: true — пассивная проверка без броска: движок сравнит Сл с пассивным значением героя (10 + модификатор, как пассивная Внимательность).',
     parameters: object(
       {
         hero: HERO,
@@ -59,6 +61,8 @@ export const MASTER_TOOLS: AiTool[] = [
         dc: int('Сложность: 10 — просто, 15 — средне, 20 — трудно, 25 — почти невозможно.', MIN_DC, MAX_DC),
         reason: str('Зачем проверка, коротко: «убедить Гуннара открыть кладовую».'),
         mode: oneOf(['normal', 'advantage', 'disadvantage'], 'Преимущество или помеха от обстоятельств (состояния героя движок учтёт сам).'),
+        hidden: { type: 'boolean', description: 'true — скрытая проверка: бросок не показывается игроку, только твой рассказ.' },
+        passive: { type: 'boolean', description: 'true — пассивная проверка без броска (10 + модификатор против Сл); всегда скрыта от игрока.' },
       },
       ['dc', 'reason'],
     ),
@@ -438,6 +442,28 @@ const HANDLERS: Record<string, Handler> = {
     const dc = integer(args, 'dc', true)!
     const reason = text(args, 'reason', true)!
     const mode = choice<RollMode>(args, 'mode', ['normal', 'advantage', 'disadvantage']) ?? 'normal'
+    const hidden = args.hidden === true
+    if (args.passive === true) {
+      if (save) reject('Спасбросок пассивным не бывает — бросай его (можно hidden: true).')
+      if (dc < MIN_DC || dc > MAX_DC) reject(`Сл — от ${MIN_DC} до ${MAX_DC}.`)
+      const subject = ctx.rules ? checkSubjectOf(member.character, ctx.rules) : member.character
+      const target = skill ? { skill } : { ability: ability! }
+      const score = passiveScore(subject, target, mode)
+      const label = skill ? `пассивная ${SKILL_DEFINITIONS[skill].name}` : `пассивная проверка ${ABILITY_NAMES_GENITIVE[ability!]}`
+      const success = score >= dc
+      return {
+        events: [],
+        result: {
+          check: label,
+          hero: member.character.name,
+          dc,
+          passive: score,
+          success,
+          hidden: true,
+          message: `${member.character.name}: ${label} ${score} против Сл ${dc} — ${success ? 'успех: герой замечает' : 'провал: герой ничего не замечает — не говори об этом игроку, просто продолжай рассказ'}. Броска не было, игрок ничего не видел.`,
+        },
+      }
+    }
     let check: D20TestResult
     try {
       check = save
@@ -456,7 +482,7 @@ const HANDLERS: Record<string, Handler> = {
           event: {
             type: 'checkRolled',
             messageId: `check-${id}`,
-            check: { heroId: member.heroId, heroName: member.character.name, reason, result: check },
+            check: { heroId: member.heroId, heroName: member.character.name, reason, result: check, ...(hidden ? { hidden: true } : {}) },
             roll,
           },
           author: ENGINE,
@@ -473,7 +499,10 @@ const HANDLERS: Record<string, Handler> = {
         success: check.success,
         margin: check.margin,
         auto_fail: check.autoFailReason,
-        message: `${check.label}, Сл ${dc}: ${check.total ?? 'автоматический провал'} — ${check.success ? 'успех' : 'провал'}. Опиши исход.`,
+        ...(hidden ? { hidden: true } : {}),
+        message: hidden
+          ? `Скрытая проверка (игрок не видит): ${check.label}, Сл ${dc}: ${check.total ?? 'автоматический провал'} — ${check.success ? 'успех. Опиши, что герой заметил или понял' : 'провал. Не озвучивай провал («ты не заметил») — просто продолжай рассказ, как будто ничего не было'}.`
+          : `${check.label}, Сл ${dc}: ${check.total ?? 'автоматический провал'} — ${check.success ? 'успех' : 'провал'}. Опиши исход.`,
       },
     }
   },

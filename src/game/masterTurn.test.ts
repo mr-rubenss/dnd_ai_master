@@ -40,6 +40,12 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('«ты входишь в таверну»')
   })
 
+  it('скрытые и пассивные проверки: провал не озвучивать', () => {
+    expect(DM_PROMPT).toContain('`hidden: true`')
+    expect(DM_PROMPT).toContain('**Провал скрытой проверки не озвучивай**')
+    expect(DM_PROMPT).toContain('`passive: true`')
+  })
+
   it('время: учитывать время суток и двигать его advance_time', () => {
     expect(DM_PROMPT).toContain('ночью таверна пустеет, лавки закрыты')
     expect(DM_PROMPT).toContain('вызови `advance_time`')

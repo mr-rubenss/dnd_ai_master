@@ -4,6 +4,7 @@ import {
   CheckError,
   formatD20Test,
   passivePerception,
+  passiveScore,
   savingThrow,
   savingThrowModifier,
   skillModifier,
@@ -80,6 +81,15 @@ describe('модификаторы навыков и спасбросков', ()
   it('все 18 навыков считаются для любого персонажа', () => {
     expect(SKILLS).toHaveLength(18)
     for (const skill of SKILLS) expect(Number.isInteger(skillModifier(rogue, skill))).toBe(true)
+  })
+})
+
+describe('пассивные проверки любого навыка', () => {
+  it('10 + модификатор проверки; Внимательность совпадает с пассивным Восприятием', () => {
+    expect(passiveScore(ratibor(), { skill: 'perception' })).toBe(passivePerception(ratibor()))
+    expect(passiveScore(ratibor(), { skill: 'insight' })).toBe(10 + skillModifier(ratibor(), 'insight'))
+    expect(passiveScore(ratibor(), { ability: 'int' })).toBe(9)
+    expect(passiveScore(ratibor(), { skill: 'investigation' }, 'advantage')).toBe(10 + skillModifier(ratibor(), 'investigation') + 5)
   })
 })
 

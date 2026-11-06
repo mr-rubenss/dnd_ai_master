@@ -83,13 +83,23 @@ export function savingThrowModifier(subject: CheckSubject, ability: Ability): nu
  * +5 при преимуществе и −5 при помехе (в т. ч. от состояний — Отравлен, Испуган).
  */
 export function passivePerception(subject: CheckSubject, mode: RollMode = 'normal'): number {
-  const effects = conditionEffects(subject.conditions, { kind: 'check', ability: 'wis' })
+  return passiveScore(subject, { skill: 'perception' }, mode)
+}
+
+/**
+ * Пассивное значение любой проверки (SRD 5.2: «Passive Perception» и другие пассивные проверки): 10 + модификатор
+ * проверки, +5 при преимуществе и −5 при помехе (в т. ч. от состояний). Без броска.
+ */
+export function passiveScore(subject: CheckSubject, target: CheckTarget, mode: RollMode = 'normal'): number {
+  const ability = target.skill ? SKILL_DEFINITIONS[target.skill].ability : target.ability!
+  const effects = conditionEffects(subject.conditions, { kind: 'check', ability })
   const finalMode = resolveRollMode(
     mode === 'advantage' || effects.advantage.length > 0,
     mode === 'disadvantage' || effects.disadvantage.length > 0,
   )
   const modeBonus = finalMode === 'advantage' ? 5 : finalMode === 'disadvantage' ? -5 : 0
-  return 10 + skillModifier(subject, 'perception') + modeBonus
+  const modifier = target.skill ? skillModifier(subject, target.skill) : abilityModifier(subject.abilities[ability])
+  return 10 + modifier + modeBonus
 }
 
 export interface ModifierPart {
