@@ -245,6 +245,7 @@ function traceBlock(trace: TurnTrace, n: number, count: number): string {
     const v = trace.verification
     lines.push('', `Сверка end_turn: ${v.status}${'problems' in v && v.problems.length ? ` — ${v.problems.join('; ')}` : ''}`)
   }
+  if (trace.claims?.length) lines.push('', `Сверка текста с состоянием — ведущего попросили исправить: ${trace.claims.join('; ')}`)
   if (trace.error) lines.push('', `**Ошибка:** ${trace.error}`)
   return lines.join('\n')
 }

@@ -4,6 +4,7 @@ import {
   ARMOR_TYPES,
   DAMAGE_TYPES,
   ITEM_CATEGORIES,
+  ITEM_RARITIES,
   TOOL_KINDS,
   WEAPON_KINDS,
   WEAPON_MASTERIES,
@@ -36,6 +37,7 @@ export function parseItemCatalog(raw: unknown): ItemCatalog {
     if (!isOneOf(ITEM_CATEGORIES, item.category)) fail(`${where}: "category" должно быть одним из: ${ITEM_CATEGORIES.join(', ')}`)
     if (!isNumber(item.weight) || item.weight < 0) fail(`${where}: "weight" должно быть неотрицательным числом`)
     if (item.cost !== undefined && (!isNumber(item.cost) || item.cost <= 0)) fail(`${where}: "cost" — положительное число (в зм)`)
+    if (item.rarity !== undefined && !isOneOf(ITEM_RARITIES, item.rarity)) fail(`${where}: "rarity" должно быть одним из: ${ITEM_RARITIES.join(', ')}`)
     if (item.toolKind !== undefined && !isOneOf(TOOL_KINDS, item.toolKind)) {
       fail(`${where}: "toolKind" должно быть одним из: ${TOOL_KINDS.join(', ')}`)
     }

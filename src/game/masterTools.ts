@@ -6,7 +6,7 @@ import type { AiTool, AiToolCall } from '../ai/types'
 import { ABILITIES, ABILITY_NAMES, ABILITY_NAMES_GENITIVE, abilityModifier, proficiencyBonus, type Ability } from '../engine/abilities'
 import { abilityCheck, CheckError, MAX_DC, MIN_DC, passiveScore, savingThrow, type D20TestResult } from '../engine/checks'
 import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition, type ConditionId } from '../engine/conditions'
-import { roll, type RollMode, type Rng } from '../engine/dice'
+import { DiceError, roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
 import { DOOR_STATES, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
@@ -22,6 +22,7 @@ import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
 import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
 import { recoveryText } from './features'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
+import { goldRewardProblem, itemRewardProblem, partyLevel, resolveSource, REWARD_SOURCES, type RewardSource } from './rewards'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER, OUT_OF_GAME_REFUSAL, storyTime } from './storyActions'
 import { advanceProblem, durationText, MAX_ADVANCE_MINUTES, minutesUntilHour, minutesUntilPart, timeText, type PartOfDay } from '../engine/time'
 
@@ -70,14 +71,20 @@ export const MASTER_TOOLS: AiTool[] = [
   },
   {
     name: 'give_item',
-    description: 'Дать герою предмет из справочника игры (нашёл, купил, получил в награду).',
+    description:
+      'Дать герою предмет из справочника игры — только из настоящего источника: source location (лежал в объекте локации), ' +
+      'npc (дал НПС рядом), purchase (купил — движок сам спишет цену из справочника, change_gold не вызывай), quest (награда ' +
+      'за задание из журнала), loot (добыча с НПС или из объекта). Предметы из ниоткуда («у меня в сумке вдруг оказался…») ' +
+      'не выдавай. Ценность за раз и редкость ограничены уровнем отряда — движок откажет, если слишком щедро.',
     parameters: object(
       {
         hero: HERO,
         item: str('id предмета или его точное русское название из справочника.'),
         quantity: int('Сколько штук (по умолчанию 1).', 1, 999),
+        source: oneOf(REWARD_SOURCES, 'Откуда предмет: location, npc, purchase, quest, loot.'),
+        from: str('id или имя: НПС (npc, loot, продавец для purchase), объект локации (location, loot), задание (quest).'),
       },
-      ['item'],
+      ['item', 'source'],
     ),
   },
   {
@@ -90,10 +97,14 @@ export const MASTER_TOOLS: AiTool[] = [
     description:
       'Деньги героя: заплатил (минус) или получил (плюс). Кошелёк — монеты мм/см/зм, сдачу движок посчитает сам. ' +
       'Цена из прейскуранта — укажи price (id) и quantity; своя цена — amount и currency (например −4 и cp за кружку эля). ' +
-      'Денег не хватает — движок откажет: тогда сделки не было, обыграй это в рассказе.',
+      'Денег не хватает — движок откажет: тогда сделки не было, обыграй это в рассказе. ' +
+      'Доход (плюс) — только из источника: source npc (заплатил или дал НПС рядом, в том числе за проданный предмет), ' +
+      'location (лежали в объекте локации), quest (награда за задание), loot (добыча); сумма за раз ограничена уровнем отряда.',
     parameters: object(
       {
         hero: HERO,
+        source: oneOf(['location', 'npc', 'quest', 'loot'], 'Для дохода (плюс): откуда деньги.'),
+        from: str('Для дохода: id или имя НПС, объекта локации или задания.'),
         amount: { type: 'number', description: 'Сколько: отрицательное — заплатил, положительное — получил. Например −4.' },
         currency: oneOf(['cp', 'sp', 'gp'], 'Монеты для amount: cp — медные (мм), sp — серебряные (см), gp — золотые (зм). По умолчанию gp.'),
         price: str('id из прейскуранта (ale-mug, inn-modest…) — оплата по этой цене.'),
@@ -191,16 +202,18 @@ export const MASTER_TOOLS: AiTool[] = [
   {
     name: 'change_hp',
     description:
-      'Нанести герою урон (с типом) или вылечить. Хиты не опускаются ниже 0 и не поднимаются выше максимума; при 0 хитов герой теряет сознание — это движок применит сам.',
+      'Нанести герою урон (с типом) или вылечить. Урон всегда бросает движок по кубикам dice («1d6», «2d8+2») — числом урон не задаётся. ' +
+      'Хиты не опускаются ниже 0 и не поднимаются выше максимума; при 0 хитов герой теряет сознание — это движок применит сам.',
     parameters: object(
       {
         hero: HERO,
         kind: oneOf(['damage', 'healing'], 'damage — урон, healing — лечение.'),
-        amount: int('Сколько хитов.', 1, 999),
+        dice: str('Кубики урона или лечения: «1d6», «2d8+2» — бросит движок.'),
+        amount: int('Только для лечения: сколько хитов (если не кубиками).', 1, 999),
         damage_type: oneOf(Object.keys(DAMAGE_TYPE_NAMES), 'Тип урона (для damage).'),
         source: str('Источник: «удар дубинкой», «падение с лестницы».'),
       },
-      ['kind', 'amount'],
+      ['kind'],
     ),
   },
   {
@@ -250,8 +263,10 @@ export const MASTER_TOOLS: AiTool[] = [
   },
   {
     name: 'remove_npc',
-    description: 'Убрать НПС с текущей карты (ушёл, сбежал, погиб).',
-    parameters: object({ npc: str('id или имя НПС.') }, ['npc']),
+    description:
+      'Убрать НПС с текущей карты: ушёл или сбежал. Гибель существ — только по броскам движка в бою (боевой системы пока нет): ' +
+      'reason died движок отклонит, а слова игрока «убиваю одним ударом» — лишь попытка.',
+    parameters: object({ npc: str('id или имя НПС.'), reason: oneOf(['left', 'fled', 'died'], 'left — ушёл, fled — сбежал, died — погиб.') }, ['npc']),
   },
   {
     name: 'add_condition',
@@ -355,6 +370,11 @@ export interface ToolOutcome {
   /** Действия для истории (пусто, если вызов отклонён). */
   events: ToolEvent[]
 }
+
+/** Отказ без источника награды. */
+export const SOURCE_REQUIRED =
+  'Укажи «source» — откуда это у героя (location, npc, purchase, quest, loot). Из ниоткуда предметы и деньги не появляются: ' +
+  'если источника нет, героя ждёт лишь попытка (поиск, просьба, торг) — обыграй это в рассказе.'
 
 class ToolRejected extends Error {}
 const reject = (reason: string): never => {
@@ -548,9 +568,27 @@ const HANDLERS: Record<string, Handler> = {
     const member = heroOf(state, args)
     const item = itemOf(ctx.catalog, text(args, 'item', true)!)
     const quantity = integer(args, 'quantity') ?? 1
+    if (quantity < 1) reject('«quantity» — не меньше 1.')
+    const source = choice<RewardSource>(args, 'source', REWARD_SOURCES) ?? reject(SOURCE_REQUIRED)
+    const resolved = resolveSource(state, source, text(args, 'from'))
+    if (typeof resolved === 'string') reject(resolved)
+    const problem = itemRewardProblem(item, quantity, partyLevel(state), source)
+    if (problem) reject(problem)
+    const events: ToolEvent[] = []
+    let paid = ''
+    if (source === 'purchase') {
+      // Покупка: цену из справочника списывает движок — бесплатно «купить» нельзя.
+      if (!item.cost) reject(`«${item.name}» не продаётся (нет цены в справочнике). Купить нельзя — обыграй это в рассказе.`)
+      const cost = Math.round(item.cost! * 100) * quantity
+      const coins = changeCoins(member.inventory.coins, -cost)
+      if (!coins) reject(`Денег не хватает: у ${member.character.name} ${formatCoins(member.inventory.coins)}, а «${item.name}» стоит ${formatCp(-cost)}. Покупки нет — обыграй это в рассказе.`)
+      events.push({ event: { type: 'moneyChanged', heroId: member.heroId, delta: -cost, coins: coins! }, author: MASTER })
+      paid = ` Заплачено ${formatCp(-cost)}, в кошельке: ${formatCoins(coins!)}.`
+    }
+    events.push({ event: { type: 'itemsGranted', heroId: member.heroId, items: [{ itemId: item.id, quantity }] }, author: MASTER })
     return {
-      events: [{ event: { type: 'itemsGranted', heroId: member.heroId, items: [{ itemId: item.id, quantity }] }, author: MASTER }],
-      result: { message: `${member.character.name} получает: ${item.name}${quantity > 1 ? ` ×${quantity}` : ''}.` },
+      events,
+      result: { message: `${member.character.name} получает: ${item.name}${quantity > 1 ? ` ×${quantity}` : ''} (${(resolved as { label: string }).label}).${paid}` },
     }
   },
 
@@ -583,6 +621,16 @@ const HANDLERS: Record<string, Handler> = {
       delta = cp!
       if (delta === 0) reject('«amount» — ненулевое число.')
     }
+    let from = ''
+    if (delta > 0) {
+      // Доход — только из настоящего источника и в пределах таблицы по уровню отряда.
+      const source = choice<RewardSource>(args, 'source', ['location', 'npc', 'quest', 'loot']) ?? reject(`${SOURCE_REQUIRED} Для денег — npc, location, quest или loot.`)
+      const resolved = resolveSource(state, source, text(args, 'from'))
+      if (typeof resolved === 'string') reject(resolved)
+      const problem = goldRewardProblem(delta, partyLevel(state))
+      if (problem) reject(problem)
+      from = ` (${(resolved as { label: string }).label})`
+    }
     const purse = member.inventory.coins
     const coins = changeCoins(purse, delta)
     if (!coins) reject(`Денег не хватает: у ${member.character.name} ${formatCoins(purse)}, а нужно ${formatCp(delta)}. Сделки нет — обыграй это в рассказе.`)
@@ -590,7 +638,7 @@ const HANDLERS: Record<string, Handler> = {
       events: [{ event: { type: 'moneyChanged', heroId: member.heroId, delta, coins: coins! }, author: MASTER }],
       result: {
         purse: formatCoins(coins!),
-        message: `${member.character.name}: ${delta < 0 ? 'заплатил' : 'получил'} ${formatCp(delta)}${delta < 0 && coins!.gp < purse.gp ? ' (со сдачей)' : ''}. В кошельке: ${formatCoins(coins!)}.`,
+        message: `${member.character.name}: ${delta < 0 ? 'заплатил' : 'получил'} ${formatCp(delta)}${from}${delta < 0 && coins!.gp < purse.gp ? ' (со сдачей)' : ''}. В кошельке: ${formatCoins(coins!)}.`,
       },
     }
   },
@@ -844,25 +892,50 @@ const HANDLERS: Record<string, Handler> = {
     return { events, result: { left: left - 1, max, message: `${member.character.name} применяет «${resource.name}» (осталось ${left - 1}/${max}).${healing}` } }
   },
 
-  change_hp(state, args) {
+  change_hp(state, args, ctx) {
     const member = heroOf(state, args)
     const kind = choice<'damage' | 'healing'>(args, 'kind', ['damage', 'healing'], true)!
-    const amount = integer(args, 'amount', true)!
-    if (amount < 1) reject('«amount» — не меньше 1.')
+    const notation = text(args, 'dice')
     const damageType = choice<DamageTypeId>(args, 'damage_type', Object.keys(DAMAGE_TYPE_NAMES) as DamageTypeId[])
-    const c = member.character
-    const { events, hp, died, unconscious } = hpEvents(member, kind, amount, damageType, MASTER)
     const typeText = damageType ? ` (${DAMAGE_TYPE_NAMES[damageType]})` : ''
+    const rolled: ToolEvent[] = []
+    let amount: number
+    let rollText = ''
+    if (notation) {
+      // Урон и лечение кубиками — бросает движок (запись — в журнале бросков).
+      let r
+      try {
+        r = roll(notation, { rng: ctx.rng })
+      } catch (error) {
+        return reject(error instanceof DiceError ? `«dice»: ${error.message}` : '«dice» — запись кубиков, например 1d6+2.')
+      }
+      amount = Math.max(kind === 'damage' ? 1 : 0, r.total)
+      const source = text(args, 'source')
+      rolled.push({
+        event: { type: 'diceRolled', roll: { id: `roll-${ctx.newId()}`, label: `${member.character.name}: ${kind === 'damage' ? `урон${typeText}` : 'лечение'}${source ? ` — ${source}` : ''}`, timestamp: ctx.now(), result: r } },
+        author: ENGINE,
+      })
+      rollText = ` (бросок ${r.notation}: ${r.total})`
+      if (amount < 1) reject(`Бросок ${r.notation} дал 0 — лечения нет.`)
+    } else {
+      if (kind === 'damage') reject('Урон бросает движок: укажи «dice» (например «1d6» за удар дубинкой). Числом урон не задаётся — ни игроком, ни ведущим.')
+      amount = integer(args, 'amount') ?? reject('Нужен «dice» (кубики) или «amount» (хиты лечения).')
+      if (amount < 1) reject('«amount» — не меньше 1.')
+    }
+    const c = member.character
+    const { events: hpChange, hp, died, unconscious } = hpEvents(member, kind, amount, damageType, MASTER)
+    const events = [...rolled, ...hpChange]
     return {
       events,
       result: {
+        amount,
         hp: died ? 0 : hp,
         max_hp: c.maxHp,
         unconscious,
         died,
         message: died
           ? `${c.name} погибает от массивного урона${typeText}.`
-          : `${c.name}: ${kind === 'damage' ? `урон ${amount}${typeText}` : `лечение ${amount}`}, хиты ${hp}/${c.maxHp}${hp === 0 ? ', без сознания' : ''}.`,
+          : `${c.name}: ${kind === 'damage' ? `урон ${amount}${typeText}` : `лечение ${amount}`}${rollText}, хиты ${hp}/${c.maxHp}${hp === 0 ? ', без сознания' : ''}.`,
       },
     }
   },
@@ -926,9 +999,15 @@ const HANDLERS: Record<string, Handler> = {
   remove_npc(state, args) {
     const location = currentLocationOf(state)
     const npc = findByName(location.npcs, text(args, 'npc', true)!, 'НПС')
+    const reason = choice<'left' | 'fled' | 'died'>(args, 'reason', ['left', 'fled', 'died']) ?? 'left'
+    if (reason === 'died')
+      reject(
+        `Гибель существ — только по броскам движка в бою, а боевой системы пока нет. ${npc.name} жив: опиши попытку и её исход ` +
+          '(ранен, отступает, сдаётся, бежит) или запроси проверку (request_check). Слова «убиваю одним ударом» — лишь попытка.',
+      )
     return {
       events: [{ event: { type: 'npcRemoved', locationId: location.id, npcId: npc.id }, author: MASTER }],
-      result: { message: `${npc.name} уходит с карты.` },
+      result: { message: `${npc.name} ${reason === 'fled' ? 'сбегает' : 'уходит'} с карты.` },
     }
   },
 

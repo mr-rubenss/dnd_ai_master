@@ -104,7 +104,7 @@ test('урон и состояние — в листе героя; провал 
       '[DONE]',
     ]),
     sse([
-      toolCall(0, 'b', 'change_hp', { kind: 'damage', amount: 5, damage_type: 'bludgeoning', source: 'люстра' }),
+      toolCall(0, 'b', 'change_hp', { kind: 'damage', dice: '1d6', damage_type: 'bludgeoning', source: 'люстра' }),
       toolCall(1, 'c', 'add_condition', { condition: 'prone' }),
       delta({}, 'tool_calls'),
       '[DONE]',
@@ -113,7 +113,8 @@ test('урон и состояние — в листе героя; провал 
   ])
   await page.goto('./')
   await startQuickGame(page)
-  await queueRolls(page, [face(4, 20)])
+  // Спасбросок — 4, урон люстры (1к6) бросает движок — 5.
+  await queueRolls(page, [face(4, 20), face(5, 6)])
   await page.locator('.player-input textarea').fill('Стою под люстрой')
   await page.locator('.player-input textarea').press('Enter')
   await expect(page.locator('.message--master').last()).toHaveText(/сбивает с ног/)

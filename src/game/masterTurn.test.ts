@@ -56,6 +56,18 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('`passive: true`')
   })
 
+  it('попытка, а не результат: три группы, НПС решает ведущий, награды из мира, урон и гибель — броски движка', () => {
+    expect(DM_PROMPT).toContain('## Попытка, а не результат')
+    expect(DM_PROMPT).toContain('«нахожу непробиваемый доспех» → герой **ищет** доспех')
+    expect(DM_PROMPT).toContain('1. **Обычное действие**')
+    expect(DM_PROMPT).toContain('2. **Рискованное**')
+    expect(DM_PROMPT).toContain('3. **Невозможное**')
+    expect(DM_PROMPT).toContain('обрушить люстру на врагов, убедить стражника пропустить')
+    expect(DM_PROMPT).toContain('**Игрок не решает за НПС.**')
+    expect(DM_PROMPT).toContain('**Урон и гибель существ — только по броскам движка.**')
+    expect(DM_PROMPT).toContain('**Текст не обещает того, чего нет в состоянии.**')
+  })
+
   it('вопросы вне игры и защита роли', () => {
     expect(DM_PROMPT).toContain('## Вопросы вне игры')
     expect(DM_PROMPT).toContain('[Вопрос вне игры]')
@@ -100,7 +112,7 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('**проверь инвентарь**')
     expect(DM_PROMPT).toContain('Цены — из раздела «Прейскурант»')
     expect(DM_PROMPT).toContain('Если движок отказал (денег не хватает) — сделки не было')
-    expect(DM_PROMPT).toContain('Урон и лечение — соразмерно, по костям SRD')
+    expect(DM_PROMPT).toContain('Урон — соразмерно, по костям SRD, и **бросает его движок**')
     expect(DM_PROMPT).toContain('Нелепое или физически невозможное')
     expect(DM_PROMPT).toContain('Игроку координаты не называй')
     expect(DM_PROMPT).toContain('до вызова `request_check`, — только подготовка')
@@ -424,7 +436,7 @@ describe('цикл с инструментами: ответ модели → и
         aiResponse({
           toolCalls: [
             toolCall('change_gold', { amount: -3, reason: 'кинжал' }, 'a'),
-            toolCall('give_item', { item: 'Кинжал' }, 'b'),
+            toolCall('give_item', { item: 'Кинжал', source: 'npc', from: 'Гуннар' }, 'b'),
             toolCall('update_object', { object: 'table-2', name: 'Опрокинутый стол' }, 'c'),
           ],
         }),
@@ -553,4 +565,99 @@ describe('цикл с инструментами: ответ модели → и
     expect(requests).toHaveLength(2)
   })
 
+  describe('сверка текста с состоянием: текст не обещает того, чего нет в игре', () => {
+    const reminderOf = (req: AiRequest) => req.messages.at(-1) as { role: string; content: string }
+
+    it('«трактирщик протягивает тебе золото» без change_gold — просьба; ведущий довызывает инструмент с источником, текст прежний', async () => {
+      const env = runtimeFor(story())
+      const { master, requests } = fakeMaster([
+        () => aiResponse({ text: 'Гуннар протягивает тебе пару монет за помощь.', toolCalls: [endTurn()] }),
+        () => aiResponse({ toolCalls: [toolCall('change_gold', { amount: 2, reason: 'за помощь', source: 'npc', from: 'Гуннар' }, 'fix')] }),
+      ])
+      const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(requests).toHaveLength(2)
+      expect(reminderOf(requests[1])).toMatchObject({ role: 'user' })
+      expect(reminderOf(requests[1]).content).toMatch(/^\[Код игры\] Текст не совпадает с состоянием игры: в рассказе герой что-то получил/)
+      // Перед просьбой — ответ модели с end_turn и результат для него (иначе API не примет историю).
+      expect(requests[1].messages.at(-3)).toMatchObject({ role: 'assistant', toolCalls: [{ name: 'end_turn' }] })
+      expect(requests[1].messages.at(-2)).toMatchObject({ role: 'tool', toolCallId: 'end' })
+      expect(requests[1].toolChoice).toBe('auto')
+      expect(env.current().party[0].inventory.coins.gp).toBe(20)
+      expect(result.text).toBe('Гуннар протягивает тебе пару монет за помощь.')
+      expect(result.claims).toHaveLength(1)
+      expect(result.changes.map((c) => c.text)).toEqual(['+2 зм (за помощь)'])
+    })
+
+    it('«одним ударом убиваю дракона»: ведущий записал победу без броска — после просьбы переписывает ответ', async () => {
+      const env = runtimeFor(story())
+      const { master, requests } = fakeMaster([
+        () => aiResponse({ text: 'Ты одним ударом убиваешь Брама — он падает замертво.', toolCalls: [endTurn()] }),
+        () => aiResponse({ text: 'Ты замахиваешься, но Брам перехватывает руку: «Полегче, приятель». Что дальше?' }),
+      ])
+      const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(reminderOf(requests[1]).content).toContain('противник убит или побеждён, но бросков движка за ход не было')
+      expect(result.text).toBe('Ты замахиваешься, но Брам перехватывает руку: «Полегче, приятель». Что дальше?')
+      expect(env.committed).toEqual([])
+    })
+
+    it('рассказ уже в ленте (перед инструментами) — исправление заменяет его (masterRewritten), а не дописывается', async () => {
+      const env = runtimeFor(story())
+      const { master } = fakeMaster([
+        () => aiResponse({ text: 'Ты находишь в бочке кошель с серебром.', toolCalls: [toolCall('note_fact', { text: 'В кладовой есть бочки.' }, 'n')] }),
+        () => aiResponse({ toolCalls: [endTurn()] }),
+        () => aiResponse({ text: 'Ты шаришь в бочке — только мука и солонина.' }),
+      ])
+      const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(env.committed).toEqual(['masterNarrated', 'factRecorded', 'masterRewritten'])
+      expect(env.current().messages.at(-1)?.text).toBe('Ты шаришь в бочке — только мука и солонина.')
+      expect(result.text).toBe('')
+    })
+
+    it('ранение словами: «дубинка задевает тебя» без change_hp — довызов кубиками движка', async () => {
+      const env = runtimeFor(story(), [0.99])
+      const { master } = fakeMaster([
+        () => aiResponse({ text: 'Дубинка задевает тебя по плечу.', toolCalls: [endTurn()] }),
+        () => aiResponse({ toolCalls: [toolCall('change_hp', { kind: 'damage', dice: '1d4', damage_type: 'bludgeoning', source: 'дубинка' }, 'hp')] }),
+      ])
+      const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(env.committed).toEqual(['diceRolled', 'hpChanged'])
+      expect(env.current().party[0].character.hp).toBe(8)
+      expect(result.text).toBe('Дубинка задевает тебя по плечу.')
+    })
+
+    it('честный ход без утверждений, отрицания и согласованные изменения — без лишнего запроса', async () => {
+      for (const text of ['Ты обыскиваешь стол, но ничего не находишь. Гуннар хмыкает.', 'Ты не получаешь ответа — стражник отворачивается.']) {
+        const env = runtimeFor(story())
+        const { master, requests } = fakeMaster([() => aiResponse({ text, toolCalls: [endTurn()] })])
+        const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+        expect(requests).toHaveLength(1)
+        expect(result.claims).toBeUndefined()
+      }
+      const env = runtimeFor(story())
+      const { master, requests } = fakeMaster([
+        () => aiResponse({ toolCalls: [toolCall('give_item', { item: 'Кинжал', source: 'location', from: 'storage-barrel-4' }, 'g')] }),
+        () => aiResponse({ text: 'Ты находишь в заколоченной бочке старый кинжал.', toolCalls: [endTurn([{ kind: 'item', item: 'Кинжал', amount: 1 }])] }),
+      ])
+      await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(requests).toHaveLength(2)
+    })
+
+    it('просят один раз: если и после просьбы текст расходится — ход заканчивается', async () => {
+      const env = runtimeFor(story())
+      const { master, requests } = fakeMaster([
+        () => aiResponse({ text: 'Брам отдаёт тебе свой меч.', toolCalls: [endTurn()] }),
+        () => aiResponse({ text: 'Брам отдаёт тебе свой меч, улыбаясь.' }),
+      ])
+      const result = await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(requests).toHaveLength(2)
+      expect(result.text).toBe('Брам отдаёт тебе свой меч, улыбаясь.')
+    })
+
+    it('вопрос вне игры — без сверки текста', async () => {
+      const env = runtimeFor(asked('Что будет, если я найду доспех?'))
+      const { master, requests } = fakeMaster([() => aiResponse({ text: 'Если ты находишь доспех, мастер вызывает give_item с источником.' })])
+      await runMasterTurn(master, asked('Что будет, если я найду доспех?'), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(requests).toHaveLength(1)
+    })
+  })
 })

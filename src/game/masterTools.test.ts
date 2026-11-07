@@ -28,6 +28,8 @@ function context(rolls: number[] = []): ToolContext {
 }
 
 const fresh = (): StoryState => newStorySeed({ id: 's1', title: 'Тест', tone: 'detective', adventure, locations, party: [ratibor], now: 1 })
+/** Урон ровно n (кубик d2 при генераторе 0,5 даёт 2): урон задаётся только кубиками. */
+const hit = (n: number, extra: Record<string, unknown> = {}) => ({ kind: 'damage', dice: `1d2+${n - 2}`, ...extra })
 const call = (name: string, args: unknown): AiToolCall => ({ id: `c-${name}`, name, arguments: args, rawArguments: JSON.stringify(args) })
 
 /** Выполнить вызов и применить его действия (как это делает ход ведущего). */
@@ -88,9 +90,9 @@ describe('недопустимые вызовы отклоняются, ниче
   })
 
   it('нельзя дать несуществующий предмет или ноль штук; похожие подсказываются', () => {
-    expect(rejected(s, 'give_item', { item: 'Экскалибур' })).toBe('Предмета «Экскалибур» нет в справочнике.')
-    expect(rejected(s, 'give_item', { item: 'меч' })).toMatch(/Похожие: .*Двуручный меч/)
-    expect(rejected(s, 'give_item', { item: 'dagger', quantity: 0 })).toBe('Нельзя выдать «dagger» × 0.')
+    expect(rejected(s, 'give_item', { item: 'Экскалибур', source: 'npc', from: 'gunnar' })).toBe('Предмета «Экскалибур» нет в справочнике.')
+    expect(rejected(s, 'give_item', { item: 'меч', source: 'npc', from: 'gunnar' })).toMatch(/Похожие: .*Двуручный меч/)
+    expect(rejected(s, 'give_item', { item: 'dagger', quantity: 0, source: 'npc', from: 'gunnar' })).toBe('«quantity» — не меньше 1.')
   })
 
   it('деньги: нехватка — отказ с причиной (сделки нет); сумма — ненулевое целое число монет; цена — из прейскуранта', () => {
@@ -111,10 +113,11 @@ describe('недопустимые вызовы отклоняются, ниче
   })
 
   it('урон и лечение: целое ≥ 1, вид и тип из списка, герой из отряда', () => {
-    expect(rejected(s, 'change_hp', { kind: 'damage', amount: 0 })).toBe('«amount» — не меньше 1.')
-    expect(rejected(s, 'change_hp', { kind: 'damage', amount: 2.5 })).toBe('«amount» — целое число.')
+    expect(rejected(s, 'change_hp', { kind: 'healing', amount: 0 })).toBe('«amount» — не меньше 1.')
+    expect(rejected(s, 'change_hp', { kind: 'healing', amount: 2.5 })).toBe('«amount» — целое число.')
     expect(rejected(s, 'change_hp', { kind: 'wound', amount: 3 })).toContain('«kind»: «wound» — не из списка')
-    expect(rejected(s, 'change_hp', { kind: 'damage', amount: 3, damage_type: 'holy' })).toContain('«damage_type»')
+    expect(rejected(s, 'change_hp', { kind: 'damage', dice: '1d6', damage_type: 'holy' })).toContain('«damage_type»')
+    expect(rejected(s, 'change_hp', { kind: 'damage', dice: 'много' })).toMatch(/^«dice»: /)
     expect(rejected(s, 'change_hp', { hero: 'Гэндальф', kind: 'healing', amount: 3 })).toBe('Героя «Гэндальф» нет в отряде. В отряде: Ратибор.')
   })
 
@@ -197,7 +200,7 @@ describe('недопустимые вызовы отклоняются, ниче
     const broken = executeTool(s, { id: 'x', name: 'give_item', arguments: null, rawArguments: '{item:', argumentsError: 'bad' }, context())
     expect(broken).toEqual({ ok: false, result: { ok: false, error: 'Аргументы — некорректный JSON-объект.' }, events: [] })
     expect(rejected({ ...s, status: 'completed' }, 'note_fact', { text: 'x' })).toBe('История завершена — в ней больше ничего не происходит.')
-    const dead = run(s, 'change_hp', { kind: 'damage', amount: 99 }).state
+    const dead = run(s, 'change_hp', hit(99)).state
     expect(rejected(dead, 'change_hp', { hero: 'Ратибор', kind: 'healing', amount: 5 })).toBe('Ратибор погиб.')
   })
 })
@@ -221,7 +224,7 @@ describe('допустимые вызовы меняют игру через д�
   })
 
   it('предметы и золото: последний экипированный предмет снимается с руки', () => {
-    let s = run(fresh(), 'give_item', { item: 'Кинжал', quantity: 2 }).state
+    let s = run(fresh(), 'give_item', { item: 'Кинжал', quantity: 2, source: 'npc', from: 'Гуннар' }).state
     expect(s.party[0].inventory.items.find((e) => e.itemId === 'dagger')?.quantity).toBe(2)
     s = run(s, 'remove_item', { item: 'greatsword' }).state
     expect(s.party[0].inventory.items.some((e) => e.itemId === 'greatsword')).toBe(false)
@@ -241,7 +244,7 @@ describe('допустимые вызовы меняют игру через д�
     expect(twoAles.state.party[0].inventory.coins).toEqual({ gp: 17, sp: 9, cp: 2 })
     const stringy = run(fresh(), 'change_gold', { amount: '−4', currency: 'cp', reason: 'эль' })
     expect(stringy.state.party[0].inventory.coins).toEqual({ gp: 17, sp: 9, cp: 6 })
-    const reward = run(fresh(), 'change_gold', { amount: 3, currency: 'sp', reason: 'награда' })
+    const reward = run(fresh(), 'change_gold', { amount: 3, currency: 'sp', reason: 'награда', source: 'npc', from: 'gunnar' })
     expect(reward.state.party[0].inventory.coins).toEqual({ gp: 18, sp: 3, cp: 0 })
   })
 
@@ -256,8 +259,8 @@ describe('допустимые вызовы меняют игру через д�
     expect(empty.state.party[0].inventory.items.some((e) => e.itemId === 'healers-kit')).toBe(false)
 
     // Раненый герой с зельем: 2к4+2, на кубиках 3 и 4 → 9 хитов.
-    let wounded = run(fresh(), 'change_hp', { kind: 'damage', amount: 10 }).state
-    wounded = run(wounded, 'give_item', { item: 'potion-of-healing' }).state
+    let wounded = run(fresh(), 'change_hp', hit(10)).state
+    wounded = run(wounded, 'give_item', { item: 'potion-of-healing', source: 'npc', from: 'Лиара' }).state
     const drink = run(wounded, 'use_item', { item: 'Зелье лечения' }, context([(3 - 0.5) / 4, (4 - 0.5) / 4]))
     expect(drink.outcome.result.healing).toEqual({ rolls: ['2d4+2 = 9'], total: 9, hp: 11, max_hp: 12 })
     expect(drink.outcome.events.map((e) => e.event.type)).toEqual(['itemsRemoved', 'diceRolled', 'hpChanged'])
@@ -266,14 +269,15 @@ describe('допустимые вызовы меняют игру через д�
   })
 
   it('урон до 0 — без сознания; массивный урон — гибель (движок); лечение — в сознании', () => {
-    const down = run(fresh(), 'change_hp', { kind: 'damage', amount: 15, damage_type: 'bludgeoning' })
+    const down = run(fresh(), 'change_hp', hit(15, { damage_type: 'bludgeoning' }))
     expect(down.outcome.result).toMatchObject({ hp: 0, unconscious: true, died: false })
     expect(down.state.party[0].character.conditions).toEqual([{ id: 'unconscious' }])
     const up = run(down.state, 'change_hp', { kind: 'healing', amount: 30 })
     expect(up.state.party[0].character).toMatchObject({ hp: 12, conditions: [] })
-    const dead = run(fresh(), 'change_hp', { kind: 'damage', amount: 24 })
+    const dead = run(fresh(), 'change_hp', hit(24))
     expect(dead.outcome.result).toMatchObject({ died: true })
     expect(dead.outcome.events.map((e) => [e.event.type, e.author.kind])).toEqual([
+      ['diceRolled', 'engine'],
       ['hpChanged', 'master'],
       ['heroDied', 'engine'],
     ])
@@ -510,5 +514,91 @@ describe('живые НПС: личность', () => {
     expect(check({ type: 'npcUpdated', locationId: loc.id, npcId: 'gunnar', changes: { goal: 'Новая цель' } })).toBeNull()
     expect(check({ type: 'npcUpdated', locationId: loc.id, npcId: 'nobody', changes: { goal: 'x' } })).toBe('В этой локации нет такого НПС.')
     expect(check({ type: 'npcUpdated', locationId: loc.id, npcId: 'gunnar', changes: { attitude: 'angry' as never } })).toMatch(/attitude/)
+  })
+})
+
+describe('награды не из ниоткуда: источник, справочник, пределы по уровню отряда; урон и гибель — только броски движка', () => {
+  const s = fresh()
+
+  it('give_item без источника или с выдуманным источником — отказ с причиной для рассказа', () => {
+    expect(rejected(s, 'give_item', { item: 'plate-armor' })).toMatch(/^Укажи «source» — откуда это у героя/)
+    expect(rejected(s, 'give_item', { item: 'dagger', source: 'gift' })).toContain('«source»: «gift» — не из списка')
+    expect(rejected(s, 'give_item', { item: 'dagger', source: 'npc', from: 'Король' })).toMatch(/^НПС «Король» здесь нет — получить от него нельзя\. НПС рядом: Гуннар/)
+    expect(rejected(s, 'give_item', { item: 'dagger', source: 'npc' })).toBe('Укажи «from»: id или имя НПС, от которого это.')
+    expect(rejected(s, 'give_item', { item: 'dagger', source: 'location', from: 'Сокровищница' })).toMatch(/^Объекта «Сокровищница» в локации нет\./)
+    expect(rejected(s, 'give_item', { item: 'dagger', source: 'quest', from: 'Драконье логово' })).toMatch(/^Задания «Драконье логово» нет в журнале заданий/)
+    expect(rejected(s, 'give_item', { item: 'dagger', source: 'loot', from: 'Дракон' })).toMatch(/^«Дракон» в локации нет — добыче неоткуда взяться/)
+  })
+
+  it('«нахожу непробиваемый доспех»: латы на 1-м уровне из бочки — слишком ценно; кинжал из бочки — можно', () => {
+    expect(rejected(s, 'give_item', { item: 'plate-armor', source: 'location', from: 'storage-barrel-4' })).toBe(
+      '«Латы» стоит 1500 зм — для отряда 1-го уровня награда за раз не больше 100 зм. Найти такое просто так нельзя: его можно купить, заработать заданием или найти поскромнее — обыграй это в рассказе.',
+    )
+    const found = run(s, 'give_item', { item: 'dagger', source: 'location', from: 'storage-barrel-4' })
+    expect(found.outcome.ok).toBe(true)
+    expect(found.outcome.result.message).toBe('Ратибор получает: Кинжал (из «Бочка»).')
+  })
+
+  it('редкость — по таблице: необычное и выше на 1-м уровне недоступно, на 5-м — редкое можно', () => {
+    const catalog = { ...itemCatalog, 'cloak-of-x': { id: 'cloak-of-x', name: 'Плащ теней', category: 'gear' as const, icon: '🧥', weight: 1, description: 'x', rarity: 'rare' as const } }
+    const ctx = { ...context(), catalog }
+    expect(rejected(s, 'give_item', { item: 'cloak-of-x', source: 'npc', from: 'gunnar' }, ctx)).toBe(
+      '«Плащ теней» — редкий предмет, а отряду 1-го уровня доступно не выше «необычный». Такого здесь нет — обыграй это в рассказе.',
+    )
+    const veteran = structuredClone(s)
+    veteran.party[0].character.level = 5
+    // На 5-м уровне редкое по редкости можно, но цена редкого (4000 зм) больше предела за раз (1000 зм).
+    expect(rejected(veteran, 'give_item', { item: 'cloak-of-x', source: 'npc', from: 'gunnar' }, ctx)).toMatch(/стоит 4000 зм — для отряда 5-го уровня награда за раз не больше 1000 зм/)
+  })
+
+  it('покупка: движок сам списывает цену из справочника; денег мало — покупки нет; без цены — не продаётся', () => {
+    const bought = run(s, 'give_item', { item: 'dagger', source: 'purchase', from: 'Гуннар' })
+    expect(bought.outcome.events.map((e) => e.event.type)).toEqual(['moneyChanged', 'itemsGranted'])
+    expect(bought.state.party[0].inventory.coins).toEqual({ gp: 16, sp: 0, cp: 0 })
+    expect(bought.outcome.result.message).toBe('Ратибор получает: Кинжал (куплено у Гуннар). Заплачено 2 зм, в кошельке: 16 зм.')
+    // Латы дороже кошелька (покупка не ограничена таблицей, но платит герой).
+    expect(rejected(s, 'give_item', { item: 'plate-armor', source: 'purchase' })).toBe('Денег не хватает: у Ратибор 18 зм, а «Латы» стоит 1500 зм. Покупки нет — обыграй это в рассказе.')
+  })
+
+  it('награда за задание — только за задание из журнала, не проваленное', () => {
+    const withQuest = (status: 'active' | 'failed') => {
+      const q = structuredClone(s)
+      q.world.quests = [{ id: 'rats', title: 'Крысы в подвале', status, notes: '' }]
+      return q
+    }
+    expect(run(withQuest('active'), 'change_gold', { amount: 10, reason: 'за крыс', source: 'quest', from: 'Крысы в подвале' }).outcome.result.message).toBe(
+      'Ратибор: получил 10 зм (награда за «Крысы в подвале»). В кошельке: 28 зм.',
+    )
+    expect(rejected(withQuest('failed'), 'change_gold', { amount: 10, reason: 'x', source: 'quest', from: 'rats' })).toBe('Задание «Крысы в подвале» провалено — награды за него нет.')
+  })
+
+  it('«трактирщик отдаёт мне всё золото»: доход без источника — отказ; сумма сверх таблицы — отказ; плата — без источника', () => {
+    expect(rejected(s, 'change_gold', { amount: 500, reason: 'всё золото трактирщика' })).toMatch(/^Укажи «source» — откуда это у героя.*Для денег — npc, location, quest или loot\.$/)
+    expect(rejected(s, 'change_gold', { amount: 500, reason: 'всё золото', source: 'npc', from: 'gunnar' })).toBe(
+      '500 зм за раз — слишком много для отряда 1-го уровня (не больше 100 зм). Столько денег здесь нет — обыграй это в рассказе.',
+    )
+    expect(rejected(s, 'change_gold', { amount: 5, reason: 'x', source: 'purchase' })).toContain('«source»: «purchase» — не из списка')
+    expect(run(s, 'change_gold', { amount: -4, currency: 'cp', reason: 'эль' }).outcome.ok).toBe(true)
+  })
+
+  it('урон — только кубиками движка (бросок в журнале); числом урон не задаётся; лечение — числом или кубиками', () => {
+    expect(rejected(s, 'change_hp', { kind: 'damage', amount: 100, source: 'одним ударом' })).toBe(
+      'Урон бросает движок: укажи «dice» (например «1d6» за удар дубинкой). Числом урон не задаётся — ни игроком, ни ведущим.',
+    )
+    expect(rejected(s, 'change_hp', { kind: 'damage', dice: '7' })).toBe('«dice»: В записи броска нет ни одного кубика')
+    const club = run(s, 'change_hp', { kind: 'damage', dice: '1d6', damage_type: 'bludgeoning', source: 'дубинка' }, context([face(4, 6)]))
+    expect(club.outcome.events.map((e) => [e.event.type, e.author.kind])).toEqual([
+      ['diceRolled', 'engine'],
+      ['hpChanged', 'master'],
+    ])
+    expect(club.outcome.result).toMatchObject({ amount: 4, hp: 8 })
+    expect(club.outcome.result.message).toBe('Ратибор: урон 4 (дробящий) (бросок 1d6: 4), хиты 8/12.')
+    expect(club.state.rolls.at(-1)?.label).toBe('Ратибор: урон (дробящий) — дубинка')
+    expect(run(club.state, 'change_hp', { kind: 'healing', amount: 2 }).state.party[0].character.hp).toBe(10)
+  })
+
+  it('«одним ударом убиваю…»: гибель существа словами не бывает — remove_npc died отклонён; ушёл и сбежал — можно', () => {
+    expect(rejected(s, 'remove_npc', { npc: 'Брам', reason: 'died' })).toMatch(/^Гибель существ — только по броскам движка в бою.*Брам жив/)
+    expect(run(s, 'remove_npc', { npc: 'Брам', reason: 'fled' }).outcome.result.message).toBe('Брам сбегает с карты.')
   })
 })

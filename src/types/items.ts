@@ -52,6 +52,10 @@ export interface ArmorStats {
   stealthDisadvantage?: boolean
 }
 
+/** Редкости волшебных предметов SRD 5.2.1 по возрастанию. */
+export const ITEM_RARITIES = ['common', 'uncommon', 'rare', 'very-rare', 'legendary', 'artifact'] as const
+export type ItemRarity = (typeof ITEM_RARITIES)[number]
+
 export interface ItemDefinition {
   id: string
   name: string
@@ -69,6 +73,8 @@ export interface ItemDefinition {
   toolKind?: ToolKind
   weapon?: WeaponStats
   armor?: ArmorStats
+  /** Редкость волшебного предмета (SRD 5.2.1, «Magic Item Rarities»); нет поля — обычный, не волшебный предмет. */
+  rarity?: ItemRarity
   /** Применение (инструмент ведущего use_item): заряды и эффект. Расходники и боеприпасы применяются и без этого поля. */
   use?: ItemUse
 }

@@ -86,6 +86,15 @@ function EntryView({ entry }: { entry: DevLogEntry }) {
         ))}
       </li>
     )
+  if (entry.kind === 'claims')
+    return (
+      <li className="dev-log-entry" data-testid="dev-log-claims">
+        <strong>{time(entry.at)} · Сверка текста: ведущего попросили привести рассказ и состояние в соответствие</strong>
+        {entry.problems.map((p) => (
+          <span key={p}>{p}</span>
+        ))}
+      </li>
+    )
   return (
     <li className="dev-log-entry is-error" data-testid="dev-log-error">
       <strong>{time(entry.at)} · Ошибка</strong>

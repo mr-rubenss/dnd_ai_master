@@ -68,6 +68,8 @@ export interface TurnTrace {
   rounds: TraceRound[]
   tools: TraceTool[]
   verification?: TurnVerification
+  /** Сверка текста с состоянием: что рассказ утверждал без изменений в игре. */
+  claims?: string[]
   /** Ошибка запроса (текст уже без ключа — тексты ошибок свои). */
   error?: string
   /** Заглушка: ведущий не настроен, запроса не было. */
@@ -153,8 +155,9 @@ export function createTraceStore(now: () => number = Date.now) {
         fail(error: string) {
           trace.error = error
         },
-        finish(verification: TurnVerification) {
+        finish(verification: TurnVerification, claims?: string[]) {
           trace.verification = verification
+          if (claims?.length) trace.claims = claims
         },
         stub() {
           trace.stub = true

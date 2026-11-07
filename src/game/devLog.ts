@@ -28,6 +28,8 @@ export type DevLogEntry =
   | ({ kind: 'attempt'; id: number; at: number; purpose: string; model: string } & AttemptReport)
   /** Сверка end_turn за ход. */
   | { kind: 'verify'; id: number; at: number; status: 'ok' | 'fixed' | 'unresolved'; problems?: string[] }
+  /** Сверка текста с состоянием: рассказ утверждал то, чего нет в игре, — ведущего попросили исправить. */
+  | { kind: 'claims'; id: number; at: number; problems: string[] }
 
 type NewEntry = DevLogEntry extends infer E ? (E extends DevLogEntry ? Omit<E, 'id' | 'at'> : never) : never
 

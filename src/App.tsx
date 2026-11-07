@@ -396,7 +396,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               if (reason) setAiError(reason)
             }
           } else {
-            const { text, suggestions, changes, verification } = await runMasterTurn(master, current, {
+            const { text, suggestions, changes, verification, claims } = await runMasterTurn(master, current, {
               ...common,
               // Инструменты: ведущий меняет игру только через них, движок проверяет каждый вызов.
               runtime: {
@@ -424,8 +424,9 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               )
             // Строка изменений за ход — после ответа ведущего: игрок видит, что рассказ отразился в листе.
             if (changes.length) await appStore.dispatchTo(story.id, { type: 'turnSummarized', messageId: crypto.randomUUID(), changes }, ENGINE)
-            recorder.finish(verification)
+            recorder.finish(verification, claims)
             if (verification.status !== 'skipped') devLog.add({ kind: 'verify', ...verification })
+            if (claims) devLog.add({ kind: 'claims', problems: claims })
             // Ведущий не разрешил и не прервал отдых — отряд отдыхает (но не после ответа вне игры).
             if (!outOfGame) completePendingRest()
           }

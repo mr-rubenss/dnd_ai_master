@@ -14,6 +14,7 @@ import { changeList, END_TURN, ledgerOf, turnDelta, verifyEndTurn } from './turn
 import { isObject } from './validation'
 import { MASTER } from './storyActions'
 import { changeNames } from './rest'
+import { claimProblems, claimReminder } from './claimCheck'
 
 /** Сколько раундов «вызовы инструментов → результаты» за один ход; последний раунд — уже без инструментов. */
 export const MAX_TOOL_ROUNDS = 4
@@ -80,6 +81,8 @@ export interface MasterTurnResult {
   verification: TurnVerification
   /** Все вызовы инструментов за ход и их итог. */
   toolCalls: { call: AiToolCall; outcome: ToolOutcome }[]
+  /** Сверка текста с состоянием: что рассказ утверждал без изменений в игре (ведущего попросили исправить). */
+  claims?: string[]
 }
 
 function emptyAnswer(response: AiResponse): never {
@@ -123,25 +126,80 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   let afterReminder = false
   /** Вопрос вне игры: не ход — инструменты движок отклонит, сверки end_turn и напоминаний нет, подсказок тоже. */
   const outOfGame = Boolean(story.outOfGame)
+  /** Рассказ, уже записанный в ленту за ход, и id последнего такого сообщения (для исправления после сверки текста). */
+  const narratedTexts: string[] = []
+  let lastNarratedId: string | null = null
+  /** Сверка текста с состоянием — один раз за ход; следующий раунд — ответ на просьбу привести их в соответствие. */
+  let claimChecked = false
+  let claimRound = false
+  let claims: string[] | undefined
+  let pending: { text: string; suggestions: string[] } = { text: '', suggestions: [] }
 
   const finish = (text: string, suggestions: string[], response: AiResponse): MasterTurnResult => {
     if (!text && !narrated) emptyAnswer(response)
     const delta = ledger ? turnDelta(ledger, ledgerOf(current(), catalog!)) : null
     const names = runtime?.tools.rules ? changeNames(runtime.tools.rules) : undefined
     const changes = delta ? changeList(delta, current(), catalog!, reasons, names?.spells, names?.features) : []
-    return { text, suggestions, truncated: response.finishReason === 'length', toolCalls, changes, verification }
+    return { text, suggestions, truncated: response.finishReason === 'length', toolCalls, changes, verification, ...(claims ? { claims } : {}) }
   }
 
   /** Текст ответа — в ленту сразу (перед карточками бросков и повтором проверки). */
   const narrate = async (text: string, suggestions: string[]) => {
     if (!text) return
+    const messageId = runtime!.tools.newId()
     const reason = await runtime!.commit(
       outOfGame
-        ? { type: 'masterNarrated', messageId: runtime!.tools.newId(), text, ooc: true }
-        : { type: 'masterNarrated', messageId: runtime!.tools.newId(), text, ...(suggestions.length ? { suggestions } : {}) },
+        ? { type: 'masterNarrated', messageId, text, ooc: true }
+        : { type: 'masterNarrated', messageId, text, ...(suggestions.length ? { suggestions } : {}) },
       MASTER,
     )
-    if (!reason) narrated = true
+    if (!reason) {
+      narrated = true
+      narratedTexts.push(text)
+      lastNarratedId = messageId
+    }
+  }
+
+  /** Выполнить вызов инструмента: проверка движком, запись действий, результат для модели. */
+  const runCall = async (call: AiToolCall): Promise<AiMessage> => {
+    let outcome = executeTool(current(), call, runtime!.tools)
+    for (const { event, author } of outcome.events) {
+      const reason = await runtime!.commit(event, author)
+      if (reason) {
+        outcome = { ok: false, result: { ok: false, error: reason }, events: [] }
+        break
+      }
+    }
+    if (outcome.ok && call.name === 'change_gold') {
+      const money = outcome.events.find((e) => e.event.type === 'moneyChanged')?.event
+      const why = isObject(call.arguments) && typeof call.arguments.reason === 'string' ? call.arguments.reason.trim() : ''
+      if (money?.type === 'moneyChanged' && why) reasons.set(money.heroId, [...(reasons.get(money.heroId) ?? []), why])
+    }
+    toolCalls.push({ call, outcome })
+    runtime!.onTool?.(call, outcome)
+    return { role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) }
+  }
+
+  /**
+   * Конец хода — сначала сверка текста с состоянием (один раз): если рассказ утверждает то, чего нет в игре
+   * (герой получил, победил, ранен), модель получает короткую просьбу — довызвать инструмент или переписать ответ.
+   * null — просьба отправлена, нужен ещё раунд.
+   */
+  const settle = (text: string, suggestions: string[], response: AiResponse, calls: AiToolCall[], results: AiMessage[]): MasterTurnResult | null => {
+    if (!runtime || outOfGame || claimChecked) return finish(text, suggestions, response)
+    claimChecked = true
+    const problems = claimProblems([...narratedTexts, text].join('\n'), turnDelta(ledger!, ledgerOf(current(), catalog!)), toolCalls)
+    if (problems.length === 0) return finish(text, suggestions, response)
+    claims = problems
+    pending = { text, suggestions }
+    const end = calls.find((c) => c.name === END_TURN)
+    turn.push({ role: 'assistant', content: response.text || null, ...(calls.length ? { toolCalls: calls } : {}) }, ...results)
+    if (end) turn.push({ role: 'tool', toolCallId: end.id, content: JSON.stringify({ ok: true }) })
+    turn.push({ role: 'user', content: claimReminder(problems) })
+    claimRound = true
+    retryPending = true
+    runtime.onRound?.()
+    return null
   }
 
   for (let round = 0; ; round++) {
@@ -179,6 +237,16 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     const calls = toolsAllowed ? response.toolCalls : []
     if (!runtime) return finish(text, suggestions, response)
 
+    if (claimRound) {
+      // Ответ на просьбу сверки: довызванные инструменты исполняются; новый текст заменяет ответ, пустой — ответ прежний.
+      claimRound = false
+      for (const call of calls.filter((c) => c.name !== END_TURN)) await runCall(call)
+      if (!text) return finish(pending.text, pending.suggestions, response)
+      if (pending.text || !lastNarratedId) return finish(text, suggestions, response)
+      const reason = await runtime.commit({ type: 'masterRewritten', messageId: lastNarratedId, text, ...(suggestions.length ? { suggestions } : {}) }, MASTER)
+      return reason ? finish(text, suggestions, response) : finish('', [], response)
+    }
+
     const endCall = calls.find((c) => c.name === END_TURN)
     const others = calls.filter((c) => c.name !== END_TURN)
 
@@ -188,24 +256,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       runtime.onRound?.()
     }
     const results: AiMessage[] = []
-    for (const call of others) {
-      let outcome = executeTool(current(), call, runtime.tools)
-      for (const { event, author } of outcome.events) {
-        const reason = await runtime.commit(event, author)
-        if (reason) {
-          outcome = { ok: false, result: { ok: false, error: reason }, events: [] }
-          break
-        }
-      }
-      if (outcome.ok && call.name === 'change_gold') {
-        const money = outcome.events.find((e) => e.event.type === 'moneyChanged')?.event
-        const why = isObject(call.arguments) && typeof call.arguments.reason === 'string' ? call.arguments.reason.trim() : ''
-        if (money?.type === 'moneyChanged' && why) reasons.set(money.heroId, [...(reasons.get(money.heroId) ?? []), why])
-      }
-      toolCalls.push({ call, outcome })
-      runtime.onTool?.(call, outcome)
-      results.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) })
-    }
+    for (const call of others) results.push(await runCall(call))
 
     if (endCall && outOfGame) return finish(others.length ? '' : text, suggestions, response)
     if (endCall) {
@@ -213,11 +264,15 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       const problems = verifyEndTurn(endCall.arguments, turnDelta(ledger!, ledgerOf(current(), catalog!)), current(), catalog!)
       if (problems.length === 0) {
         verification = retried ? { status: 'fixed', problems: retried } : { status: 'ok' }
-        return finish(others.length ? '' : text, suggestions, response)
+        const done = settle(others.length ? '' : text, suggestions, response, [...others, endCall], results)
+        if (done) return done
+        continue
       }
       if (retried) {
         verification = { status: 'unresolved', problems }
-        return finish(others.length ? '' : text, suggestions, response)
+        const done = settle(others.length ? '' : text, suggestions, response, [...others, endCall], results)
+        if (done) return done
+        continue
       }
       retried = problems
       retryPending = true
@@ -247,7 +302,9 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     // Ответ без вызовов. end_turn нет: один раз напоминаем (если инструменты ещё доступны; вне игры — не нужно).
     if (!toolsAllowed || retried || outOfGame) {
       if (verification.status === 'skipped' && retried) verification = { status: 'unresolved', problems: retried }
-      return finish(text, suggestions, response)
+      const done = settle(text, suggestions, response, [], [])
+      if (done) return done
+      continue
     }
     retried = ['Ведущий не вызвал end_turn.']
     retryPending = true
