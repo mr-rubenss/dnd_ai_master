@@ -21,7 +21,7 @@ test('тема «Тёмное фэнтези» задаёт оформление
   // Карта: пол, стены, двери, рамки фишек — из токенов карты.
   await startQuickGame(page)
   const map = page.locator('.map-svg')
-  expect(await css(map.locator('.floor--wood').first(), 'fill')).toBe('rgb(74, 53, 35)')
+  expect(await css(map.locator('.pat-wood').first(), 'fill')).toBe('rgb(74, 53, 35)')
   expect(await css(map.locator('.wall-line--stone').first(), 'stroke')).toBe('rgb(18, 14, 11)')
   expect(await css(page.getByTestId('door-entrance').locator('.door-leaf'), 'fill')).toBe('rgb(138, 90, 43)')
   expect(await css(map.locator('.npc-token').first(), 'stroke')).toBe('rgb(11, 9, 7)')

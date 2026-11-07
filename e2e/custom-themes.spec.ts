@@ -84,7 +84,7 @@ test('редактор цветов: живой предпросмотр, пре
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(20, 32, 44)')
   await expect(editor.locator('.theme-preview')).toHaveCSS('background-color', 'rgb(20, 32, 44)')
   await editor.getByTestId('color-map.floorWood').fill('#5a4a30')
-  await expect(page.locator('.floor--wood').first()).toHaveCSS('fill', 'rgb(90, 74, 48)')
+  await expect(page.locator('.map-svg .pat-wood').first()).toHaveCSS('fill', 'rgb(90, 74, 48)')
   await expect(panel.getByTestId('contrast-warning')).toHaveCount(0)
 
   // Плохо читаемый текст — предупреждение; исправили — исчезло.

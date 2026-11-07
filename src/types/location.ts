@@ -3,10 +3,62 @@
 // Стены тонкие: они лежат на границах клеток (как в Roll20 и Foundry), а не занимают клетки.
 // Клетки бывают только пол или пустота. Двери и окна — отрезки на линии стены.
 
-export const FLOOR_TYPES = ['wood', 'stone', 'dirt', 'grass'] as const
+/** Пол: доски, камень, плитка, земля, трава — у карты целиком и (необязательно) у каждой комнаты. */
+export const FLOOR_TYPES = ['wood', 'stone', 'tile', 'dirt', 'grass'] as const
 export const WALL_MATERIALS = ['stone', 'wood'] as const
-/** Объекты обстановки; fire — огонь, debris — обломки и завал, item — прочий предмет (люстра, ящик, сундук). */
-export const OBJECT_TYPES = ['table', 'chair', 'bar', 'fireplace', 'barrel', 'fire', 'debris', 'item'] as const
+/**
+ * Объекты обстановки; fire — огонь, debris — обломки и завал, item — прочий предмет; torch и candle — источники
+ * света; rug и candle — «плоские»: лежат поверх пола или стола и клетку не занимают; tree, rock, building — для карт
+ * местности (частичной и общей).
+ */
+export const OBJECT_TYPES = [
+  'table', 'chair', 'bar', 'fireplace', 'barrel', 'fire', 'debris', 'item',
+  'bed', 'chest', 'shelf', 'rug', 'torch', 'candle', 'tree', 'rock', 'building',
+] as const
+/** Объекты, которые не занимают клетку (на ковре стоят столы, свеча — на столе). */
+export const FLAT_OBJECT_TYPES: readonly MapObjectType[] = ['rug', 'candle']
+
+/**
+ * Масштаб карты: клеточная (бой и помещения, клетка 5 футов), частичная (окрестности, квартал — клетка в десятки
+ * футов) и общая (регион — клетка в милях). Отрисовка одна; от вида зависят сетка, свет, размер фишек и какие
+ * объекты допустимы.
+ */
+export const MAP_KINDS = ['tactical', 'area', 'region'] as const
+export type MapKind = (typeof MAP_KINDS)[number]
+export const DISTANCE_UNITS = ['ft', 'mi'] as const
+export type DistanceUnit = (typeof DISTANCE_UNITS)[number]
+
+/** Какие объекты бывают на картах каждого масштаба. */
+export const MAP_KIND_OBJECTS: Record<MapKind, readonly MapObjectType[]> = {
+  tactical: OBJECT_TYPES,
+  area: ['tree', 'rock', 'building', 'fire', 'debris', 'item', 'barrel', 'chest', 'torch', 'table', 'chair'],
+  region: ['tree', 'rock', 'building'],
+}
+
+export interface MapScale {
+  kind: MapKind
+  /** Сколько единиц в одной клетке. */
+  cell: number
+  unit: DistanceUnit
+}
+
+/** Общий свет на карте без учёта источников: ярко (день, открыто), полумрак (помещение), тьма (подвал, ночь). */
+export const AMBIENT_LIGHTS = ['bright', 'dim', 'dark'] as const
+export type AmbientLight = (typeof AMBIENT_LIGHTS)[number]
+
+/** Свет источника в футах (SRD 5.2.1): яркий радиус и ещё столько же тусклого. */
+export interface LightRadius {
+  bright: number
+  dim: number
+}
+
+/** Свет по умолчанию: факел — 20/20 футов (SRD), свеча — 5/5 (SRD), камин — 15/15, огонь на полу — 10/10. */
+export const DEFAULT_LIGHTS: Partial<Record<MapObjectType, LightRadius>> = {
+  torch: { bright: 20, dim: 20 },
+  candle: { bright: 5, dim: 5 },
+  fireplace: { bright: 15, dim: 15 },
+  fire: { bright: 10, dim: 10 },
+}
 export const NPC_ATTITUDES = ['friendly', 'neutral', 'hostile'] as const
 export const DOOR_STATES = ['open', 'closed', 'locked'] as const
 
@@ -62,6 +114,8 @@ export interface MapWindow extends GridSegment {
 export interface Room {
   id: string
   name?: string
+  /** Пол комнаты, если отличается от пола карты (кладовая с камнем в деревянной таверне). */
+  floor?: FloorType
   x: number
   y: number
   w: number
@@ -77,6 +131,8 @@ export interface MapObject extends CellPosition {
   w?: number
   /** Высота в клетках (по умолчанию 1). */
   h?: number
+  /** Свет, если объект светит иначе, чем обычно для своего типа (`DEFAULT_LIGHTS`), в футах; 0/0 — погашен. */
+  light?: LightRadius
 }
 
 export interface Npc extends CellPosition, NpcPersonality {
@@ -126,8 +182,12 @@ export interface LocationData {
   id: string
   name: string
   description: string
-  /** Размер одной клетки в футах (по правилам — 5). */
+  /** Размер одной клетки в футах (по правилам — 5); у общей карты — мили, переведённые в футы. */
   cellFeet: number
+  /** Масштаб: вид карты, размер клетки и единицы. Нет поля (старые истории) — клеточная, `cellFeet` футов. */
+  scale?: MapScale
+  /** Общий свет без источников. Нет поля — по виду карты и источникам (`ambientOf` в src/game/mapView.ts). */
+  ambientLight?: AmbientLight
   width: number
   height: number
   floor: FloorType

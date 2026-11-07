@@ -145,23 +145,56 @@ textarea {
   width: min(100cqw, 100cqh * var(--board-w) / var(--board-h));
 }
 
+/* Окно карты: всё, что за краем при увеличении, обрезается. Одним пальцем страница прокручивается,
+   двумя — масштаб и сдвиг карты (useMapViewport). */
+.map-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-map);
+  background: var(--map-background);
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.map-viewport.is-dragging { cursor: grabbing; }
+
+.map-zoom {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+}
+
+/* Во время жеста — композитный слой (без перерастеризации SVG на каждом кадре). */
+.map-zoom.is-moving { will-change: transform; }
+.map-zoom.is-animating { transition: transform 260ms ease; }
+:root[data-motion='reduce'] .map-zoom.is-animating { transition: none; }
+
 .map-svg {
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-map);
-  background: var(--map-background);
 }
 
-.floor--wood { fill: var(--map-floor-wood); }
-.floor--wood.floor--alt { fill: var(--map-floor-wood-alt); }
-.floor--stone { fill: var(--map-floor-stone); }
-.floor--stone.floor--alt { fill: var(--map-floor-stone-alt); }
-.floor--dirt { fill: var(--map-floor-dirt); }
-.floor--dirt.floor--alt { fill: var(--map-floor-dirt-alt); }
-.floor--grass { fill: var(--map-floor-grass); }
-.floor--grass.floor--alt { fill: var(--map-floor-grass-alt); }
+/* Пол: узоры (MapDefs.tsx) — доски, камень, плитка, земля, трава. */
+.pat-wood { fill: var(--map-floor-wood); }
+.pat-wood-alt { fill: var(--map-floor-wood-alt); }
+.pat-stone { fill: var(--map-floor-stone); }
+.pat-stone-alt { fill: var(--map-floor-stone-alt); }
+.pat-slab { fill-opacity: 0.85; stroke: var(--map-floor-seam); stroke-width: 0.035; }
+.pat-slab:not(.pat-stone-alt) { fill: var(--map-floor-stone); }
+.pat-tile { fill: var(--map-floor-tile); }
+.pat-tile-alt { fill: var(--map-floor-tile-alt); }
+.pat-dirt { fill: var(--map-floor-dirt); }
+.pat-dirt-alt { fill: var(--map-floor-dirt-alt); }
+.pat-grass { fill: var(--map-floor-grass); }
+.pat-grass-alt { fill: var(--map-floor-grass-alt); }
+.pat-seam { stroke: var(--map-floor-seam); stroke-width: 0.02; }
+.pat-seam--tile { fill: none; stroke-width: 0.025; }
+.pat-grain { stroke: var(--map-floor-fleck); stroke-width: 0.015; }
+.pat-fleck { fill: var(--map-floor-fleck); }
+.pat-blade { fill: none; stroke: var(--map-grass-blade); stroke-width: 0.025; stroke-linecap: round; }
 
 /* Тонкие стены по границам клеток */
 .wall-line {
@@ -217,6 +250,37 @@ textarea {
 }
 
 /* Объекты */
+.obj-shadow,
+.token-shadow { fill: url(#soft-shadow); pointer-events: none; }
+.obj-plank { stroke: var(--map-table-stroke); stroke-width: 0.02; stroke-opacity: 0.6; }
+.obj-plate { fill: var(--map-mug-fill); fill-opacity: 0.7; stroke: var(--map-mug-stroke); stroke-width: 0.02; }
+.obj-bottle { fill: var(--map-window-glass); fill-opacity: 0.75; stroke: var(--map-bar-stroke); stroke-width: 0.02; }
+.obj-brick { stroke: var(--map-fireplace-stroke); stroke-width: 0.025; }
+.obj-log { fill: none; stroke: var(--map-tree-trunk); stroke-width: 0.09; stroke-linecap: round; }
+.obj-stave { fill: none; stroke: var(--map-barrel-stroke); stroke-width: 0.02; stroke-opacity: 0.7; }
+.obj-bed { fill: var(--map-bed-frame); stroke: var(--map-table-stroke); stroke-width: 0.04; }
+.obj-bed-sheet { fill: var(--map-bed-sheet); }
+.obj-bed-blanket { fill: var(--map-bed-blanket); }
+.obj-bed-pillow { fill: var(--map-bed-pillow); stroke: var(--map-table-stroke); stroke-width: 0.02; }
+.obj-chest { fill: var(--map-chest-fill); stroke: var(--map-table-stroke); stroke-width: 0.04; }
+.obj-chest-band { fill: none; stroke: var(--map-chest-band); stroke-width: 0.05; }
+.obj-metal { fill: var(--map-metal); stroke: var(--map-chest-band); stroke-width: 0.02; }
+.obj-shelf { fill: var(--map-shelf-fill); stroke: var(--map-table-stroke); stroke-width: 0.04; }
+.obj-shelf-item { fill: var(--map-shelf-item); }
+.obj-shelf-item--alt { fill: var(--map-bed-blanket); }
+.obj-rug { fill: var(--map-rug-fill); }
+.obj-rug-border { fill: none; stroke: var(--map-rug-border); stroke-width: 0.04; stroke-opacity: 0.8; }
+.obj-rug-pattern { fill: var(--map-rug-pattern); stroke: var(--map-rug-border); stroke-width: 0.03; stroke-opacity: 0.6; }
+.obj-torch { fill: var(--map-tree-trunk); stroke: var(--map-table-stroke); stroke-width: 0.02; }
+.obj-candle { fill: var(--map-candle-wax); stroke: var(--map-table-stroke); stroke-width: 0.015; }
+.obj-tree { fill: var(--map-tree-canopy); }
+.obj-tree-dark { fill: var(--map-tree-canopy-dark); }
+.obj-tree-trunk { fill: var(--map-tree-trunk); }
+.obj-rock { fill: var(--map-rock-fill); stroke: var(--map-rock-shade); stroke-width: 0.03; }
+.obj-rock-shade { fill: none; stroke: var(--map-rock-shade); stroke-width: 0.03; }
+.obj-roof { fill: var(--map-roof-fill); stroke: var(--map-roof-ridge); stroke-width: 0.05; }
+.obj-roof-ridge { fill: none; stroke: var(--map-roof-ridge); stroke-width: 0.07; }
+
 .obj-table { fill: var(--map-table-fill); stroke: var(--map-table-stroke); stroke-width: 0.05; }
 .obj-table-top { fill: var(--map-table-top); }
 .obj-mug { fill: var(--map-mug-fill); stroke: var(--map-mug-stroke); stroke-width: 0.03; }
@@ -237,6 +301,72 @@ textarea {
 .obj-item-band { stroke: var(--map-bar-edge); stroke-width: 0.06; }
 .obj-fire .obj-flame,
 .obj-fire .obj-flame-core { pointer-events: none; }
+
+/* Свет и тьма (слой эффектов). Мерцание — только непрозрачность, это дёшево. */
+.light-mask-on { fill: var(--map-light-mask-on); }
+.map-darkness { fill: var(--map-darkness); }
+.map-light-glow {
+  animation: map-flicker 3.2s ease-in-out infinite alternate;
+}
+.map-light-glow:nth-child(2n) { animation-duration: 2.6s; }
+@keyframes map-flicker {
+  0% { opacity: 1; }
+  40% { opacity: 0.82; }
+  70% { opacity: 0.95; }
+  100% { opacity: 0.86; }
+}
+:root[data-motion='reduce'] .map-light-glow { animation: none; }
+/* Скорость: во время жеста мерцание на паузе; на сенсорных экранах (телефон) — без мерцания (перерисовка SVG дорога). */
+.map-zoom.is-moving .map-light-glow { animation-play-state: paused; }
+@media (pointer: coarse) {
+  .map-light-glow { animation: none; }
+}
+
+/* Фишки идут по клеткам пути (useWalks): переход transform длиной в шаг. */
+.map-token { transition: transform 140ms linear; }
+:root[data-motion='reduce'] .map-token { transition: none; }
+
+/* Кнопки масштаба карты. */
+.map-controls {
+  position: absolute;
+  left: var(--space-6);
+  bottom: var(--space-4);
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  max-width: 60%;
+}
+
+.map-control {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 var(--space-6);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-scale-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: var(--text-85);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-control--wide { font-size: var(--text-75); }
+
+@media (max-width: 600px) {
+  .map-control {
+    min-width: 26px;
+    height: 24px;
+    padding: 0 var(--space-4);
+    font-size: var(--text-75);
+  }
+
+  .map-control--wide { font-size: var(--text-68); }
+}
+.map-control:hover:not(:disabled) { border-color: var(--color-accent); }
+.map-control:disabled { opacity: 0.45; cursor: default; }
+.map-control:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
 /* НПС */
 .npc-token {

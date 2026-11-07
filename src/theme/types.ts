@@ -58,7 +58,10 @@ export const COLOR_TOKENS = [
   'hpCriticalTo',
 ] as const
 
-/** Цвета карты → `--map-<ключ>`: пол, стены, окна, двери, объекты, фишки НПС и героя. */
+/**
+ * Цвета карты → `--map-<ключ>`: пол и его узоры, стены, окна, двери, предметы обстановки, тени, свет и тьма, фишки НПС
+ * и героя. `lightMaskOn`/`lightMaskOff` — служебные цвета маски света (белый и чёрный, яркость маски), их не меняют.
+ */
 export const MAP_TOKENS = [
   'background',
   'grid',
@@ -114,6 +117,36 @@ export const MAP_TOKENS = [
   'playerFill',
   'playerFillLight',
   'playerLabel',
+  'floorTile',
+  'floorTileAlt',
+  'floorSeam',
+  'floorFleck',
+  'grassBlade',
+  'objectShadow',
+  'darkness',
+  'lightWarm',
+  'bedFrame',
+  'bedSheet',
+  'bedBlanket',
+  'bedPillow',
+  'chestFill',
+  'chestBand',
+  'metal',
+  'shelfFill',
+  'shelfItem',
+  'rugFill',
+  'rugBorder',
+  'rugPattern',
+  'candleWax',
+  'treeCanopy',
+  'treeCanopyDark',
+  'treeTrunk',
+  'rockFill',
+  'rockShade',
+  'roofFill',
+  'roofRidge',
+  'lightMaskOn',
+  'lightMaskOff',
 ] as const
 
 /** Кубики и подсветка натуральных 20 и 1 → `--dice-<ключ>`. */

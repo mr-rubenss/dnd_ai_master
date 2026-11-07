@@ -117,6 +117,15 @@ describe('хранение своих тем', () => {
     expect(readCustomThemes(null, darkFantasy)).toEqual([])
   })
 
+  it('своя тема, сохранённая до новых токенов карты, дополняется значениями эталона', () => {
+    const old = structuredClone(mine)
+    delete (old.map as Partial<typeof old.map>).floorTile
+    delete (old.map as Partial<typeof old.map>).lightWarm
+    const [read] = readCustomThemes(JSON.stringify([customRecord(old)]), darkFantasy)
+    expect(read.map.floorTile).toBe(darkFantasy.map.floorTile)
+    expect(read.map.floorWood).toBe(mine.map.floorWood)
+  })
+
   it('загрузочный скрипт применяет свою тему из хранилища до отрисовки; битые записи пропускает', () => {
     const blue = withColor(mine, ['colors', 'bg'], '#102030')
     const items: Record<string, string> = {

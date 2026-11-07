@@ -12,11 +12,11 @@ describe('цвета только из токенов темы', () => {
   it('проверяются стили и компоненты', () => {
     const names = Object.keys(files)
     expect(names).toContain('../index.css')
-    expect(names).toContain('../components/LocationMap.tsx')
+    expect(names).toContain('../components/MapDefs.tsx')
     expect(names.some((n) => n.startsWith('./'))).toBe(false)
     // Тексты настоящие (Vitest без `css: true` отдал бы CSS пустым — и проверка прошла бы вхолостую).
     expect(files['../index.css']).toContain('var(--color-bg)')
-    expect(files['../components/LocationMap.tsx']).toContain("token('map', 'fireGlow')")
+    expect(files['../components/MapDefs.tsx']).toContain("token('map', 'fireGlow')")
   })
 
   it('ни в стилях, ни в компонентах нет цветов, заданных напрямую', () => {

@@ -273,3 +273,55 @@ describe('личность НПС', () => {
     for (const n of tavern.npcs) for (const key of ['backstory', 'goal', 'fear', 'speech', 'activity'] as const) expect(n[key], `${n.id}.${key}`).toBeTruthy()
   })
 })
+
+describe('богатая карта: пол комнат, масштаб, свет, плоские объекты', () => {
+  it('пол «плитка» и пол комнаты поверх пола карты', () => {
+    const loc = parseLocation(
+      twoRooms({ floor: 'tile', rooms: [{ id: 'west', x: 0, y: 0, w: 3, h: 3, floor: 'grass' }, { id: 'east', x: 3, y: 0, w: 3, h: 3 }], openings: [{ x1: 3, y1: 1, x2: 3, y2: 2 }] }),
+    )
+    expect(loc.floor).toBe('tile')
+    expect(loc.rooms[0].floor).toBe('grass')
+    expect(problemsOf(twoRooms({ rooms: [{ id: 'west', x: 0, y: 0, w: 3, h: 3, floor: 'lava' }] }))).toContainEqual(expect.stringContaining('"floor" должно быть одним из'))
+  })
+
+  it('масштаб: по умолчанию клеточная; общая — в милях, cellFeet не обязателен; ошибки — понятные', () => {
+    expect(parseLocation(makeRoom()).scale).toEqual({ kind: 'tactical', cell: 5, unit: 'ft' })
+    const region = parseLocation(makeRoom({ cellFeet: undefined, scale: { kind: 'region', cell: 6, unit: 'mi' }, objects: [{ id: 't', type: 'tree', name: 'Лес', x: 1, y: 1 }] }))
+    expect(region.scale).toEqual({ kind: 'region', cell: 6, unit: 'mi' })
+    expect(region.cellFeet).toBe(6 * 5280)
+    expect(problemsOf(makeRoom({ scale: { kind: 'world', cell: 1, unit: 'mi' } }))).toContainEqual(expect.stringContaining('"scale" — объект'))
+    // Набор объектов — по виду карты: стула на общей карте нет.
+    expect(problemsOf(makeRoom({ scale: { kind: 'region', cell: 6, unit: 'mi' }, objects: [{ id: 'c', type: 'chair', name: 'Стул', x: 1, y: 1 }] }))).toContainEqual(
+      expect.stringContaining('на карте вида «region» объекты «chair» не ставятся'),
+    )
+  })
+
+  it('общий свет и свет предмета проверяются', () => {
+    expect(parseLocation(makeRoom({ ambientLight: 'dark' })).ambientLight).toBe('dark')
+    expect(problemsOf(makeRoom({ ambientLight: 'sunny' }))).toContainEqual(expect.stringContaining('"ambientLight"'))
+    expect(problemsOf(makeRoom({ objects: [{ id: 't', type: 'torch', name: 'Факел', x: 1, y: 1, light: { bright: -5, dim: 5 } }] }))).toContainEqual(expect.stringContaining('"light"'))
+  })
+
+  it('ковёр и свеча клетку не занимают: стол на ковре, свеча на столе', () => {
+    const loc = parseLocation(
+      makeRoom({
+        objects: [
+          { id: 'rug', type: 'rug', name: 'Ковёр', x: 1, y: 1, w: 3, h: 2 },
+          { id: 'table', type: 'table', name: 'Стол', x: 2, y: 1, w: 2 },
+          { id: 'candle', type: 'candle', name: 'Свеча', x: 2, y: 1 },
+        ],
+      }),
+    )
+    expect(loc.objects.map((o) => o.type)).toEqual(['rug', 'table', 'candle'])
+    expect(problemsOf(makeRoom({ objects: [{ id: 'a', type: 'chest', name: 'Сундук', x: 1, y: 1 }, { id: 'b', type: 'bed', name: 'Кровать', x: 1, y: 1 }] }))).toContainEqual(
+      expect.stringContaining('уже занята объектом'),
+    )
+  })
+
+  it('таверна: каменная кладовая, ковёр, свечи, факелы, полка, сундук, лежанка', () => {
+    const loc = parseLocation(drunkenGriffinJson)
+    expect(loc.rooms.find((r) => r.id === 'storeroom')?.floor).toBe('stone')
+    const types = new Set(loc.objects.map((o) => o.type))
+    for (const t of ['rug', 'candle', 'torch', 'shelf', 'chest', 'bed', 'fireplace']) expect(types).toContain(t)
+  })
+})

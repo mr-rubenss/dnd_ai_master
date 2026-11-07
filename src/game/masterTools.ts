@@ -9,7 +9,7 @@ import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition
 import { DiceError, roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
-import { DOOR_STATES, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
+import { DOOR_STATES, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
@@ -297,11 +297,16 @@ export const MASTER_TOOLS: AiTool[] = [
   {
     name: 'add_object',
     description:
-      'Добавить на текущую карту объект обстановки: огонь, обломки, упавшую люстру, ящик. Движок проверит, что клетки на карте, это пол и они свободны.',
+      'Добавить на текущую карту объект обстановки: огонь, обломки, упавшую люстру, ящик, сундук, факел. Движок проверит, что клетки на карте, ' +
+      'это пол и они свободны (ковёр и свеча клетку не занимают — их можно положить под стол или на стол). Факел, свеча, огонь и камин светят.',
     parameters: object(
       {
         name: str('Название: «Упавшая люстра».'),
-        type: oneOf(OBJECT_TYPES, 'Вид: table, chair, bar, fireplace, barrel, fire — огонь, debris — обломки, item — прочий предмет.'),
+        type: oneOf(
+          OBJECT_TYPES,
+          'Вид: table, chair, bar, fireplace, barrel, fire — огонь, debris — обломки, item — прочий предмет, bed — кровать, chest — сундук, ' +
+            'shelf — полка, rug — ковёр, torch — факел, candle — свеча, tree — дерево, rock — камень, building — строение.',
+        ),
         x: int('Столбец левой верхней клетки.', 0),
         y: int('Строка левой верхней клетки.', 0),
         w: int('Ширина в клетках (по умолчанию 1).', 1, 10),
@@ -1073,7 +1078,9 @@ const HANDLERS: Record<string, Handler> = {
     const w = integer(args, 'w') ?? 1
     const h = integer(args, 'h') ?? 1
     const description = text(args, 'description')
-    const problem = placementProblem(location, heroesOnMap(state), { x, y, w, h })
+    const kind = location.scale?.kind ?? 'tactical'
+    if (!MAP_KIND_OBJECTS[kind].includes(type)) reject(`На этой карте объекты «${type}» не ставятся. Можно: ${MAP_KIND_OBJECTS[kind].join(', ')}.`)
+    const problem = placementProblem(location, heroesOnMap(state), { x, y, w, h }, { flat: FLAT_OBJECT_TYPES.includes(type) })
     if (problem) reject(problem)
     const object: MapObject = {
       id: slugId('obj', location.objects, ctx.newId),
@@ -1116,7 +1123,7 @@ const HANDLERS: Record<string, Handler> = {
     }
     if (Object.keys(changes).length === 0) reject('Не указано, что изменить.')
     const next = { ...obj, ...changes }
-    const problem = placementProblem(location, heroesOnMap(state), next, { objectId: obj.id })
+    const problem = placementProblem(location, heroesOnMap(state), next, { objectId: obj.id, flat: FLAT_OBJECT_TYPES.includes(next.type) })
     if (problem) reject(problem)
     return {
       events: [{ event: { type: 'objectUpdated', locationId: location.id, objectId: obj.id, changes }, author: MASTER }],

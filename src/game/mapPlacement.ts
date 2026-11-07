@@ -1,7 +1,7 @@
 // Размещение на карте истории: что занимает клетку, можно ли поставить объект или НПС. Чистые функции —
 // ими пользуются инструменты ведущего (понятные отказы) и проверка действий (checkAction).
 import { edgeBetween, edgeContent, isFloor } from '../engine/movement'
-import type { CellPosition, LocationData, MapObject } from '../types/location'
+import { FLAT_OBJECT_TYPES, type CellPosition, type LocationData, type MapObject } from '../types/location'
 
 /** Клетки, которые занимает объект (с учётом w × h). */
 export function objectCells(o: Pick<MapObject, 'x' | 'y' | 'w' | 'h'>): CellPosition[] {
@@ -15,6 +15,8 @@ export interface PlacementIgnore {
   npcId?: string
   /** Ставим существо (НПС): на стул можно сесть — стулья не мешают. */
   creature?: boolean
+  /** Плоский объект (ковёр, свеча): клетку не занимает — ложится поверх пола или стола. */
+  flat?: boolean
 }
 
 /** Кто или что стоит в клетке: «объект «Стол»», «НПС «Гуннар»», «герой Ратибор» или null. */
@@ -29,7 +31,11 @@ export function cellOccupant(
   const hero = heroes.find((h) => h.position.x === cell.x && h.position.y === cell.y)
   if (hero) return `герой ${hero.name}`
   const object = location.objects.find(
-    (o) => o.id !== ignore.objectId && !(ignore.creature && o.type === 'chair') && objectCells(o).some((c) => c.x === cell.x && c.y === cell.y),
+    (o) =>
+      o.id !== ignore.objectId &&
+      !FLAT_OBJECT_TYPES.includes(o.type) &&
+      !(ignore.creature && o.type === 'chair') &&
+      objectCells(o).some((c) => c.x === cell.x && c.y === cell.y),
   )
   return object ? `объект «${object.name}»` : null
 }
@@ -62,6 +68,7 @@ export function placementProblem(
         return `Область пересекает стену между клетками (${c.x}, ${c.y}) и (${n.x}, ${n.y}).`
     }
   }
+  if (ignore.flat) return null
   for (const c of cells) {
     const who = cellOccupant(location, heroes, c, ignore)
     if (who) return `Клетка (${c.x}, ${c.y}) занята: ${who}.`

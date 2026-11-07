@@ -6,14 +6,22 @@ test.beforeEach(async ({ page }) => {
   await startQuickGame(page)
 })
 
-test('карта: тонкие стены по границам клеток, весь план — пол', async ({ page }, testInfo) => {
+test('карта: узоры пола по областям, тонкие стены по границам клеток, весь план — пол', async ({ page }, testInfo) => {
   const errors = collectPageErrors(page)
   const map = page.locator('.map-svg')
   await expect(map).toBeVisible()
 
-  // Стен-клеток больше нет: 20×14 клеток пола, стены — линии.
+  // Пол — не сотни клеток, а по одной фигуре с узором на тип: доски зала и камень кладовой, вместе — весь план 20×14.
+  await expect(map.locator('rect.floor')).toHaveCount(0)
+  const areas = map.locator('path.floor-area')
+  await expect(areas).toHaveCount(2)
+  await expect(map.locator('path.floor-area--wood')).toHaveAttribute('fill', 'url(#floor-wood)')
+  await expect(map.locator('path.floor-area--stone')).toHaveAttribute('data-cells', '25')
+  const cells = await areas.evaluateAll((list) => list.reduce((n, el) => n + Number(el.getAttribute('data-cells')), 0))
+  expect(cells).toBe(20 * 14)
+  for (const floor of ['wood', 'stone', 'tile', 'dirt', 'grass']) await expect(map.locator(`pattern#floor-${floor}`)).toHaveCount(1)
+
   await expect(map.locator('rect.wall')).toHaveCount(0)
-  await expect(map.locator('rect.floor')).toHaveCount(20 * 14)
   const walls = map.locator('.wall-line')
   expect(await walls.count()).toBeGreaterThan(4)
   await expect(map.locator('.wall-line--wood')).not.toHaveCount(0)

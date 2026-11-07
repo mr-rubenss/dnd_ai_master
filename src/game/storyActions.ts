@@ -10,7 +10,7 @@ import { isFloor } from '../engine/movement'
 import type { CharacterSheet, Equipment } from '../types/character'
 import type { ChatMessage } from '../types/game'
 import type { ItemCatalog } from '../types/items'
-import { OBJECT_TYPES, type LocationData } from '../types/location'
+import { FLAT_OBJECT_TYPES, OBJECT_TYPES, type LocationData } from '../types/location'
 import {
   QUEST_STATUSES,
   type ActionAuthor,
@@ -622,7 +622,7 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!isNonEmptyString(o.id) || !isNonEmptyString(o.name)) return 'У объекта нужны id и название.'
       if (!(OBJECT_TYPES as readonly string[]).includes(o.type)) return `Неизвестный вид объекта «${o.type}».`
       if (location.objects.some((x) => x.id === o.id)) return `Объект с id «${o.id}» уже есть.`
-      return placementProblem(location, [], o, {})
+      return placementProblem(location, [], o, { flat: FLAT_OBJECT_TYPES.includes(o.type) })
     }
     case 'objectRemoved': {
       const location = state.world.locations[action.locationId]
@@ -637,7 +637,7 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const next = { ...o, ...action.changes }
       if (!isNonEmptyString(next.name)) return 'У объекта нужно название.'
       if (!(OBJECT_TYPES as readonly string[]).includes(next.type)) return `Неизвестный вид объекта «${next.type}».`
-      return placementProblem(location, [], next, { objectId: o.id })
+      return placementProblem(location, [], next, { objectId: o.id, flat: FLAT_OBJECT_TYPES.includes(next.type) })
     }
     case 'npcUpdated': {
       const location = state.world.locations[action.locationId]

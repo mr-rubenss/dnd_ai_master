@@ -9,8 +9,13 @@
 
 import { edgeBetween, edgeKey, segmentEdges, type EdgeRef } from '../engine/movement'
 import {
+  AMBIENT_LIGHTS,
+  DISTANCE_UNITS,
   DOOR_STATES,
+  FLAT_OBJECT_TYPES,
   FLOOR_TYPES,
+  MAP_KIND_OBJECTS,
+  MAP_KINDS,
   NPC_ATTITUDES,
   NPC_PERSONALITY_FIELDS,
   NPC_PERSONALITY_LIMITS,
@@ -23,6 +28,8 @@ import {
   type GridSegment,
   type LocationData,
   type MapObject,
+  type MapObjectType,
+  type MapScale,
   type MapWindow,
   type Npc,
   type Room,
@@ -50,18 +57,30 @@ const describeSegment = (s: GridSegment) => `(${s.x1}, ${s.y1})–(${s.x2}, ${s.
 const MAX_LISTED_CELLS = 5
 
 /** Проверяет произвольные данные (например, распарсенный JSON) и возвращает типизированную локацию. */
-export function parseLocation(raw: unknown): LocationData {
+export function parseLocation(input: unknown): LocationData {
+  let raw: Record<string, unknown>
   const problems: string[] = []
   const fail = (message: string) => {
     problems.push(message)
   }
 
-  if (!isObject(raw)) throw new LocationValidationError(['локация должна быть объектом'])
+  if (!isObject(input)) throw new LocationValidationError(['локация должна быть объектом'])
+  raw = input as Record<string, unknown>
 
   for (const key of ['id', 'name', 'description'] as const) {
     if (!isNonEmptyString(raw[key])) fail(`поле "${key}" должно быть непустой строкой`)
   }
+  // Масштаб: у клеточной карты достаточно cellFeet; у частичной и общей — scale { kind, cell, unit }.
+  let scale: MapScale | null = null
+  if (raw.scale !== undefined) {
+    const sc = raw.scale
+    if (!isObject(sc) || !isOneOf(MAP_KINDS, sc.kind) || !(typeof sc.cell === 'number' && sc.cell > 0) || !isOneOf(DISTANCE_UNITS, sc.unit))
+      fail(`"scale" — объект { kind: ${MAP_KINDS.join('|')}, cell: число > 0, unit: ${DISTANCE_UNITS.join('|')} }`)
+    else scale = { kind: sc.kind, cell: sc.cell, unit: sc.unit }
+  }
+  if (raw.cellFeet === undefined && scale) raw = { ...raw, cellFeet: scale.unit === 'mi' ? Math.round(scale.cell * 5280) : scale.cell }
   if (!isInt(raw.cellFeet) || raw.cellFeet <= 0) fail('"cellFeet" должно быть положительным целым числом')
+  if (raw.ambientLight !== undefined && !isOneOf(AMBIENT_LIGHTS, raw.ambientLight)) fail(`"ambientLight" должно быть одним из: ${AMBIENT_LIGHTS.join(', ')}`)
   if (!isInt(raw.width) || raw.width < 1 || raw.width > 100) fail('"width" должно быть целым от 1 до 100')
   if (!isInt(raw.height) || raw.height < 1 || raw.height > 100) fail('"height" должно быть целым от 1 до 100')
   if (!isOneOf(FLOOR_TYPES, raw.floor)) fail(`"floor" должно быть одним из: ${FLOOR_TYPES.join(', ')}`)
@@ -76,6 +95,7 @@ export function parseLocation(raw: unknown): LocationData {
   const width = raw.width as number
   const height = raw.height as number
   const wallMaterial = raw.wallMaterial as WallMaterial
+  const kind = scale?.kind ?? 'tactical'
   const list = (key: string) => (Array.isArray(raw[key]) ? (raw[key] as unknown[]) : [])
 
   // ---------- Пол ----------
@@ -126,6 +146,7 @@ export function parseLocation(raw: unknown): LocationData {
       return fail(`${where}: "x", "y" — целые, "w", "h" — положительные целые`)
     }
     const { x, y, w, h } = room as unknown as Room
+    if (room.floor !== undefined && !isOneOf(FLOOR_TYPES, room.floor)) fail(`${where}: "floor" должно быть одним из: ${FLOOR_TYPES.join(', ')}`)
     if (x < 0 || y < 0 || x + w > width || y + h > height) return fail(`${where}: комната ${w}×${h} в клетке (${x}, ${y}) выходит за пределы карты ${width}×${height}`)
     for (let cy = y; cy < y + h; cy++) {
       for (let cx = x; cx < x + w; cx++) {
@@ -148,7 +169,15 @@ export function parseLocation(raw: unknown): LocationData {
       addWall({ side: 'v', x, y: cy }, wallMaterial)
       addWall({ side: 'v', x: x + w, y: cy }, wallMaterial)
     }
-    rooms.push({ id: room.id as string, ...(isNonEmptyString(room.name) ? { name: room.name } : {}), x, y, w, h })
+    rooms.push({
+      id: room.id as string,
+      ...(isNonEmptyString(room.name) ? { name: room.name } : {}),
+      ...(isOneOf(FLOOR_TYPES, room.floor) ? { floor: room.floor } : {}),
+      x,
+      y,
+      w,
+      h,
+    })
   })
 
   /** Проверяет отрезок по линиям сетки и возвращает его рёбра (или null с записанной ошибкой). */
@@ -278,8 +307,15 @@ export function parseLocation(raw: unknown): LocationData {
       const hint = obj.type === 'door' ? ' (двери теперь задаются в "doors" — отрезком на стене)' : ''
       fail(`${where}: "type" должно быть одним из: ${OBJECT_TYPES.join(', ')}${hint}`)
     }
+    else if (!MAP_KIND_OBJECTS[kind].includes(obj.type as MapObjectType))
+      fail(`${where}: на карте вида «${kind}» объекты «${obj.type}» не ставятся (можно: ${MAP_KIND_OBJECTS[kind].join(', ')})`)
     if (!isNonEmptyString(obj.name)) fail(`${where}: "name" должно быть непустой строкой`)
     checkOptionalText(obj, 'description', where)
+    if (obj.light !== undefined) {
+      const l = obj.light
+      if (!isObject(l) || !isInt(l.bright) || !isInt(l.dim) || (l.bright as number) < 0 || (l.dim as number) < 0)
+        fail(`${where}: "light" — { bright, dim } в футах, целые не меньше 0`)
+    }
     let sizeOk = true
     for (const key of ['w', 'h'] as const) {
       if (obj[key] !== undefined && (!isInt(obj[key]) || (obj[key] as number) < 1)) {
@@ -306,6 +342,8 @@ export function parseLocation(raw: unknown): LocationData {
         if (walls.has(edgeKey(e.side, e.x, e.y))) return fail(`${where}: объект пересекает стену на границе ${describeEdge(e)}`)
       }
     }
+    // Ковёр и свеча клетку не занимают: на ковре стоит стол, свеча — на столе.
+    if (FLAT_OBJECT_TYPES.includes(obj.type as MapObjectType)) return
     for (const c of cells) {
       const other = occupied.get(`${c.x},${c.y}`)
       if (other) return fail(`${where}: клетка (${c.x}, ${c.y}) уже занята объектом ${other}`)
@@ -386,6 +424,8 @@ export function parseLocation(raw: unknown): LocationData {
     name: raw.name as string,
     description: raw.description as string,
     cellFeet: raw.cellFeet as number,
+    scale: scale ?? { kind: 'tactical', cell: raw.cellFeet as number, unit: 'ft' },
+    ...(isOneOf(AMBIENT_LIGHTS, raw.ambientLight) ? { ambientLight: raw.ambientLight } : {}),
     width,
     height,
     floor: raw.floor as LocationData['floor'],

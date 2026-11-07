@@ -149,8 +149,22 @@ export function readCustomThemes(raw: string | null, reference: Theme): Theme[] 
   }
   if (!Array.isArray(list)) return []
   const sameKeys = (a: unknown, b: object) => !!a && typeof a === 'object' && Object.keys(b).every((k) => typeof (a as Record<string, unknown>)[k] === 'string')
+  // Тема, сохранённая до появления новых токенов (например, новых цветов карты), дополняется значениями эталона.
+  const GROUPS = ['colors', 'map', 'dice', 'fonts', 'fontSizes', 'space', 'radii', 'shadows'] as const
+  const withNewTokens = (t: Theme | undefined): Theme | undefined => {
+    if (!t || typeof t !== 'object') return t
+    const next = { ...t }
+    for (const g of GROUPS) {
+      const group = t[g] as Record<string, unknown> | undefined
+      if (!group || typeof group !== 'object') continue
+      // Дополняем только недостающее меньшинство ключей: группа без большинства токенов — битая запись.
+      const missing = Object.keys(reference[g]).filter((k) => !(k in group)).length
+      if (missing * 2 <= Object.keys(reference[g]).length) (next as Record<string, unknown>)[g] = { ...reference[g], ...group }
+    }
+    return next
+  }
   return list
-    .map((rec) => (rec as CustomThemeRecord | null)?.theme)
+    .map((rec) => withNewTokens((rec as CustomThemeRecord | null)?.theme))
     .filter(
       (t): t is Theme =>
         !!t &&

@@ -602,3 +602,15 @@ describe('награды не из ниоткуда: источник, спра�
     expect(run(s, 'remove_npc', { npc: 'Брам', reason: 'fled' }).outcome.result.message).toBe('Брам сбегает с карты.')
   })
 })
+
+describe('обстановка богатой карты', () => {
+  it('ковёр и свеча ложатся поверх стола; сундук на занятую клетку — нельзя; набор объектов — по виду карты', () => {
+    const s = fresh()
+    expect(run(s, 'add_object', { name: 'Свеча', type: 'candle', x: 9, y: 7 }).outcome.ok).toBe(true)
+    expect(run(s, 'add_object', { name: 'Ковёр', type: 'rug', x: 9, y: 7, w: 2, h: 2 }).outcome.ok).toBe(true)
+    expect(rejected(s, 'add_object', { name: 'Сундук', type: 'chest', x: 9, y: 7 })).toContain('занята')
+    const region = structuredClone(s)
+    region.world.locations[LOC].scale = { kind: 'region', cell: 6, unit: 'mi' }
+    expect(rejected(region, 'add_object', { name: 'Стул', type: 'chair', x: 6, y: 9 })).toMatch(/^На этой карте объекты «chair» не ставятся/)
+  })
+})

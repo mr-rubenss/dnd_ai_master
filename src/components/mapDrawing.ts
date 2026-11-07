@@ -52,3 +52,6 @@ export function segmentBox(s: GridSegment, pad: number) {
   }
 }
 
+
+/** id SVG-узора пола по типу (MapDefs.tsx). */
+export const floorPatternId = (floor: string) => `floor-${floor}`
