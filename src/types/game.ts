@@ -56,6 +56,8 @@ export interface RollRecord {
   /** Время броска, мс с начала эпохи. */
   timestamp: number
   result: RollResult
+  /** Ручной бросок игрока с панели кубиков (ведущему не передаётся). */
+  manual?: boolean
 }
 
 /** Прохождение истории в старом формате сохранения (v8, localStorage) — только для переноса. */

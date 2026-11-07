@@ -6,7 +6,7 @@ import { VERBOSITY, type ContextBudget, type Verbosity } from '../ai/settings'
 import type { AiMaster, AiMessage, AiRequest, AiResponse, AiToolCall, AiUsage } from '../ai/types'
 import type { TurnChange } from '../types/game'
 import type { ActionAuthor, StoryEvent, StoryState } from '../types/story'
-import { buildMasterRequest, type PromptPart } from './masterPrompt'
+import { buildMasterRequest, type MasterRequestPlan, type PromptPart } from './masterPrompt'
 import { rewritableMessageId, splitSuggestions } from './masterSuggestions'
 import type { MasterStateContext } from './masterState'
 import { executeTool, TURN_TOOLS, type ToolContext, type ToolOutcome } from './masterTools'
@@ -58,6 +58,14 @@ export interface MasterTurnOptions {
   onText?: AiRequest['onText']
   onRetry?: AiRequest['onRetry']
   signal?: AbortSignal
+  /** Запись хода для тестового отчёта (src/game/turnTrace.ts): каждый запрос к модели и её сырой ответ. */
+  trace?: MasterTraceHooks
+}
+
+/** Сырой обмен с моделью — для тестового отчёта: запрос (до отправки) и ответ. */
+export interface MasterTraceHooks {
+  request: (story: StoryState, plan: MasterRequestPlan, request: Pick<AiRequest, 'toolChoice' | 'maxTokens' | 'temperature'> & { toolCount: number }) => void
+  response: (response: AiResponse) => void
 }
 
 export interface MasterTurnResult {
@@ -151,15 +159,18 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
       historyEnd,
       turn,
     })
+    const toolChoice = runtime ? (toolsAllowed ? ('auto' as const) : ('none' as const)) : undefined
+    options.trace?.request(current(), plan, { toolChoice, maxTokens: VERBOSITY[options.verbosity].maxTokens, temperature: 0.9, toolCount: runtime ? TURN_TOOLS.length : 0 })
     const response = await master.complete({
       messages: plan.messages,
-      ...(runtime ? { tools: TURN_TOOLS, toolChoice: toolsAllowed ? ('auto' as const) : ('none' as const) } : {}),
+      ...(runtime ? { tools: TURN_TOOLS, toolChoice } : {}),
       maxTokens: VERBOSITY[options.verbosity].maxTokens,
       temperature: 0.9,
       onText: options.onText,
       onRetry: options.onRetry,
       signal: options.signal,
     })
+    options.trace?.response(response)
     options.onRequest?.({ purpose: 'turn', parts: partsReport(plan.parts), rawTokens: plan.rawTokens, estimatedTokens: plan.estimatedTokens, dropped: plan.dropped, usage: response.usage })
     const split = splitSuggestions(response.text)
     const suggestions = outOfGame ? [] : split.suggestions
@@ -279,6 +290,7 @@ export async function runMasterRewrite(
     factor: options.factor?.(),
     trailing: [{ role: 'user', content: REWRITE_REQUEST }],
   })
+  options.trace?.request(story, plan, { maxTokens: VERBOSITY[options.verbosity].maxTokens, temperature: 1, toolCount: 0 })
   const response = await master.complete({
     messages: plan.messages,
     maxTokens: VERBOSITY[options.verbosity].maxTokens,
@@ -287,6 +299,7 @@ export async function runMasterRewrite(
     onRetry: options.onRetry,
     signal: options.signal,
   })
+  options.trace?.response(response)
   options.onRequest?.({ purpose: 'rewrite', parts: partsReport(plan.parts), rawTokens: plan.rawTokens, estimatedTokens: plan.estimatedTokens, dropped: plan.dropped, usage: response.usage })
   const { text, suggestions } = splitSuggestions(response.text)
   if (!text) emptyAnswer(response)

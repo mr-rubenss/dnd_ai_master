@@ -12,10 +12,12 @@ interface Props {
   onHeroes: () => void
   onCreate: () => void
   onQuickStart: () => void
+  /** «Что-то не так» — тестовый отчёт. */
+  onReport: () => void
 }
 
 /** Стартовый экран: продолжить последнюю историю, мои истории и герои, создать героя или быстрый старт. */
-export function StartMenu({ latest, storyCount, heroCount, onContinue, onStories, onHeroes, onCreate, onQuickStart }: Props) {
+export function StartMenu({ latest, storyCount, heroCount, onContinue, onStories, onHeroes, onCreate, onQuickStart, onReport }: Props) {
   const hero = startingSheet.character
 
   return (
@@ -57,6 +59,12 @@ export function StartMenu({ latest, storyCount, heroCount, onContinue, onStories
             </span>
           </button>
         </div>
+        <p className="start-menu-report">
+          <button type="button" className="report-button" onClick={onReport} data-testid="report-button">
+            Что-то не так
+          </button>
+          <span>— тестовый отчёт для разработчика: что произошло, последние ходы и ошибки.</span>
+        </p>
       </section>
     </main>
   )

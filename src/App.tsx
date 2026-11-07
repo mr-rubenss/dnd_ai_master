@@ -33,6 +33,10 @@ import { compactionNeeded, compactMemory, writeEpilogueSummary } from './game/me
 import { masterSession, timedFor, type MasterSession } from './game/masterSession'
 import { AiProgress, AiTaskError } from './components/AiTask'
 import { useAiTask } from './components/useAiTask'
+import { ReportButton, ReportDialog, ReportOffer } from './components/TestReport'
+import { useCrashOffer } from './components/reportCollect'
+import { reportStore, useReportUi } from './components/reportStore'
+import { traceStore } from './game/turnTrace'
 import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryEpilogue, StoryEvent, StoryState } from './types/story'
@@ -68,6 +72,10 @@ function App() {
   const current: Screen = screen === 'game' && !app.active ? 'menu' : screen
   const readOnly = app.active?.status === 'completed'
   const latest = app.stories.find((s) => s.status === 'active') ?? null
+  /** Тестовый отчёт: окно и предложение после сбоя (необработанная ошибка). */
+  const reportUi = useReportUi()
+  useCrashOffer()
+  const reportStoryId = current === 'game' && app.active ? app.active.id : (app.stories[0]?.id ?? null)
 
   useEffect(() => {
     void appStore.init()
@@ -178,6 +186,8 @@ function App() {
         </div>
       </header>
       {settingsTab && <SettingsPanel initialTab={settingsTab} onClose={closeSettings} />}
+      <ReportOffer />
+      {reportUi.open && <ReportDialog storyId={reportStoryId} />}
       {pendingEpilogue && (
         <div className="ai-task-overlay" role="dialog" aria-modal="true" aria-label="Итог истории" data-testid="epilogue-writing">
           <div className="ai-task-dialog panel">
@@ -206,6 +216,7 @@ function App() {
           onQuickStart={async () => {
             if (ok(await appStore.quickStart(startingSheet, defaultAdventure.id))) setScreen('game')
           }}
+          onReport={() => reportStore.open()}
         />
       )}
       {current === 'stories' && (
@@ -335,7 +346,10 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     }
     // Вопрос вне игры: ответ — тоже вне игры; игра не меняется (ни отдыха, ни строки изменений, ни сжатия памяти).
     const outOfGame = !rewriteId && Boolean(appStore.getState().active?.outOfGame)
+    // Запись хода для тестового отчёта: запросы, сырые ответы модели, инструменты (только в памяти вкладки).
+    const recorder = traceStore.start(appStore.getState().active ?? story, rewriteId ? 'rewrite' : 'turn', itemCatalog)
     if (settingsProblems(ai.settings, ai.apiKey).length > 0) {
+      recorder.stub()
       timerRef.current = window.setTimeout(() => {
         const event = rewriteId
           ? ({ type: 'masterRewritten', messageId: rewriteId, text: STUB_REPLY } as const)
@@ -364,7 +378,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     // Сроки ответа (src/ai/timeouts.ts): нет кусков потока или ответа слишком долго — запрос обрывается с объяснением.
     const master = timedFor(session.master, rewriteId ? 'rewrite' : 'turn', session.model, { signal: controller.signal })
     const context = { catalog: itemCatalog, rules: rulesData, prices: priceList }
-    const common = { verbosity: ai.settings.verbosity, context, ...session.turn, signal: controller.signal, onText, onRetry }
+    const common = { verbosity: ai.settings.verbosity, context, ...session.turn, signal: controller.signal, onText, onRetry, trace: recorder.hooks }
     let ok = false
     try {
       // Ошибка «слишком длинный контекст» — сжатие памяти и один повтор.
@@ -390,8 +404,10 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
                 commit: (event, author) => appStore.dispatchTo(story.id, event, author),
                 tools: { catalog: itemCatalog, rules: rulesData, prices: priceList, now: () => Date.now(), newId: () => crypto.randomUUID() },
                 // Журнал разработчика: каждый вызов инструмента и его итог — чтобы видеть, где потерялось изменение.
-                onTool: (call, outcome) =>
-                  devLog.add({ kind: 'tool', name: call.name, ok: outcome.ok, detail: String(outcome.result.error ?? outcome.result.message ?? '') }),
+                onTool: (call, outcome) => {
+                  recorder.tool(call, outcome)
+                  devLog.add({ kind: 'tool', name: call.name, ok: outcome.ok, detail: String(outcome.result.error ?? outcome.result.message ?? '') })
+                },
                 onRound: () => {
                   streamed = ''
                   setStreamText('')
@@ -408,6 +424,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               )
             // Строка изменений за ход — после ответа ведущего: игрок видит, что рассказ отразился в листе.
             if (changes.length) await appStore.dispatchTo(story.id, { type: 'turnSummarized', messageId: crypto.randomUUID(), changes }, ENGINE)
+            recorder.finish(verification)
             if (verification.status !== 'skipped') devLog.add({ kind: 'verify', ...verification })
             // Ведущий не разрешил и не прервал отдых — отряд отдыхает (но не после ответа вне игры).
             if (!outOfGame) completePendingRest()
@@ -425,9 +442,12 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         }
       }
     } catch (error) {
+      const message = error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.'
+      recorder.fail(cancelledRef.current ? 'Отменено игроком.' : controller.signal.aborted ? 'Прервано (игрок ушёл с экрана).' : `${message}${error instanceof AiError ? ` [${error.kind}${error.stage ? `, ${error.stage}` : ''}]` : ` [${error instanceof Error ? error.message : String(error)}]`}`)
+      if (!(error instanceof AiError) && !controller.signal.aborted) console.error('Ход ведущего не удался.', error)
       if (cancelledRef.current) setAiError('Ответ ведущего отменён. Всё, что ведущий успел сделать инструментами, сохранено.')
       else if (controller.signal.aborted) return
-      else setAiError(error instanceof AiError ? error.message : 'Ведущий не ответил из-за неизвестной ошибки.')
+      else setAiError(message)
     } finally {
       if (!controller.signal.aborted || cancelledRef.current) finish()
     }
@@ -531,7 +551,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
 
   const handleRoll = (notation: string, mode: RollMode): string | null => {
     try {
-      const record = { id: crypto.randomUUID(), timestamp: Date.now(), result: roll(notation, { mode }) }
+      const record = { id: crypto.randomUUID(), timestamp: Date.now(), result: roll(notation, { mode }), manual: true }
       const reason = appStore.dispatch({ type: 'diceRolled', roll: record }, ENGINE)
       if (reason) return reason
       setAnimatedRollId(record.id)
@@ -603,6 +623,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
                 <button type="button" className="item-action is-primary" onClick={retryMaster} disabled={waiting}>
                   Повторить
                 </button>
+                {/* Сбой ведущего — игра сама предлагает отчёт. */}
+                <ReportButton className="item-action" hint={`Ошибка ведущего: ${aiError}`} testId="report-from-error" />
               </div>
             )}
             {readOnly ? (
@@ -617,6 +639,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
                 onSend={handleSend}
                 disabled={waiting}
                 suggestions={suggestions}
+                aside={<ReportButton />}
                 leading={
                   <>
                     <DiceTray rolls={story.rolls} onRoll={handleRoll} />

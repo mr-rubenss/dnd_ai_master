@@ -15,10 +15,12 @@ interface Props {
   leading?: ReactNode
   /** Подсказки действий от ведущего: нажатие вставляет текст в поле (не отправляет). */
   suggestions?: string[]
+  /** Справа над полем (кнопка «Что-то не так»). */
+  aside?: ReactNode
 }
 
 /** Поле ответа игрока. Enter — отправить, Shift+Enter — новая строка. */
-export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Props) {
+export function PlayerInput({ onSend, disabled, leading, suggestions = [], aside }: Props) {
   const [text, setText] = useState('')
   const [mode, setMode] = useState<InputMode>('action')
   const current = MODES.find((m) => m.id === mode)!
@@ -56,6 +58,7 @@ export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Pro
 
   return (
     <form className={`player-input${mode === 'question' ? ' is-question' : ''}`} onSubmit={handleSubmit}>
+      <div className="input-toolbar">
       <div className="segmented input-mode" role="radiogroup" aria-label="Что отправить" data-testid="input-mode">
         {MODES.map((m) => (
           <button
@@ -70,6 +73,8 @@ export function PlayerInput({ onSend, disabled, leading, suggestions = [] }: Pro
             {m.label}
           </button>
         ))}
+      </div>
+      {aside}
       </div>
       {leading}
       <textarea

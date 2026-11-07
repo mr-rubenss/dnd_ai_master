@@ -105,6 +105,8 @@ export interface MasterRequestPlan {
   estimatedTokens: number
   /** Сколько старых сообщений не вошло в запрос, чтобы не превысить окно контекста. */
   dropped: number
+  /** Сколько сообщений ленты («Последние сообщения») после системного — дальше действие игрока и сообщения хода. */
+  recentCount: number
   /** Запрос больше целевого размера — пора сжимать память. */
   overBudget: boolean
   /** Предел запроса: окно контекста минус ответ и запас. */
@@ -180,6 +182,7 @@ export function buildMasterRequest(story: StoryState, options: MasterRequestOpti
     rawTokens: m.total,
     estimatedTokens: estimate(m.total, factor),
     dropped,
+    recentCount: recent.length,
     overBudget,
     hardLimit,
   }

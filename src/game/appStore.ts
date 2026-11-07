@@ -159,6 +159,9 @@ export function createAppStore(options: AppStoreOptions) {
       return (await serial(() => repo.loadStory(storyId)))?.state ?? null
     },
 
+    /** Журнал действий истории (после всех записей в базу) — для тестового отчёта. */
+    readActions: (storyId: string) => serial(() => repo.actionsOf(storyId)),
+
     /** Действие в открытой истории. */
     dispatch(event: StoryEvent, author: ActionAuthor): CommandResult {
       if (!state.active) return 'Нет открытой истории.'

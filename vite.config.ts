@@ -2,6 +2,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { appearanceBootData } from './src/theme/appearance.ts'
 import { bootAppearance } from './src/theme/boot.ts'
@@ -66,9 +67,22 @@ function themePlugin(): Plugin {
   }
 }
 
+/** Версия игры для тестового отчёта: номер из package.json, коммит сборки и дата. */
+function appVersion(): string {
+  const pkg = JSON.parse(readFileSync(resolve(import.meta.dirname, 'package.json'), 'utf8')) as { version: string }
+  let commit = 'без git'
+  try {
+    commit = execSync('git rev-parse --short HEAD', { cwd: import.meta.dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    // Сборка вне репозитория — без коммита.
+  }
+  return `${pkg.version} (${commit}, сборка ${new Date().toISOString().slice(0, 10)})`
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   plugins: [react(), themePlugin()],
+  define: { __APP_VERSION__: JSON.stringify(appVersion()) },
   base: command === 'build' ? `/${REPO_NAME}/` : '/',
   test: {
     // Модульные тесты — только в src/; e2e-тесты (e2e/*.spec.ts) запускает Playwright.

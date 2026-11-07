@@ -54,6 +54,8 @@ const textStream = (text: string) =>
 async function mockApi(page: Page, proposals: unknown[], hold: number[] = []) {
   const bodies: Body[] = []
   const releases: (() => void)[] = []
+  /** release() раньше, чем придержанный запрос дошёл до заглушки, — засчитывается заранее (иначе запрос повиснет). */
+  let credit = 0
   let proposalIndex = 0
   await page.route(DEEPSEEK, async (route: Route) => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS })
@@ -62,12 +64,22 @@ async function mockApi(page: Page, proposals: unknown[], hold: number[] = []) {
     const isProposal = body.tools?.some((t) => t.function.name === 'propose_background')
     if (isProposal) {
       const index = proposalIndex++
-      if (hold.includes(index)) await new Promise<void>((resolve) => releases.push(resolve))
+      if (hold.includes(index)) {
+        if (credit > 0) credit--
+        else await new Promise<void>((resolve) => releases.push(resolve))
+      }
     }
     const payload = isProposal ? proposalStream(proposals.shift()) : textStream('Ветер с моря доносит запах соли.')
     await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'text/event-stream' }, body: withEndTurn(route, payload) }).catch(() => {})
   })
-  return { bodies, release: () => releases.shift()?.() }
+  return {
+    bodies,
+    release: () => {
+      const next = releases.shift()
+      if (next) next()
+      else credit++
+    },
+  }
 }
 
 const withKey = (page: Page) => page.addInitScript((key) => localStorage.setItem('ai-master:api-key', key), KEY)
