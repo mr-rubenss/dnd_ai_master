@@ -14,7 +14,8 @@ import { changeList, END_TURN, ledgerOf, turnDelta, verifyEndTurn } from './turn
 import { isObject } from './validation'
 import { MASTER } from './storyActions'
 import { changeNames } from './rest'
-import { claimProblems, claimReminder } from './claimCheck'
+import { castProblems, claimProblems, claimReminder } from './claimCheck'
+import { knownSpells } from './magic'
 
 /** Сколько раундов «вызовы инструментов → результаты» за один ход; последний раунд — уже без инструментов. */
 export const MAX_TOOL_ROUNDS = 4
@@ -180,6 +181,16 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     return { role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) }
   }
 
+  /** Игрок заявил каст заклинания своего героя, а cast_spell не вызывался — просьба вызвать (часть сверки текста). */
+  const spellClaims = (): string[] => {
+    const rules = runtime?.tools.rules
+    const said = [...story.messages].reverse().find((m) => m.author === 'player')
+    if (!rules || !said || said.ooc) return []
+    const hero = story.party.find((m) => m.heroId === said.heroId) ?? story.party[0]
+    if (!hero) return []
+    return castProblems(said.text, knownSpells(hero.character, rules).map((k) => k.spell), toolCalls)
+  }
+
   /**
    * Конец хода — сначала сверка текста с состоянием (один раз): если рассказ утверждает то, чего нет в игре
    * (герой получил, победил, ранен), модель получает короткую просьбу — довызвать инструмент или переписать ответ.
@@ -188,7 +199,7 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   const settle = (text: string, suggestions: string[], response: AiResponse, calls: AiToolCall[], results: AiMessage[]): MasterTurnResult | null => {
     if (!runtime || outOfGame || claimChecked) return finish(text, suggestions, response)
     claimChecked = true
-    const problems = claimProblems([...narratedTexts, text].join('\n'), turnDelta(ledger!, ledgerOf(current(), catalog!)), toolCalls)
+    const problems = [...claimProblems([...narratedTexts, text].join('\n'), turnDelta(ledger!, ledgerOf(current(), catalog!)), toolCalls), ...spellClaims()]
     if (problems.length === 0) return finish(text, suggestions, response)
     claims = problems
     pending = { text, suggestions }

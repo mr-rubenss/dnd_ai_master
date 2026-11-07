@@ -18,7 +18,8 @@ import { placementProblem } from './mapPlacement'
 import type { PriceList } from './prices'
 import { END_TURN_TOOL } from './turnChanges'
 import { checkSubjectOf } from './classOrder'
-import { planCast, spendCast, spellSlots, type MagicRules } from './magic'
+import { castableSpellsText, knownSpells, planCast, spendCast, spellSlots, type MagicRules } from './magic'
+import { findSpell } from './spellMatch'
 import { featureResources, hitDiceOf, REST_NAMES, restEvents, restRequestProblem } from './rest'
 import { recoveryText } from './features'
 import { DAMAGE_TYPE_NAMES } from './damageTypes'
@@ -134,7 +135,7 @@ export const MASTER_TOOLS: AiTool[] = [
     parameters: object(
       {
         hero: HERO,
-        spell: str('id или русское название заклинания из списка героя.'),
+        spell: str('id заклинания из списка героя («Может сотворить» в листе), например minor-illusion. Можно и название — движок узнает его в любом падеже.'),
         slot_level: int('Круг ячейки (не ниже круга заклинания). Не указывай — движок выберет бесплатное сотворение или младшую свободную ячейку.', 1, 9),
         ritual: { type: 'boolean', description: 'true — ритуалом (только у заклинаний с пометкой «ритуал»): на 10 минут дольше, без ячейки.' },
         target: str('Цель: имя героя отряда, имя НПС или что-то ещё («дверь», «трое гоблинов»). Лечение без цели — на себя.'),
@@ -698,11 +699,16 @@ const HANDLERS: Record<string, Handler> = {
     const member = heroOf(state, args)
     const c = member.character
     const query = text(args, 'spell', true)!
-    const spell = rules.spells[query] ?? Object.values(rules.spells).find((s) => norm(s.name) === norm(query))
-    if (!spell) reject(`Заклинания «${query}» нет в справочнике.`)
+    // Отказ всегда с причиной и списком того, что герой может сотворить, — ведущий исправит вызов.
+    const available = () => ` Доступно ${c.name}: ${castableSpellsText(c, rules)}. Вызови cast_spell с id из списка.`
+    // Мягко: id, название без учёта регистра и ё/е, с падежами («малой иллюзией»), — сначала среди заклинаний героя.
+    const found = findSpell(query, knownSpells(c, rules).map((k) => k.spell), rules.spells)
+    if (found && 'ambiguous' in found) return reject(`«${query}» подходит к нескольким заклинаниям: ${found.ambiguous.map((s) => `${s.name} (${s.id})`).join(', ')}.${available()}`)
+    if (!found) return reject(`Заклинания «${query}» нет ни у ${c.name}, ни в справочнике.${available()}`)
+    const spell = found.spell
     const slotLevel = integer(args, 'slot_level')
-    const plan = planCast({ ...c }, { spellId: spell!.id, slotLevel, ritual: args.ritual === true }, rules)
-    if (typeof plan === 'string') return reject(plan)
+    const plan = planCast({ ...c }, { spellId: spell.id, slotLevel, ritual: args.ritual === true }, rules)
+    if (typeof plan === 'string') return reject(`${plan}${available()}`)
     const events: ToolEvent[] = [
       {
         event: { type: 'spellCast', heroId: member.heroId, spellId: spell!.id, slotLevel: plan.slotLevel, freeKey: plan.freeKey, ritual: plan.ritual },

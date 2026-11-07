@@ -581,3 +581,31 @@ export function castProblem(subject: MagicSubject & { name?: string }, cast: Cas
   if (!slot || cast.slotLevel! < spell.level) return `Нет подходящей ячейки ${cast.slotLevel}-го круга для «${spell.name}».`
   return slot.left > 0 ? null : `Ячейки ${slot.level}-го круга потрачены.`
 }
+
+// ---------- Список заклинаний героя для ведущего ----------
+
+/**
+ * Запись заклинания для ведущего: название, id, круг и чем творится — «Малая иллюзия [minor-illusion; заговор]»,
+ * «Волшебная стрела [magic-missile; 1-й круг; ячеек 1+ круга: 2]», «Разговор с животными [speak-with-animals;
+ * 1-й круг; без ячейки 2/2]». По id ведущий зовёт cast_spell.
+ */
+export function spellEntryText(k: KnownSpell, slots: SlotState[]): string {
+  const s = k.spell
+  const parts = [s.id, s.level === 0 ? 'заговор' : `${s.level}-й круг`]
+  if (s.level > 0) {
+    if (k.innate && k.innate.freeMax !== null) parts.push(`без ячейки ${k.innate.freeMax - k.innate.freeUsed}/${k.innate.freeMax}`)
+    else if (k.inBookOnly) parts.push(s.ritual ? 'не подготовлено — только ритуалом' : 'не подготовлено')
+    else parts.push(`ячеек ${s.level}+ круга: ${slots.filter((sl) => sl.level >= s.level).reduce((n, sl) => n + sl.left, 0)}`)
+    if (s.ritual && !k.inBookOnly) parts.push('ритуал')
+  }
+  if (s.concentration) parts.push('концентрация')
+  return `${s.name} [${parts.join('; ')}]`
+}
+
+/** Все заклинания героя одной строкой (без повторов) — для ведущего и для отказа движка. */
+export function castableSpellsText(subject: MagicSubject, rules: MagicRules): string {
+  const slots = spellSlots(subject, rules)
+  const seen = new Set<string>()
+  const list = knownSpells(subject, rules).filter((k) => !seen.has(k.spell.id) && seen.add(k.spell.id))
+  return list.length ? list.map((k) => spellEntryText(k, slots)).join(', ') : 'нет заклинаний'
+}

@@ -351,9 +351,31 @@ describe('cast_spell: заклинания героя', () => {
 
   it('отказ на неизвестное заклинание и у героя без магии', () => {
     expect(rejected(mage(), 'cast_spell', { spell: 'Лечение ран' })).toMatch(/не знает заклинания «Лечение ран»/)
-    expect(rejected(mage(), 'cast_spell', { spell: 'Огненный шар' })).toMatch(/нет в справочнике/)
+    expect(rejected(mage(), 'cast_spell', { spell: 'Огненный шар' })).toMatch(/^Заклинания «Огненный шар» нет ни у Ратибор, ни в справочнике\. Доступно Ратибор: /)
     expect(rejected(fresh(), 'cast_spell', { spell: 'fire-bolt' })).toMatch(/не знает/)
     expect(rejected(mage(), 'cast_spell', { spell: 'magic-missile', slot_level: 2 })).toMatch(/нет ячеек 2-го круга/)
+  })
+
+  it('название — мягко: регистр, ё/е, падежи («малой иллюзией»); id и английское название тоже', () => {
+    const gnome = fresh()
+    gnome.party[0].character = { ...gnome.party[0].character, speciesId: 'gnome', speciesOption: 'forest-gnome' }
+    for (const spell of ['малой иллюзией', 'Малую Иллюзию', 'minor-illusion', 'Minor Illusion', '«малая иллюзия»']) {
+      const { outcome } = run(gnome, 'cast_spell', { spell, target: 'звук шагов за дверью' })
+      expect(outcome.ok, spell).toBe(true)
+      expect(outcome.result).toMatchObject({ spell: 'Малая иллюзия', spent: 'заговор (без ячейки)' })
+    }
+    expect(run(mage(), 'cast_spell', { spell: 'волшебной стрелой' }).outcome.result).toMatchObject({ spell: 'Волшебная стрела', spent: 'ячейка 1-го круга' })
+    expect(run(mage(), 'cast_spell', { spell: 'огненным снарядом' }).outcome.result).toMatchObject({ spell: 'Огненный снаряд' })
+  })
+
+  it('отказ — с причиной и списком того, что герой может сотворить (id, круг, ячейки)', () => {
+    const notKnown = rejected(mage(), 'cast_spell', { spell: 'Полёт' })
+    expect(notKnown).toContain('Доступно Ратибор: ')
+    expect(notKnown).toContain('Огненный снаряд [fire-bolt; заговор]')
+    expect(notKnown).toContain('Волшебная стрела [magic-missile; 1-й круг; ячеек 1+ круга: 2]')
+    expect(notKnown).toContain('Опознание [identify; 1-й круг; не подготовлено — только ритуалом]')
+    expect(notKnown).toContain('Вызови cast_spell с id из списка.')
+    expect(rejected(mage(), 'cast_spell', { spell: 'Лечение ран' })).toMatch(/не знает заклинания «Лечение ран».*Доступно Ратибор: Огненный снаряд/)
   })
 
   it('лечение на себя: бросок движка + модификатор, хиты растут', () => {

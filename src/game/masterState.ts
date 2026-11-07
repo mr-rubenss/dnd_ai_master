@@ -22,7 +22,7 @@ import { invocationLabel } from './invocations'
 import { languageNames } from './languages'
 import { masteryRule } from './weaponMastery'
 import { MASTERY_LABELS } from '../components/itemText'
-import { classSpellcasting, hasMagic, knownSpells, needsSpellChoice, spellcastingStats, spellSlots } from './magic'
+import { castableSpellsText, classSpellcasting, hasMagic, knownSpells, needsSpellChoice, spellcastingStats, spellEntryText, spellSlots } from './magic'
 
 export interface MasterStateContext {
   catalog: ItemCatalog
@@ -97,10 +97,11 @@ export function magicText(member: PartyMember, ctx: MasterStateContext): string[
   }
   if (needsSpellChoice(c, rules)) lines.push('Заклинания ещё не выбраны игроком — пока колдовать нельзя (кроме магии вида).')
   const known = knownSpells(c, rules)
+  const slots = spellSlots(c, rules)
   const byGroup = (filter: (k: (typeof known)[number]) => boolean) =>
     known
       .filter(filter)
-      .map((k) => `${k.spell.name} (${k.spell.id}${k.spell.ritual ? ', ритуал' : ''}${k.spell.concentration ? ', концентрация' : ''})`)
+      .map((k) => spellEntryText(k, slots))
       .join(', ')
   const cantrips = byGroup((k) => k.source === 'class' && k.spell.level === 0)
   const prepared = byGroup((k) => k.source === 'class' && k.spell.level > 0 && !k.inBookOnly)
@@ -115,10 +116,12 @@ export function magicText(member: PartyMember, ctx: MasterStateContext): string[
         .map((k) => {
           const i = k.innate!
           const stats = spellcastingStats(c, k.ability)
-          return `${k.spell.name} (${k.spell.id}; ${i.sourceName}; Сл ${stats.saveDc}, атака ${formatModifier(stats.attackBonus)}${i.freeMax !== null ? `; без ячейки ${i.freeMax - i.freeUsed}/${i.freeMax}` : ''})`
+          return `${spellEntryText(k, slots)} (${i.sourceName}; Сл ${stats.saveDc}, атака ${formatModifier(stats.attackBonus)})`
         })
         .join(', ')}.`,
     )
+  // Сводная строка — все заклинания героя с id: «кастую …» = cast_spell с этим id, а не отказ.
+  if (known.length) lines.push(`Может сотворить (cast_spell, spell = id из скобок): ${castableSpellsText(c, rules)}. Эти заклинания герой знает — не оспаривай их.`)
   return lines
 }
 

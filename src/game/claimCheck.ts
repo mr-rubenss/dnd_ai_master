@@ -3,6 +3,8 @@
 // получает короткую просьбу привести текст и состояние в соответствие (один раз за ход, masterTurn.ts).
 // Эвристика по словам рассказа (второе лицо, «ты»): отрицания («не находишь») не считаются. Чистые функции.
 import type { AiToolCall } from '../ai/types'
+import type { SpellDefinition } from '../types/spells'
+import { nameInText } from './spellMatch'
 import type { ToolOutcome } from './masterTools'
 import type { TurnDelta } from './turnChanges'
 
@@ -63,8 +65,37 @@ export function claimReminder(problems: string[]): string {
     '[Код игры] Текст не совпадает с состоянием игры: ' +
     problems.join('; ') +
     '. Текст не может обещать того, чего нет в состоянии. Если это честно по правилам (есть источник, нужен бросок) — ' +
-    'вызови нужный инструмент (give_item/change_gold с source, request_check, change_hp с dice). Если нет — напиши ответ ' +
+    'вызови нужный инструмент (cast_spell для заклинания героя, give_item/change_gold с source, request_check, change_hp с dice). Если нет — напиши ответ ' +
     'заново целиком, без этого утверждения: игрок только попытался, исход решают правила. Не упоминай, что исправляешь. ' +
     'Если всё исправлено инструментами и текст верен — ответь пустым текстом.'
   )
+}
+
+// ---------- Заклинание игрока ----------
+
+/** Глаголы, которыми игрок заявляет сотворение: «кастую», «колдую», «творю», «бросаю», «использую»… */
+const CAST_VERBS =
+  /(?<!\p{L})(?:кастую|скастую|кастанул|колдую|наколдую|творю|сотворяю|сотворю|накладываю|наложу|читаю|прочитаю|произношу|применяю|использую|бросаю|запускаю|пускаю|выпускаю|cast)(?!\p{L})/iu
+
+/**
+ * Какое заклинание героя игрок заявил сотворить: после глагола сотворения в реплике есть все слова названия (в любом
+ * падеже). null — не заклинание героя (или не каст): тогда решает ведущий (невозможное — вежливый отказ).
+ */
+export function castIntent(playerText: string, known: readonly SpellDefinition[]): SpellDefinition | null {
+  const verb = CAST_VERBS.exec(playerText)
+  if (!verb) return null
+  const rest = playerText.slice(verb.index)
+  // Самое длинное подходящее название — точнее («Огненные ладони», а не что-то из одного слова).
+  const hits = known.filter((s) => nameInText(s.name, rest) || (s.nameEn ? nameInText(s.nameEn, rest) : false))
+  return hits.sort((a, b) => b.name.split(' ').length - a.name.split(' ').length)[0] ?? null
+}
+
+/**
+ * Игрок заявил сотворение заклинания из списка героя, а ведущий не вызвал cast_spell (и движок не отказывал — вызова
+ * не было вовсе): просьба вызвать инструмент. Заклинание героя — не «невозможное», его не оспаривают.
+ */
+export function castProblems(playerText: string, known: readonly SpellDefinition[], toolCalls: readonly { call: AiToolCall; outcome: ToolOutcome }[]): string[] {
+  const spell = castIntent(playerText, known)
+  if (!spell || toolCalls.some((t) => t.call.name === 'cast_spell')) return []
+  return [`игрок сотворяет «${spell.name}» — это заклинание героя (${spell.id}), но cast_spell не вызван: вызови cast_spell (spell: ${spell.id}) и опиши исход по результату движка, не оспаривай заклинание из списка героя`]
 }

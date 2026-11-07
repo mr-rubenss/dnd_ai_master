@@ -68,6 +68,14 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('**Текст не обещает того, чего нет в состоянии.**')
   })
 
+  it('заклинание из списка героя: всегда cast_spell по id, не оспаривать; отказ — только если его нет у героя', () => {
+    expect(DM_PROMPT).toContain('**Заклинание из списка героя не оспаривай и не отказывай в нём.**')
+    expect(DM_PROMPT).toContain('**всегда вызов `cast_spell`**')
+    expect(DM_PROMPT).toContain('«кастую малой иллюзией»')
+    expect(DM_PROMPT).toContain('**Заклинание из листа героя — не «невозможное».**')
+    expect(DM_PROMPT).toContain('«кастую полёт» у героя без «Полёта»')
+  })
+
   it('вопросы вне игры и защита роли', () => {
     expect(DM_PROMPT).toContain('## Вопросы вне игры')
     expect(DM_PROMPT).toContain('[Вопрос вне игры]')
