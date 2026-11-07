@@ -18,7 +18,7 @@ export interface Walks {
   walking: Set<string>
 }
 
-export function useWalks(targets: Record<string, CellPosition>, path: (from: CellPosition, to: CellPosition) => CellPosition[] | null): Walks {
+export function useWalks(targets: Record<string, CellPosition>, path: (from: CellPosition, to: CellPosition, id: string) => CellPosition[] | null): Walks {
   const [state, setState] = useState<Walks>({ pos: targets, walking: new Set() })
   const current = useRef(targets)
   const queues = useRef<Record<string, CellPosition[]>>({})
@@ -44,7 +44,7 @@ export function useWalks(targets: Record<string, CellPosition>, path: (from: Cel
         delete queues.current[id]
         continue
       }
-      let steps = reducedMotion() ? null : pathRef.current(from, to)
+      let steps = reducedMotion() ? null : pathRef.current(from, to, id)
       if (!steps || steps.length === 0 || steps.length > MAX_WALK_STEPS) steps = [to]
       queues.current[id] = steps
     }

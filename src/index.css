@@ -4881,3 +4881,73 @@ textarea {
   color: var(--color-danger-text);
   overflow-wrap: anywhere;
 }
+
+/* ---------- Перемещение героя по карте ---------- */
+
+.player-token.is-draggable { cursor: grab; touch-action: none; }
+.player-token.is-dragging { cursor: grabbing; }
+.player-token.is-dragging .player-core { opacity: 0.55; }
+
+/* Клетки, куда не дойти (стены, закрытые двери, мебель, НПС) — красноватая тень. */
+.map-unreachable { fill: var(--map-npc-hostile); fill-opacity: 0.32; }
+.drag-path {
+  fill: none;
+  stroke: var(--map-highlight);
+  stroke-width: 0.12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.25 0.18;
+}
+.drag-ghost { fill: var(--map-player-fill); fill-opacity: 0.45; stroke: var(--map-highlight); stroke-width: 0.06; }
+.drag-target.is-invalid .drag-ghost { fill: var(--map-npc-hostile); stroke: var(--map-npc-hostile); }
+.drag-label {
+  font-family: var(--font-ui);
+  font-size: var(--text-map-label);
+  font-weight: 700;
+  fill: var(--map-npc-label);
+  stroke: var(--map-npc-label-outline);
+  stroke-width: 0.12;
+  paint-order: stroke;
+  text-anchor: middle;
+}
+.drag-target.is-invalid .drag-label { fill: var(--color-danger-text); }
+
+.map-notice {
+  position: absolute;
+  left: 50%;
+  top: var(--space-6);
+  z-index: 2;
+  max-width: 90%;
+  margin: 0;
+  padding: var(--space-4) var(--space-10);
+  transform: translateX(-50%);
+  border: 1px solid var(--color-danger-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-tooltip-bg);
+  color: var(--color-danger-text);
+  font-size: var(--text-78);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Меню действий у закреплённой подсказки. */
+.map-tooltip--menu { pointer-events: auto; }
+.map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+.map-action {
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-panel-raised);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: var(--text-78);
+  cursor: pointer;
+}
+.map-action:hover:not(:disabled) { border-color: var(--color-accent); }
+.map-action:disabled { opacity: 0.45; cursor: default; }
+.map-action:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }

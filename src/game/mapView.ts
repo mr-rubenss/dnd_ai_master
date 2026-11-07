@@ -1,7 +1,8 @@
 // Общая отрисовка карт трёх масштабов (клеточная, частичная, общая) — чистые расчёты без React: профиль вида
 // карты (сетка, свет, размер фишек), области пола по типам, источники света, подпись масштаба, путь фишки по клеткам
 // и математика масштабирования и сдвига. Компоненты — src/components/LocationMap.tsx и соседние файлы карты.
-import { canStep, isFloor, type DoorStates } from '../engine/movement'
+import { isFloor, type DoorStates } from '../engine/movement'
+import { findPath } from '../engine/pathfinding'
 import {
   DEFAULT_LIGHTS,
   type AmbientLight,
@@ -116,32 +117,17 @@ export const DARKNESS_OPACITY: Record<AmbientLight, number> = { bright: 0, dim: 
 export const MAX_WALK_STEPS = 24
 
 /**
- * Кратчайший путь по клеткам (с диагоналями) с учётом стен и закрытых дверей — для анимации перемещения фишки.
- * Без начальной клетки; null — пути нет.
+ * Кратчайший путь по клеткам (A*, с диагоналями) с учётом стен и закрытых дверей — для анимации перемещения фишки.
+ * Без начальной клетки; null — пути нет. `blocked` — занятые клетки (для героя — НПС и мебель).
  */
-export function walkPath(location: LocationData, from: CellPosition, to: CellPosition, doors: DoorStates = {}): CellPosition[] | null {
-  if (from.x === to.x && from.y === to.y) return []
-  const key = (c: CellPosition) => c.y * location.width + c.x
-  const prev = new Map<number, number>([[key(from), -1]])
-  let frontier: CellPosition[] = [from]
-  while (frontier.length && !prev.has(key(to))) {
-    const next: CellPosition[] = []
-    for (const c of frontier) {
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const n = { x: c.x + dx, y: c.y + dy }
-          if ((dx === 0 && dy === 0) || prev.has(key(n)) || n.x < 0 || n.y < 0 || n.x >= location.width || n.y >= location.height) continue
-          if (!canStep(location, c, n, doors)) continue
-          prev.set(key(n), key(c))
-          next.push(n)
-        }
-    }
-    frontier = next
-  }
-  if (!prev.has(key(to))) return null
-  const path: CellPosition[] = []
-  for (let k = key(to); k !== key(from); k = prev.get(k)!) path.push({ x: k % location.width, y: Math.floor(k / location.width) })
-  return path.reverse()
+export function walkPath(
+  location: LocationData,
+  from: CellPosition,
+  to: CellPosition,
+  doors: DoorStates = {},
+  blocked?: (cell: CellPosition) => boolean,
+): CellPosition[] | null {
+  return findPath(location, from, to, { doors, blocked })
 }
 
 // ---------- Масштаб и сдвиг ----------

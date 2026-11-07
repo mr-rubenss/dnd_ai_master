@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SettingsButton, SettingsPanel, type SettingsTab } from './components/SettingsPanel'
 import { CharacterCreation } from './components/creation/CharacterCreation'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
@@ -14,6 +14,10 @@ import type { RestKind } from './types/story'
 import { needsSheetCompletion } from './game/sheetCompletion'
 import { GameClock } from './components/GameClock'
 import { MapPanel } from './components/MapPanel'
+import type { HeroMovement, MapActions } from './components/LocationMap'
+import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
+import { walkPath } from './game/mapView'
+import type { CellPosition } from './types/location'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
 import { PlayerInput, type InputMode } from './components/PlayerInput'
@@ -588,6 +592,27 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   const changeMasteries = (weapons: string[]) => appStore.dispatch({ type: 'weaponMasteriesChosen', heroId: lead.heroId, weapons }, player(lead.heroId))
   const prepareSpells = (prepared: string[]) => appStore.dispatch({ type: 'preparedSpellsChanged', heroId: lead.heroId, prepared }, player(lead.heroId))
 
+  // Карта: игрок двигает своего героя (действие heroMoved через хранилище) и выбирает действия в меню у НПС и предметов.
+  const movement = useMemo<HeroMovement | undefined>(() => {
+    if (readOnly) return undefined
+    const heroId = lead.heroId
+    const doors = story.world.doors[location.id] ?? {}
+    const blocker = heroBlocker(location, story, heroId)
+    const moveTo = (to: CellPosition) => appStore.dispatch({ type: 'heroMoved', heroId, to }, player(heroId))
+    return {
+      plan: (to) => heroMovePlan(location, story, heroId, to),
+      reachable: () => heroReachable(location, story, heroId),
+      path: (from, to) => walkPath(location, from, to, doors, (c) => blocker(c) !== null),
+      move: moveTo,
+      approach: (area) => {
+        const near = approachCell(location, story, heroId, area)
+        if (!near) return 'Не подойти: путь перекрыт.'
+        return near.plan.path.length ? moveTo(near.cell) : null
+      },
+    }
+  }, [readOnly, lead.heroId, location, story])
+  const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleEquipChange = (change: EquipmentChange): string | null => {
     const result = equipmentEvent(lead, itemCatalog, change)
     if (!result.ok) return result.reason
@@ -598,7 +623,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} />
+          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} />
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}

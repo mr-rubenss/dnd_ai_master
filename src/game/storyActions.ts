@@ -24,6 +24,7 @@ import {
 import type { AdventureData } from './adventure'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
+import { heroMovePlan } from './heroMove'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -329,6 +330,8 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       }))
     case 'npcUpdated':
       return updateLocation(state, action.locationId, (l) => ({ ...l, npcs: l.npcs.map((n) => (n.id === action.npcId ? applyNpcChanges(n, action.changes) : n)) }))
+    case 'heroMoved':
+      return updateMember(state, action.heroId, (m) => ({ ...m, position: { x: action.to.x, y: action.to.y } }))
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]
       const npcs = location.npcs.map((n) => (n.id === action.npcId ? { ...n, x: action.to.x, y: action.to.y } : n))
@@ -653,6 +656,13 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!isNonEmptyString(action.npc.id) || !isNonEmptyString(action.npc.name)) return 'У НПС нужны id и имя.'
       if (location.npcs.some((n) => n.id === action.npc.id)) return `НПС с id «${action.npc.id}» уже есть.`
       return isFloor(location, action.npc.x, action.npc.y) ? null : 'НПС может стоять только на полу.'
+    }
+    case 'heroMoved': {
+      // Героя двигает его игрок (или движок); путь — по правилам карты.
+      if (action.author.kind === 'master') return 'Героя передвигает игрок, а не ведущий.'
+      if (action.author.kind === 'player' && action.author.heroId !== action.heroId) return 'Игрок двигает только своего героя.'
+      const plan = heroMovePlan(currentLocation(state), state, action.heroId, action.to)
+      return typeof plan === 'string' ? plan : null
     }
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]

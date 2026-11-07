@@ -240,6 +240,8 @@ export type StoryEvent =
   /** Изменение объекта: название, описание, вид, положение, размер. */
   | { type: 'objectUpdated'; locationId: string; objectId: string; changes: Partial<Omit<MapObject, 'id'>> }
   | { type: 'npcMoved'; locationId: string; npcId: string; to: CellPosition }
+  /** Игрок передвинул своего героя по карте (путь проверяет движок: стены, двери, занятые клетки). */
+  | { type: 'heroMoved'; heroId: string; to: CellPosition }
   /** Ведущий обновил НПС: занятие, цель, отношение и т. п. (пустая строка — убрать поле). */
   | { type: 'npcUpdated'; locationId: string; npcId: string; changes: NpcChanges }
   | { type: 'doorChanged'; locationId: string; doorId: string; state: DoorState }

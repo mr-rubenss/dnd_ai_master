@@ -72,6 +72,8 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
     let suppressClick = false
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.button !== 0) return
+      // Токен героя перетаскивается сам (LocationMap) — карту в это время не сдвигаем.
+      if ((e.target as Element | null)?.closest?.('[data-draggable]')) return
       drag = { x: e.clientX, y: e.clientY, start: view.current, moved: false, id: e.pointerId }
     }
     const onPointerMove = (e: PointerEvent) => {
@@ -118,6 +120,11 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
       moving()
     }
     const onTouchMove = (e: TouchEvent) => {
+      // Палец тащит токен героя — страница не прокручивается (слушатель не пассивный с самого начала касания).
+      if (box.dataset.tokenDrag === '1') {
+        e.preventDefault()
+        return
+      }
       if (!pinch || e.touches.length !== 2) return
       e.preventDefault()
       const t = touchInfo(e.touches)
