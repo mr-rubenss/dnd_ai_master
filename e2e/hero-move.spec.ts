@@ -135,7 +135,7 @@ test('меню действий: «Поговорить» с НПС, «Откр�
   await expect(page.locator('.message--master').last()).toContainText('Ведущий задумчиво молчит')
 
   await press('door-entrance')
-  await expect(menu.locator('button')).toHaveText(['Подойти', 'Осмотреть', 'Открыть'])
+  await expect(menu.locator('button')).toHaveText(['Подойти', 'Осмотреть', 'Открыть', 'Выйти'])
   await expect(page.locator('.message--master').last()).toContainText('Ведущий задумчиво молчит')
   await menu.getByRole('button', { name: 'Открыть' }).click()
   await expect(page.locator('.message--player').last()).toHaveText(/Открываю дверь «Входная дверь»\./)

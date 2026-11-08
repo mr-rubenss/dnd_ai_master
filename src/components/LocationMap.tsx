@@ -23,7 +23,7 @@ import { mapAreaResult, type AreaCreature } from '../game/mapAreas'
 import { AreaOverlay, MeasureInfo, MeasureToolbar, RulerOverlay } from './MapMeasure'
 import { rulerText, templateFromDrag, type MeasureTool, type Measurement } from '../game/mapMeasure'
 import { useMapChanges } from './useMapChanges'
-import { EFFECT_KIND_NAMES, FLAT_OBJECT_TYPES, type MapEffect, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
+import { EFFECT_KIND_NAMES, EXIT_KIND_NAMES, FLAT_OBJECT_TYPES, type MapEffect, type MapExit, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
 import type { HeroMovePlan } from '../game/heroMove'
 import { entityActions } from '../game/mapActions'
 import { MapDefs } from './MapDefs'
@@ -70,7 +70,9 @@ const OBJECT_ORDER = (o: MapObject) => (o.type === 'rug' ? 0 : o.type === 'candl
 interface MapEntity {
   key: string
   /** Что это — для меню действий. */
-  kind: 'npc' | 'object' | 'door' | 'window'
+  kind: 'npc' | 'object' | 'door' | 'window' | 'exit'
+  /** Выход в другую локацию (у выхода и у двери, через которую он ведёт). */
+  exitId?: string
   /** Вид объекта (для «Взять») или состояние двери (для «Открыть/Закрыть»). */
   type?: MapObjectType
   doorState?: DoorState
@@ -107,6 +109,8 @@ export interface HeroMovement {
 /** Действия героя из меню карты — сообщение ведущему от имени героя. */
 export interface MapActions {
   send: (text: string) => void
+  /** «Выйти»: герой идёт к выходу, отряд переходит на другую карту (или ведущий создаёт её). */
+  leave?: (exitId: string) => string | null
   /** Ведущий отвечает или история только для чтения — действия недоступны. */
   disabled: boolean
 }
@@ -196,6 +200,11 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
         : changes.objects,
     [changes.objects, vision],
   )
+  // Значки выходов видны, как обстановка: в исследованных клетках. Выход через дверь — без значка: «Выйти» в меню двери.
+  const exitsShown = useMemo(
+    () => (location.exits ?? []).filter((e) => !(e.door && location.doors.some((d) => d.id === e.door)) && (!vision || vision.explored.has(`${e.x},${e.y}`))),
+    [location.exits, location.doors, vision],
+  )
   const spawned = changes.spawned
   const spawn = useCallback((id: string) => (spawned.has(id) ? exit : null), [spawned, exit])
   const targets = useMemo(() => {
@@ -238,9 +247,11 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
       map.set(`obj:${obj.id}`, { key: `obj:${obj.id}`, kind: 'object', type: obj.type, name: obj.name, kindLabel: OBJECT_TYPE_LABELS[obj.type], description: obj.description, x: obj.x, y: obj.y, w: obj.w ?? 1, h: obj.h ?? 1 })
     }
     for (const door of location.doors) {
+      const exit = location.exits?.find((e) => e.door === door.id)
       map.set(`door:${door.id}`, {
         key: `door:${door.id}`,
         kind: 'door',
+        ...(exit ? { exitId: exit.id } : {}),
         doorState: doorState(door, doors),
         name: door.name,
         kindLabel: `Дверь · ${DOOR_STATE_LABELS[doorState(door, doors)]}`,
@@ -250,6 +261,17 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     }
     for (const win of location.windows) {
       map.set(`window:${win.id}`, { key: `window:${win.id}`, kind: 'window', name: win.name ?? 'Окно', kindLabel: 'Окно', description: win.description, ...segmentBox(win, 0.3) })
+    }
+    for (const exit of exitsShown) {
+      map.set(`exit:${exit.id}`, {
+        key: `exit:${exit.id}`,
+        kind: 'exit',
+        exitId: exit.id,
+        name: exit.name,
+        kindLabel: `Выход · ${EXIT_KIND_NAMES[exit.kind]}`,
+        description: exit.description,
+        ...EXIT_BADGE_BOX(exit),
+      })
     }
     for (const npc of npcsShown) {
       map.set(`npc:${npc.id}`, {
@@ -266,7 +288,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
       })
     }
     return map
-  }, [location, doors, objectsShown, npcsShown])
+  }, [location, doors, objectsShown, npcsShown, exitsShown])
 
   // Закрыть подсказку по Escape.
   useEffect(() => {
@@ -541,6 +563,11 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
   const runAction = (entity: MapEntity, action: { id: string; text: string }) => {
     setActive(null)
     if (!actions || actions.disabled) return
+    if (action.id === 'leave' && entity.exitId) {
+      const reason = actions.leave?.(entity.exitId)
+      if (reason) say(reason)
+      return
+    }
     if (action.id === 'approach' && movement) {
       const reason = movement.approach({ x: entity.x, y: entity.y, w: entity.w, h: entity.h })
       if (reason) return say(reason)
@@ -675,6 +702,13 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                       <circle cx={0.5} cy={0.5} r={0.36} fill="url(#player-fill)" className="player-core" />
                     </g>
                   </g>
+                  {/* Выходы (кроме дверей — у двери «Выйти» в её меню): значок в углу клетки, поверх фишек. */}
+                  {exitsShown.map((exit) => (
+                    <g key={exit.id} {...interactiveProps(`exit:${exit.id}`)} data-testid={`exit-${exit.id}`} data-kind={exit.kind} data-x={exit.x} data-y={exit.y}>
+                      <rect {...hitBox(entities.get(`exit:${exit.id}`))} className="hit-area" />
+                      <ExitBadge exit={exit} />
+                    </g>
+                  ))}
                 </g>
 
                 <EffectLayer effects={location.effects} />
@@ -889,6 +923,23 @@ const FogLayer = memo(function FogLayer({ location, vision }: { location: Locati
     </g>
   )
 })
+
+/** Область значка выхода — нижний левый угол клетки (центр клетки — для фишек, верхний правый — для меток игрока). */
+const EXIT_BADGE_BOX = (exit: CellPosition) => ({ x: exit.x, y: exit.y + 0.56, w: 0.44, h: 0.44 })
+
+/** Значок выхода: кружок со стрелкой (у лестницы — ступени). */
+function ExitBadge({ exit }: { exit: MapExit }) {
+  return (
+    <g className={`map-exit map-exit--${exit.kind}`} transform={`translate(${exit.x + 0.22} ${exit.y + 0.78}) scale(0.8)`} pointerEvents="none">
+      <circle r={0.24} className="map-exit-badge" />
+      {exit.kind === 'stairs' ? (
+        <path d="M-0.13 0.1h0.09v-0.08h0.09v-0.08h0.09" className="map-exit-glyph" />
+      ) : (
+        <path d="M-0.12 0h0.22M0.03 -0.09l0.09 0.09l-0.09 0.09" className="map-exit-glyph" />
+      )}
+    </g>
+  )
+}
 
 /** Эффекты ведущего (огонь, дым, тьма, лужа, свечение) — области поверх обстановки и фишек. */
 const EffectLayer = memo(function EffectLayer({ effects }: { effects?: MapEffect[] }) {

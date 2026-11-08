@@ -80,6 +80,7 @@ describe('описания инструментов', () => {
       'remove_effect',
       'reveal',
       'create_location',
+      'travel',
       'set_combat',
     ])
     for (const t of MASTER_TOOLS) expect(t.parameters).toMatchObject({ type: 'object', additionalProperties: false })

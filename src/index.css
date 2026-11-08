@@ -5147,3 +5147,20 @@ textarea {
   font-family: var(--font-ui);
   font-size: var(--text-input); /* иначе iOS увеличивает страницу при фокусе */
 }
+
+/* Выходы в другие локации (LocationMap: ExitBadge) и путь отряда над картой (MapPanel). */
+.map-exit-badge { fill: var(--map-npc-label-outline); stroke: var(--map-selection); stroke-width: 0.05; }
+.map-exit-glyph { fill: none; stroke: var(--map-npc-label); stroke-width: 0.05; stroke-linecap: round; stroke-linejoin: round; }
+.map-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-75);
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.map-trail li + li::before { content: '›'; margin-right: var(--space-4); }
+.map-trail li[aria-current='location'] { color: var(--color-accent-bright); }

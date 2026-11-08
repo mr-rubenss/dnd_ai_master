@@ -89,6 +89,8 @@ export interface World {
    * Нет поля — меток ещё не ставили.
    */
   marks?: PlayerMark[]
+  /** Путь отряда: локации по порядку прихода (src/game/travel.ts, строка над картой). Нет поля — только текущая. */
+  trail?: string[]
 }
 
 export const MARK_ICONS = ['question', 'danger', 'cache', 'note'] as const
@@ -345,6 +347,10 @@ export type StoryEvent =
   | { type: 'areaExplored'; locationId: string; cells: number[] }
   /** Ведущий создал новую локацию (create_location): проверенная, в полной записи; дальше она живёт в мире истории. */
   | { type: 'locationCreated'; location: LocationData }
+  /** Выход локации теперь ведёт в локацию `to` (к её входу `toExit`) — движок при переходе (src/game/travel.ts). */
+  | { type: 'exitLinked'; locationId: string; exitId: string; to: string; toExit?: string }
+  /** Отряд перешёл через выход `exitId` из `from` в `to`; герои — в клетках `positions` у входа `arrivalExitId`. */
+  | { type: 'partyTraveled'; from: string; to: string; exitId: string; arrivalExitId?: string; positions: Record<string, CellPosition> }
   /** Метки игрока на карте: поставить, изменить текст и значок, убрать (src/game/marks.ts). */
   | { type: 'markPlaced'; mark: PlayerMark }
   | { type: 'markEdited'; markId: string; icon: MarkIcon; text: string }

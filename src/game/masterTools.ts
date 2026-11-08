@@ -12,6 +12,7 @@ import { isUsable, type ItemCatalog } from '../types/items'
 import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type EffectKind, type LocationData, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
 import { parseCreatedLocation } from './locationCreate'
+import { travelNote, travelPlan, type TravelPlan } from './travel'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
@@ -442,6 +443,20 @@ export const MASTER_TOOLS: AiTool[] = [
       'exits [{id, kind: door|road|stairs|edge, name, x, y, door, to}] — хотя бы один: клетка пола у выхода (edge — на краю карты, door — вплотную к двери, door — её id; to — id локации, куда ведёт), ' +
       'playerStart {x, y} — клетка пола. Весь пол должен быть достижим от playerStart. Тексты — на русском, без раскрытия тайн.',
     parameters: object({ location: { type: 'object', description: 'JSON локации в формате выше.' } }, ['location']),
+  },
+  {
+    name: 'travel',
+    description:
+      'Перевести отряд на другую карту через выход текущей локации (дверь наружу, дорога, лестница, край карты): игрок пишет «выхожу на улицу», ' +
+      '«спускаюсь в подвал», «иду по дороге в деревню». Движок поставит героев у соответствующего входа новой карты. Если карты места ещё нет ' +
+      '(выход ведёт «не задано» или в несозданную) — сначала create_location (с выходом назад), затем travel с to = её id. После перехода опиши новое место.',
+    parameters: object(
+      {
+        exit: str('id или название выхода текущей локации (раздел «Выходы в другие локации»).'),
+        to: str('id локации, куда ведёт выход, — только если выход ещё никуда не ведёт (новая карта из create_location).'),
+      },
+      ['exit'],
+    ),
   },
   {
     name: 'set_combat',
@@ -1469,6 +1484,14 @@ const HANDLERS: Record<string, Handler> = {
         message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток, выходы: ${exits.join('; ')}. Она сохранена в мире истории — второй раз не создавай.`,
       },
     }
+  },
+
+  travel(state, args) {
+    const plan = travelPlan(state, text(args, 'exit', true)!, text(args, 'to'))
+    if (typeof plan === 'string') reject(plan)
+    const p = plan as TravelPlan
+    const lead = state.party.find((m) => !m.fallen)?.character.name ?? 'Отряд'
+    return { events: p.events.map((event) => ({ event, author: ENGINE })), result: { location: p.to.id, message: travelNote(p, lead) } }
   },
 
   set_combat(state, args, ctx) {

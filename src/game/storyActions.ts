@@ -30,6 +30,7 @@ import { mergeMove } from './mapEvents'
 import { mergeExplored } from './vision'
 import { markChangeProblem, markPlaceProblem } from './marks'
 import { createdLocationProblem } from './locationCreate'
+import { exitLinkedProblem, nextTrail, partyTraveledProblem, trailOf } from './travel'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -383,6 +384,24 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     }
     case 'locationCreated':
       return { ...state, world: { ...state.world, locations: { ...state.world.locations, [action.location.id]: structuredClone(action.location) } } }
+    case 'exitLinked':
+      return updateLocation(state, action.locationId, (l) => ({
+        ...l,
+        exits: (l.exits ?? []).map((e) => {
+          if (e.id !== action.exitId) return e
+          const { toExit: _t, ...rest } = e
+          return { ...rest, to: action.to, ...(action.toExit ? { toExit: action.toExit } : {}) }
+        }),
+      }))
+    case 'partyTraveled': {
+      // Новая карта: текущая локация, герои у входа, путь отряда; перемещения по старой карте уже не рассказать.
+      const { pendingMoves: _p, ...rest } = state
+      return {
+        ...rest,
+        party: state.party.map((m) => (action.positions[m.heroId] ? { ...m, position: { ...action.positions[m.heroId] } } : m)),
+        world: { ...state.world, currentLocationId: action.to, trail: nextTrail(trailOf(state), action.to) },
+      }
+    }
     case 'markPlaced':
       return { ...state, world: { ...state.world, marks: [...(state.world.marks ?? []), action.mark] } }
     case 'markEdited':
@@ -809,6 +828,12 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const size = location.width * location.height
       return action.cells.length > 0 && action.cells.every((i) => Number.isInteger(i) && i >= 0 && i < size) ? null : 'Клетки за пределами карты.'
     }
+    case 'exitLinked':
+      if (action.author.kind !== 'engine') return 'Выходы связывает движок при переходе.'
+      return exitLinkedProblem(state, action)
+    case 'partyTraveled':
+      if (action.author.kind !== 'engine') return 'Отряд переводит на другую карту движок (инструмент travel или выход на карте).'
+      return partyTraveledProblem(state, action)
     case 'locationCreated':
       if (action.author.kind !== 'master') return 'Новые локации создаёт ведущий.'
       return createdLocationProblem(state, action.location)

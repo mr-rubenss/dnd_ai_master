@@ -17,6 +17,7 @@ import { MapPanel } from './components/MapPanel'
 import type { HeroMovement, MapActions, MapVision } from './components/LocationMap'
 import type { MarkEditor } from './components/MapMarks'
 import { marksOf } from './game/marks'
+import { exitLockProblem, missingMapNote, trailOf, travelNote, travelPlan, travelText } from './game/travel'
 import { exploredCells, newlyExplored, partyVision } from './game/vision'
 import { useAppearance } from './theme/appearanceStore'
 import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
@@ -660,7 +661,48 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       },
     }
   }, [readOnly, lead.heroId, location, story])
-  const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
+  // «Выйти» через выход карты: герой идёт к выходу; карта за ним есть — отряд переходит (действия движка) и ведущий
+  // описывает новое место; карты ещё нет — ведущий получает событие, создаёт её (create_location) и переводит (travel).
+  const leaveVia = (exitId: string): string | null => {
+    const before = appStore.getState().active ?? story
+    const heroId = lead.heroId
+    const from = currentLocation(before)
+    const exit = from.exits?.find((e) => e.id === exitId)
+    if (!exit) return 'Такого выхода здесь нет.'
+    const locked = exitLockProblem(before, from, exit)
+    if (locked) return locked
+    const hero = before.party.find((m) => m.heroId === heroId)!
+    if (hero.position.x !== exit.x || hero.position.y !== exit.y) {
+      const plan = heroMovePlan(from, before, heroId, exit)
+      const near = typeof plan === 'string' ? approachCell(from, before, heroId, { x: exit.x, y: exit.y, w: 1, h: 1 }) : null
+      const to = typeof plan === 'string' ? near?.cell : exit
+      if (!to) return typeof plan === 'string' ? plan : 'Не дойти до выхода.'
+      if (to.x !== hero.position.x || to.y !== hero.position.y) {
+        const reason = appStore.dispatch({ type: 'heroMoved', heroId, to }, player(heroId))
+        if (reason) return reason
+      }
+    }
+    const now = appStore.getState().active ?? before
+    const name = hero.character.name
+    const target = exit.to ? now.world.locations[exit.to] : undefined
+    let report: { text: string; note: string }
+    if (!target) report = { text: `${name}: уходит через «${exit.name}».`, note: missingMapNote(from, exit, name) }
+    else {
+      const plan = travelPlan(now, exit.id)
+      if (typeof plan === 'string') return plan
+      for (const event of plan.events) {
+        const reason = appStore.dispatch(event, ENGINE)
+        if (reason) return reason
+      }
+      report = { text: travelText(plan, name), note: travelNote(plan, name) }
+    }
+    const reason = appStore.dispatch({ type: 'heroMoveReported', heroId, messageId: crypto.randomUUID(), rules: ['exit'], text: report.text, note: report.note.slice(0, MAX_MOVE_TEXT) }, ENGINE)
+    if (reason) return reason
+    devLog.add({ kind: 'map', rules: ['exit'], sent: true })
+    void askMaster()
+    return null
+  }
+  const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), leave: leaveVia, disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Видимость: что отряд видит сейчас (линия видимости, свет, тёмное зрение) и туман войны (исследованное копится
   // действием areaExplored — и при выключенном тумане, чтобы включить его можно было в любой момент).
@@ -677,6 +719,9 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     for (const k of seenNow) explored.add(k)
     return { visible: seenNow, explored }
   }, [appearance.settings.fogOfWar, story, location, seenNow])
+
+  // Путь отряда над картой: локации по порядку прихода.
+  const trailNames = useMemo(() => trailOf(story).map((id) => story.world.locations[id]?.name ?? id), [story])
 
   // Метки игрока: ставит, правит и убирает игрок своего героя (действия хранилища; проверки — src/game/marks.ts).
   const mapMarks = useMemo(() => marksOf(story.world, location.id), [story.world, location.id])
@@ -709,7 +754,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} shownArea={story.shownArea} companions={companions} marks={mapMarks} markEditor={markEditor} />
+          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} shownArea={story.shownArea} companions={companions} marks={mapMarks} markEditor={markEditor} trail={trailNames} />
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}
