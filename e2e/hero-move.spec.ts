@@ -131,7 +131,7 @@ test('меню действий: «Поговорить» с НПС, «Откр�
   await expectNoHorizontalScroll(page)
   await testInfo.attach('меню действий', { body: await page.locator('.map-board').screenshot(), contentType: 'image/png' })
   await menu.getByRole('button', { name: 'Поговорить' }).click()
-  await expect(page.locator('.message--player').last()).toHaveText(/Заговариваю с НПС «Гуннар»\./)
+  await expect(page.locator('.message--player').last()).toHaveText(/Заговариваю с «Гуннар»\./)
   await expect(page.locator('.message--master').last()).toContainText('Ведущий задумчиво молчит')
 
   await press('door-entrance')
@@ -144,7 +144,7 @@ test('меню действий: «Поговорить» с НПС, «Откр�
 
   await press('npc-tobias')
   await menu.getByRole('button', { name: 'Подойти' }).click()
-  await expect(page.locator('.message--player').last()).toHaveText(/Подхожу к НПС «Тобиас»\./)
+  await expect(page.locator('.message--player').last()).toHaveText(/Подхожу к «Тобиас»\./)
   await expect(hero(page)).not.toHaveAttribute('data-walking', 'true')
   const x = Number(await hero(page).getAttribute('data-x'))
   const y = Number(await hero(page).getAttribute('data-y'))

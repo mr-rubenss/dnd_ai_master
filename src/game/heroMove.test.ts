@@ -74,7 +74,11 @@ describe('меню действий на карте', () => {
 
   it('текст — от имени героя', () => {
     const talk = entityActions({ kind: 'npc', name: 'Гуннар' }).find((a) => a.id === 'talk')!
-    expect(talk.text).toBe('Заговариваю с НПС «Гуннар».')
+    expect(talk.text).toBe('Заговариваю с «Гуннар».')
+    // У НПС — без слова «НПС», имя в кавычках без склонения.
+    expect(entityActions({ kind: 'npc', name: 'Тобиас' }).map((a) => a.text)).toEqual(['Подхожу к «Тобиас».', 'Присматриваюсь к «Тобиас».', 'Заговариваю с «Тобиас».'])
+    // Двери и предметы — как раньше.
+    expect(entityActions({ kind: 'object', name: 'Свеча', type: 'candle' }).map((a) => a.text)).toEqual(['Подхожу ближе: «Свеча».', 'Осматриваю: «Свеча».', 'Беру: «Свеча».'])
     expect(entityActions({ kind: 'door', name: 'Входная дверь', doorState: 'locked' }).at(-1)!.text).toBe('Открываю дверь «Входная дверь».')
   })
 })

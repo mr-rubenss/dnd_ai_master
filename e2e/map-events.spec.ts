@@ -114,5 +114,5 @@ test('«Подойти» из меню — одна реплика, без от�
   await expect(page.locator('.message--master').last()).toContainText('Тобиас кивает')
   expect(bodies).toHaveLength(1)
   await expect(page.getByTestId('map-event')).toHaveCount(0)
-  expect(lastUser(bodies[0])).toMatch(/^\[Перемещение на карте\] [\s\S]*вплотную: Тобиас[\s\S]*\nПодхожу к НПС «Тобиас»\.$/)
+  expect(lastUser(bodies[0])).toMatch(/^\[Перемещение на карте\] [\s\S]*вплотную: Тобиас[\s\S]*\nПодхожу к «Тобиас»\.$/)
 })
