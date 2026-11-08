@@ -116,6 +116,13 @@ interface Props {
   actions?: MapActions
   /** Подсветка ведущего (ping): показывается несколько секунд, если появилась при открытой карте. */
   ping?: MapPing
+  /** Туман войны: что отряд видит сейчас и что уже исследовано (ключи «x,y»); нет — видна вся карта. */
+  vision?: MapVision
+}
+
+export interface MapVision {
+  visible: ReadonlySet<string>
+  explored: ReadonlySet<string>
 }
 
 /** Сколько ушедший НПС стоит у выхода, прежде чем исчезнуть, мс. */
@@ -130,7 +137,7 @@ interface DragState {
   reachable: Set<string>
 }
 
-export function LocationMap({ location, player, doors = {}, movement, actions, ping }: Props) {
+export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision }: Props) {
   const { width, height } = location
   const [active, setActive] = useState<ActiveEntity | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -157,14 +164,28 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     // Дойти до выхода и ещё немного постоять у двери — чтобы уход было видно.
     return Math.min(steps, MAX_WALK_STEPS) * WALK_STEP_MS + LEAVE_LINGER_MS
   })
+  // Туман войны: НПС видны только в видимых сейчас клетках; обстановка — в исследованных.
+  const seenNpc = useCallback((n: { x: number; y: number }) => !vision || vision.visible.has(`${n.x},${n.y}`), [vision])
+  const npcsShown = useMemo(() => changes.npcs.filter(seenNpc), [changes.npcs, seenNpc])
+  const leavingShown = useMemo(() => changes.leavingNpcs.filter(seenNpc), [changes.leavingNpcs, seenNpc])
+  const objectsShown = useMemo(
+    () =>
+      vision
+        ? changes.objects.filter((o) => {
+            for (let y = o.y; y < o.y + (o.h ?? 1); y++) for (let x = o.x; x < o.x + (o.w ?? 1); x++) if (vision.explored.has(`${x},${y}`)) return true
+            return false
+          })
+        : changes.objects,
+    [changes.objects, vision],
+  )
   const spawned = changes.spawned
   const spawn = useCallback((id: string) => (spawned.has(id) ? exit : null), [spawned, exit])
   const targets = useMemo(() => {
     const t: Record<string, CellPosition> = { [PLAYER_ID]: player }
-    for (const npc of changes.npcs) t[npc.id] = { x: npc.x, y: npc.y }
-    for (const npc of changes.leavingNpcs) t[npc.id] = exit
+    for (const npc of npcsShown) t[npc.id] = { x: npc.x, y: npc.y }
+    for (const npc of leavingShown) t[npc.id] = exit
     return t
-  }, [changes.npcs, changes.leavingNpcs, player, exit])
+  }, [npcsShown, leavingShown, player, exit])
   const walks = useWalks(targets, path, spawn)
 
   // Подсветка ведущего: только новая (не та, что была при открытии карты), на PING_MS.
@@ -182,7 +203,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
 
   const entities = useMemo(() => {
     const map = new Map<string, MapEntity>()
-    for (const obj of changes.objects) {
+    for (const obj of objectsShown) {
       map.set(`obj:${obj.id}`, { key: `obj:${obj.id}`, kind: 'object', type: obj.type, name: obj.name, kindLabel: OBJECT_TYPE_LABELS[obj.type], description: obj.description, x: obj.x, y: obj.y, w: obj.w ?? 1, h: obj.h ?? 1 })
     }
     for (const door of location.doors) {
@@ -199,7 +220,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     for (const win of location.windows) {
       map.set(`window:${win.id}`, { key: `window:${win.id}`, kind: 'window', name: win.name ?? 'Окно', kindLabel: 'Окно', description: win.description, ...segmentBox(win, 0.3) })
     }
-    for (const npc of changes.npcs) {
+    for (const npc of npcsShown) {
       map.set(`npc:${npc.id}`, {
         key: `npc:${npc.id}`,
         kind: 'npc',
@@ -214,7 +235,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
       })
     }
     return map
-  }, [location, doors, changes.objects, changes.npcs])
+  }, [location, doors, objectsShown, npcsShown])
 
   // Закрыть подсказку по Escape.
   useEffect(() => {
@@ -345,7 +366,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     }
     actions.send(action.text)
   }
-  const objects = useMemo(() => [...changes.objects].sort((a, b) => OBJECT_ORDER(a) - OBJECT_ORDER(b)), [changes.objects])
+  const objects = useMemo(() => [...objectsShown].sort((a, b) => OBJECT_ORDER(a) - OBJECT_ORDER(b)), [objectsShown])
   const heroPos = walks.pos[PLAYER_ID] ?? player
   const tokenR = profile.tokenRadius
 
@@ -411,7 +432,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
               </g>
 
               <g className="map-layer map-layer--tokens">
-                {changes.leavingNpcs.map((npc) => {
+                {leavingShown.map((npc) => {
                   const pos = walks.pos[npc.id] ?? npc
                   return (
                     <g key={`gone-${npc.id}`} className="npc-leaving" data-testid={`npc-leaving-${npc.id}`} data-x={pos.x} data-y={pos.y} pointerEvents="none">
@@ -424,7 +445,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                     </g>
                   )
                 })}
-                {changes.npcs.map((npc) => {
+                {npcsShown.map((npc) => {
                   const pos = walks.pos[npc.id] ?? npc
                   return (
                     <g
@@ -470,11 +491,13 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
 
               <LightLayer width={width} height={height} lights={lights} darkness={darkness} />
 
+              {vision && <FogLayer location={location} vision={vision} />}
+
               <g className="map-layer map-layer--ui" pointerEvents="none">
                 {drag && <DragOverlay location={location} drag={drag} hero={heroPos} />}
                 {shownPing && <PingMarker key={shownPing.id} ping={shownPing} />}
                 {profile.labels &&
-                  changes.npcs.map((npc) => {
+                  npcsShown.map((npc) => {
                     const pos = walks.pos[npc.id] ?? npc
                     return (
                       <g key={npc.id} className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
@@ -584,6 +607,43 @@ const LightLayer = memo(function LightLayer({ width, height, lights, darkness }:
       {lights.map((l) => (
         <circle key={l.id} cx={l.x} cy={l.y} r={Math.max(0.8, l.radius * 0.75)} fill="url(#warm-glow)" className="map-light-glow" data-testid={`light-${l.id}`} />
       ))}
+    </g>
+  )
+})
+
+/**
+ * Туман войны: неисследованные клетки пола закрыты целиком, исследованные, но не видимые сейчас, — затемнены.
+ * По одной фигуре на вид (полосы по строкам), как пол.
+ */
+const FogLayer = memo(function FogLayer({ location, vision }: { location: LocationData; vision: MapVision }) {
+  const { hidden, dimmed } = useMemo(() => {
+    let hiddenD = ''
+    let dimmedD = ''
+    for (let y = 0; y < location.height; y++) {
+      let x = 0
+      while (x < location.width) {
+        const kind = (cx: number) =>
+          location.floorPlan[y][cx] !== '.' ? null : vision.visible.has(`${cx},${y}`) ? null : vision.explored.has(`${cx},${y}`) ? 'dim' : 'hidden'
+        const k = kind(x)
+        if (!k) {
+          x++
+          continue
+        }
+        let end = x + 1
+        while (end < location.width && kind(end) === k) end++
+        const d = `M${x} ${y}h${end - x}v1h${x - end}z`
+        if (k === 'hidden') hiddenD += d
+        else dimmedD += d
+        x = end
+      }
+    }
+    return { hidden: hiddenD, dimmed: dimmedD }
+  }, [location, vision])
+  return (
+    <g className="map-layer map-layer--fog" pointerEvents="none" data-testid="map-fog">
+      {/* Чуть шире клетки — чтобы между полосами не просвечивали швы. */}
+      {hidden && <path d={hidden} className="fog-hidden" data-testid="fog-hidden" />}
+      {dimmed && <path d={dimmed} className="fog-dimmed" data-testid="fog-dimmed" />}
     </g>
   )
 })

@@ -345,6 +345,10 @@ textarea {
 :root[data-motion='reduce'] .map-object-pos.is-leaving { opacity: 0; }
 :root[data-motion='reduce'] .map-entity[data-fresh] .map-token > * { animation: none; }
 
+/* Туман войны: неисследованное закрыто, исследованное, но не видимое сейчас, — затемнено. */
+.fog-hidden { fill: var(--map-background); stroke: var(--map-background); stroke-width: 0.04; }
+.fog-dimmed { fill: var(--map-darkness); opacity: 0.6; }
+
 /* Эффекты ведущего: огонь, дым, тьма, лужа, магическое свечение. */
 .map-effect { stroke-width: 0.04; }
 .map-effect--fire { fill: var(--map-flame); stroke: var(--map-fire-glow); opacity: 0.55; animation: map-flicker 1.4s ease-in-out infinite alternate; }

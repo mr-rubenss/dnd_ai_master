@@ -69,6 +69,7 @@ export function bootAppearance(data: BootData, env: BootEnv): BootResult {
     mapGrid: flag(src.mapGrid, d.mapGrid),
     gridOpacity: Math.round(opacity * 100) / 100,
     npcLabels: flag(src.npcLabels, d.npcLabels),
+    fogOfWar: flag(src.fogOfWar, d.fogOfWar),
     animations: pick(src.animations, ['system', 'on', 'off'], d.animations),
   }
 
@@ -94,6 +95,7 @@ export function bootAppearance(data: BootData, env: BootEnv): BootResult {
   root.dataset.density = settings.density
   root.dataset.mapGrid = settings.mapGrid ? 'on' : 'off'
   root.dataset.npcLabels = settings.npcLabels ? 'on' : 'off'
+  root.dataset.fog = settings.fogOfWar ? 'on' : 'off'
   root.dataset.motion = reduce ? 'reduce' : 'full'
   return { settings, themeId, preview }
 }

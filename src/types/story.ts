@@ -80,6 +80,8 @@ export interface World {
   doors: Record<string, Record<string, DoorState>>
   facts: WorldFact[]
   quests: Quest[]
+  /** Туман войны: исследованные клетки — id локации → строка «0»/«1» по клеткам (строка за строкой). Нет — ничего не исследовано. */
+  explored?: Record<string, string>
 }
 
 export type StoryStatus = 'active' | 'completed'
@@ -301,6 +303,8 @@ export type StoryEvent =
   /** Ведущий указывает на клетку или объект («вот эта дверь») — подсветка на карте. */
   | { type: 'mapPinged'; ping: MapPing }
   /** Скрытый НПС или объект обнаружен (проверка героя или решение ведущего) — теперь виден на карте. */
+  /** Отряд увидел новые клетки (туман войны): индексы y × ширина + x. */
+  | { type: 'areaExplored'; locationId: string; cells: number[] }
   | { type: 'entityRevealed'; locationId: string; kind: 'npc' | 'object'; entityId: string }
   /**
    * Значимое перемещение (вошёл в комнату, вплотную к НПС, скрытая зона, скрылся из виду) — событие ведущему без

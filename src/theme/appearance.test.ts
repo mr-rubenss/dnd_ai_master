@@ -39,7 +39,7 @@ describe('загрузочный скрипт оформления', () => {
     expect(root.vars['--pref-grid-opacity']).toBe('1')
     expect(root.style.fontSize).toBe('100%')
     expect(root.style.colorScheme).toBe('dark')
-    expect(root.dataset).toEqual({ theme: 'dark-fantasy', density: 'normal', mapGrid: 'on', npcLabels: 'on', motion: 'full' })
+    expect(root.dataset).toEqual({ theme: 'dark-fantasy', density: 'normal', mapGrid: 'on', npcLabels: 'on', fog: 'on', motion: 'full' })
   })
 
   it('битые и чужие значения в хранилище заменяются стандартными', () => {
@@ -77,6 +77,7 @@ describe('загрузочный скрипт оформления', () => {
       mapGrid: false,
       gridOpacity: 0.4,
       npcLabels: false,
+      fogOfWar: false,
       animations: 'off',
     }
     const { root, result } = boot({ storage: storageWith(settings) })
@@ -89,7 +90,7 @@ describe('загрузочный скрипт оформления', () => {
     expect(root.style.fontSize).toBe('125%')
     expect(root.vars['--space-12']).toBe('8px')
     expect(root.vars['--pref-grid-opacity']).toBe('0.4')
-    expect(root.dataset).toEqual({ theme: 'sepia', density: 'compact', mapGrid: 'off', npcLabels: 'off', motion: 'reduce' })
+    expect(root.dataset).toEqual({ theme: 'sepia', density: 'compact', mapGrid: 'off', npcLabels: 'off', fog: 'off', motion: 'reduce' })
   })
 
   it('анимации: по умолчанию — как в системе, иначе — выбор игрока', () => {

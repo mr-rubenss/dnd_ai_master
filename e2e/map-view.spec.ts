@@ -22,7 +22,8 @@ async function heroInView(page: Page) {
 
 test('слои по порядку: пол → стены → обстановка → фишки → эффекты → интерфейс; узлов немного', async ({ page }) => {
   const layers = await page.locator('.map-svg > g.map-layer').evaluateAll((gs) => gs.map((g) => [...g.classList].find((c) => c.startsWith('map-layer--'))))
-  expect(layers).toEqual(['map-layer--floor', 'map-layer--walls', 'map-layer--objects', 'map-layer--tokens', 'map-layer--effects', 'map-layer--ui'])
+  // Туман войны — над светом и тьмой, под интерфейсом.
+  expect(layers).toEqual(['map-layer--floor', 'map-layer--walls', 'map-layer--objects', 'map-layer--tokens', 'map-layer--effects', 'map-layer--fog', 'map-layer--ui'])
   // Подписи НПС — в слое интерфейса, поверх тьмы.
   await expect(page.locator('.map-layer--ui .npc-label')).toHaveCount(4)
   // На телефоне не тормозит: пол одной фигурой на тип, а не по клетке.
@@ -31,6 +32,8 @@ test('слои по порядку: пол → стены → обстановк
 })
 
 test('обстановка: кровать, сундук, полка, ковёр, факелы, свечи — с мягкими тенями; подсказка по ним работает', async ({ page, isMobile }, testInfo) => {
+  // Кладовая за запертой дверью — под туманом войны; здесь смотрим всю карту.
+  await page.evaluate(() => (window as unknown as { __aiMasterAppearance: { update(p: object): void } }).__aiMasterAppearance.update({ fogOfWar: false }))
   for (const [id, type] of [
     ['storage-cot', 'bed'],
     ['storage-chest', 'chest'],

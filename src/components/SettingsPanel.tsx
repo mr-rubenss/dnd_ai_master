@@ -270,6 +270,15 @@ export function SettingsPanel({ onClose, initialTab = 'appearance' }: Props) {
                   />
                   Подписи НПС
                 </label>
+                <label className="appearance-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.fogOfWar}
+                    onChange={(e) => update({ fogOfWar: e.target.checked })}
+                    data-testid="fog-of-war"
+                  />
+                  Туман войны (выключите, чтобы видеть всю карту)
+                </label>
               </section>
 
               <section className="appearance-section" aria-labelledby={`${titleId}-motion`}>

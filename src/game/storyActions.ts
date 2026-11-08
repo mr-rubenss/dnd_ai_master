@@ -26,6 +26,7 @@ import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
 import { heroBlocker, heroMovePlan } from './heroMove'
 import { mergeMove } from './mapEvents'
+import { mergeExplored } from './vision'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -370,6 +371,11 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       return updateLocation(state, action.locationId, (l) => ({ ...l, effects: (l.effects ?? []).filter((e) => e.id !== action.effectId) }))
     case 'mapPinged':
       return { ...state, ping: action.ping }
+    case 'areaExplored': {
+      const location = state.world.locations[action.locationId]
+      const bits = mergeExplored(state.world.explored?.[action.locationId], location.width * location.height, action.cells)
+      return { ...state, world: { ...state.world, explored: { ...state.world.explored, [action.locationId]: bits } } }
+    }
     case 'entityRevealed':
       return updateLocation(state, action.locationId, (l) =>
         action.kind === 'npc'
@@ -771,6 +777,13 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!location) return 'В мире этой истории нет такой локации.'
       if (![p.x, p.y, p.w, p.h].every((v) => typeof v === 'number' && Number.isFinite(v)) || p.w <= 0 || p.h <= 0) return 'Неверная область подсветки.'
       return p.x < 0 || p.y < 0 || p.x + p.w > location.width + 0.5 || p.y + p.h > location.height + 0.5 ? 'Подсветка за пределами карты.' : null
+    }
+    case 'areaExplored': {
+      if (action.author.kind === 'master') return 'Исследованное отмечает игра, а не ведущий.'
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      const size = location.width * location.height
+      return action.cells.length > 0 && action.cells.every((i) => Number.isInteger(i) && i >= 0 && i < size) ? null : 'Клетки за пределами карты.'
     }
     case 'entityRevealed': {
       const location = state.world.locations[action.locationId]

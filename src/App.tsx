@@ -14,7 +14,9 @@ import type { RestKind } from './types/story'
 import { needsSheetCompletion } from './game/sheetCompletion'
 import { GameClock } from './components/GameClock'
 import { MapPanel } from './components/MapPanel'
-import type { HeroMovement, MapActions } from './components/LocationMap'
+import type { HeroMovement, MapActions, MapVision } from './components/LocationMap'
+import { exploredCells, newlyExplored, partyVision } from './game/vision'
+import { useAppearance } from './theme/appearanceStore'
 import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
 import { walkPath } from './game/mapView'
 import { MAP_REACTIONS, moveReportEvent, moveSignificance, pendingMoveText, reactionDue } from './game/mapEvents'
@@ -42,7 +44,7 @@ import { ReportButton, ReportDialog, ReportOffer } from './components/TestReport
 import { useCrashOffer } from './components/reportCollect'
 import { reportStore, useReportUi } from './components/reportStore'
 import { traceStore } from './game/turnTrace'
-import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, MAX_MOVE_TEXT, player, type EquipmentChange } from './game/storyActions'
+import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, MAX_MOVE_TEXT, player, SYSTEM, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryEpilogue, StoryEvent, StoryState } from './types/story'
 
@@ -658,6 +660,22 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   }, [readOnly, lead.heroId, location, story])
   const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Видимость: что отряд видит сейчас (линия видимости, свет, тёмное зрение) и туман войны (исследованное копится
+  // действием areaExplored — и при выключенном тумане, чтобы включить его можно было в любой момент).
+  const appearance = useAppearance()
+  const seenNow = useMemo(() => partyVision(location, story, rulesData), [location, story])
+  useEffect(() => {
+    if (readOnly) return
+    const cells = newlyExplored(story, location, seenNow)
+    if (cells.length) void appStore.dispatchTo(story.id, { type: 'areaExplored', locationId: location.id, cells }, SYSTEM)
+  }, [seenNow, story, location, readOnly])
+  const vision = useMemo<MapVision | undefined>(() => {
+    if (!appearance.settings.fogOfWar) return undefined
+    const explored = exploredCells(story, location)
+    for (const k of seenNow) explored.add(k)
+    return { visible: seenNow, explored }
+  }, [appearance.settings.fogOfWar, story, location, seenNow])
+
   const handleEquipChange = (change: EquipmentChange): string | null => {
     const result = equipmentEvent(lead, itemCatalog, change)
     if (!result.ok) return result.reason
@@ -668,7 +686,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} />
+          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} />
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}

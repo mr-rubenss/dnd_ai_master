@@ -57,6 +57,8 @@ export interface AppearanceSettings {
   /** Прозрачность сетки карты: 0.1–1 (1 — как задумано темой). */
   gridOpacity: number
   npcLabels: boolean
+  /** Туман войны на карте: неисследованное скрыто, невидимое сейчас — затемнено (выключить — видна вся карта). */
+  fogOfWar: boolean
   /** system — как в настройке «уменьшить движение» системы. */
   animations: 'system' | 'on' | 'off'
 }
@@ -70,6 +72,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   mapGrid: true,
   gridOpacity: 1,
   npcLabels: true,
+  fogOfWar: true,
   animations: 'system',
 }
 
