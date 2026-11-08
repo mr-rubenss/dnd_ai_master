@@ -25,6 +25,7 @@ import type { AdventureData } from './adventure'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
 import { heroMovePlan } from './heroMove'
+import { mergeMove } from './mapEvents'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -169,9 +170,22 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     case 'heroDied':
       return updateMember(state, action.heroId, (m) => ({ ...m, fallen: true, character: { ...m.character, hp: 0 } }))
     case 'playerSpoke': {
-      const message: ChatMessage = { id: action.messageId, author: 'player', text: action.text, heroId: action.heroId, ...(action.ooc ? { ooc: true } : {}) }
+      const message: ChatMessage = {
+        id: action.messageId,
+        author: 'player',
+        text: action.text,
+        heroId: action.heroId,
+        ...(action.ooc ? { ooc: true } : {}),
+        ...(action.move ? { move: action.move } : {}),
+      }
       const { outOfGame: _o, ...rest } = state
-      return { ...rest, ...(action.ooc ? { outOfGame: true } : {}), messages: [...state.messages, message] }
+      // Перемещения ушли ведущему вместе с репликой.
+      const next = action.move ? withoutPendingMove(rest, action.heroId) : rest
+      return { ...next, ...(action.ooc ? { outOfGame: true } : {}), messages: [...state.messages, message] }
+    }
+    case 'heroMoveReported': {
+      const message: ChatMessage = { id: action.messageId, author: 'system', text: action.text, heroId: action.heroId, mapEvent: { note: action.note } }
+      return { ...withoutPendingMove(state, action.heroId), messages: [...state.messages, message] }
     }
     case 'masterNarrated': {
       const message: ChatMessage = { id: action.messageId, author: 'master', text: action.text, ...(action.ooc ? { ooc: true } : {}) }
@@ -330,8 +344,12 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       }))
     case 'npcUpdated':
       return updateLocation(state, action.locationId, (l) => ({ ...l, npcs: l.npcs.map((n) => (n.id === action.npcId ? applyNpcChanges(n, action.changes) : n)) }))
-    case 'heroMoved':
-      return updateMember(state, action.heroId, (m) => ({ ...m, position: { x: action.to.x, y: action.to.y } }))
+    case 'heroMoved': {
+      // Мелкие перемещения подряд склеиваются (src/game/mapEvents.ts) — уйдут ведущему со следующей репликой.
+      const move = mergeMove(state, currentLocation(state), action.heroId, action.to)
+      const moved = updateMember(state, action.heroId, (m) => ({ ...m, position: { x: action.to.x, y: action.to.y } }))
+      return move ? { ...moved, pendingMoves: { ...state.pendingMoves, [action.heroId]: move } } : moved
+    }
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]
       const npcs = location.npcs.map((n) => (n.id === action.npcId ? { ...n, x: action.to.x, y: action.to.y } : n))
@@ -384,6 +402,17 @@ export interface ActionContext {
  * Так проверяются и действия игрока, и предложения ведущего, и (в будущем) действия, пришедшие по сети.
  */
 /** Что ведущий и движок могут записать во время вопроса вне игры: только ответ (и его переписывание). */
+/** Описание перемещений для ведущего — не длиннее (символов). */
+export const MAX_MOVE_TEXT = 1500
+
+/** Убрать накопленное перемещение героя (рассказано ведущему). */
+function withoutPendingMove<T extends Pick<StoryState, 'pendingMoves'>>(state: T, heroId: string): T {
+  if (!state.pendingMoves?.[heroId]) return state
+  const { [heroId]: _done, ...rest } = state.pendingMoves
+  const { pendingMoves: _all, ...base } = state
+  return (Object.keys(rest).length ? { ...base, pendingMoves: rest } : base) as T
+}
+
 const OUT_OF_GAME_ALLOWED = new Set<StoryEvent['type']>(['masterNarrated', 'masterRewritten'])
 export const OUT_OF_GAME_REFUSAL =
   'Сейчас вопрос вне игры: игра не меняется — ни время, ни отдых, ни броски, ни предметы. Просто ответь игроку как мастер.'
@@ -419,7 +448,13 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       return needMember(action.heroId) ?? (action.author.kind === 'engine' ? null : 'Гибель героя определяет движок по правилам.')
     case 'playerSpoke':
       if (action.author.kind !== 'player' || action.author.heroId !== action.heroId) return 'Говорить за героя может только его игрок.'
+      if (action.move !== undefined && (!isNonEmptyString(action.move) || action.move.length > MAX_MOVE_TEXT)) return 'Описание перемещения пустое или слишком длинное.'
       return isNonEmptyString(action.text) ? null : 'Пустая реплика.'
+    case 'heroMoveReported':
+      if (action.author.kind !== 'engine') return 'О перемещениях героя ведущему сообщает движок.'
+      if (!member(action.heroId)) return 'Этого героя нет в отряде истории.'
+      if (!isNonEmptyString(action.text) || !isNonEmptyString(action.note) || action.note.length > MAX_MOVE_TEXT) return 'Пустое или слишком длинное событие карты.'
+      return null
     case 'masterNarrated':
       if (Boolean(action.ooc) !== Boolean(state.outOfGame))
         return action.ooc ? 'Ответ вне игры — только на вопрос игрока вне игры.' : 'Сейчас вопрос вне игры — ответ ведущего тоже вне игры.'

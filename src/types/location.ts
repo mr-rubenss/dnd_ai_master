@@ -60,6 +60,26 @@ export const DEFAULT_LIGHTS: Partial<Record<MapObjectType, LightRadius>> = {
   fire: { bright: 10, dim: 10 },
 }
 export const NPC_ATTITUDES = ['friendly', 'neutral', 'hostile'] as const
+/**
+ * Скрытые зоны — знает только ведущий, игроку на карте не видны: ловушка, засада, опасное место (скрипучие половицы,
+ * гнилой пол), тайник. Если путь героя проходит через зону — ведущий сразу получает событие и реагирует.
+ */
+export const ZONE_KINDS = ['trap', 'ambush', 'hazard', 'secret'] as const
+export type ZoneKind = (typeof ZONE_KINDS)[number]
+export const ZONE_KIND_NAMES: Record<ZoneKind, string> = { trap: 'ловушка', ambush: 'засада', hazard: 'опасное место', secret: 'тайник' }
+
+/** Скрытая зона — прямоугольник клеток. */
+export interface MapZone {
+  id: string
+  kind: ZoneKind
+  name: string
+  /** Что там на самом деле (заметка ведущего). */
+  description?: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
 export const DOOR_STATES = ['open', 'closed', 'locked'] as const
 
 export type FloorType = (typeof FLOOR_TYPES)[number]
@@ -202,5 +222,7 @@ export interface LocationData {
   windows: MapWindow[]
   objects: MapObject[]
   npcs: Npc[]
+  /** Скрытые зоны (ловушки, засады) — только для ведущего. Нет поля — зон нет. */
+  zones?: MapZone[]
   playerStart: CellPosition
 }

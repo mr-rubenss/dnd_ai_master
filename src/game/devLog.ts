@@ -30,6 +30,8 @@ export type DevLogEntry =
   | { kind: 'verify'; id: number; at: number; status: 'ok' | 'fixed' | 'unresolved'; problems?: string[] }
   /** Сверка текста с состоянием: рассказ утверждал то, чего нет в игре, — ведущего попросили исправить. */
   | { kind: 'claims'; id: number; at: number; problems: string[] }
+  /** Событие карты: значимое перемещение героя ушло ведущему (или пропущено из-за паузы между реакциями). */
+  | { kind: 'map'; id: number; at: number; rules: string[]; sent: boolean }
 
 type NewEntry = DevLogEntry extends infer E ? (E extends DevLogEntry ? Omit<E, 'id' | 'at'> : never) : never
 

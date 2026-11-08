@@ -17,6 +17,7 @@ import { MapPanel } from './components/MapPanel'
 import type { HeroMovement, MapActions } from './components/LocationMap'
 import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
 import { walkPath } from './game/mapView'
+import { MAP_REACTIONS, moveReportEvent, moveSignificance, pendingMoveText, reactionDue } from './game/mapEvents'
 import type { CellPosition } from './types/location'
 import { NarrationLog } from './components/NarrationLog'
 import { NewStoryScreen } from './components/NewStoryScreen'
@@ -41,7 +42,7 @@ import { ReportButton, ReportDialog, ReportOffer } from './components/TestReport
 import { useCrashOffer } from './components/reportCollect'
 import { reportStore, useReportUi } from './components/reportStore'
 import { traceStore } from './game/turnTrace'
-import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, player, type EquipmentChange } from './game/storyActions'
+import { currentLocation, ENGINE, equipmentEvent, leadMember, MASTER, MAX_MOVE_TEXT, player, type EquipmentChange } from './game/storyActions'
 import { appStore, useAppState } from './hooks/useGame'
 import type { StoryEpilogue, StoryEvent, StoryState } from './types/story'
 
@@ -547,12 +548,50 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
   }
 
   const handleSend = (text: string, mode: InputMode = 'action') => {
+    // Накопленные перемещения по карте уходят ведущему вместе с репликой (вопрос вне игры их не забирает).
+    const active = appStore.getState().active ?? story
+    const move = mode === 'action' ? pendingMoveText(active, currentLocation(active), lead.heroId, MAP_REACTIONS) : null
     appStore.dispatch(
-      { type: 'playerSpoke', heroId: lead.heroId, messageId: crypto.randomUUID(), text, ...(mode === 'question' ? { ooc: true } : {}) },
+      {
+        type: 'playerSpoke',
+        heroId: lead.heroId,
+        messageId: crypto.randomUUID(),
+        text,
+        ...(mode === 'question' ? { ooc: true } : {}),
+        ...(move ? { move: move.slice(0, MAX_MOVE_TEXT) } : {}),
+      },
       player(lead.heroId),
     )
     void askMaster()
   }
+
+  /**
+   * Значимое перемещение (правила — src/data/map-reactions.json) — короткая реакция ведущего сразу, без реплики игрока,
+   * не чаще одной за cooldownSeconds. Иначе (или пока ведущий отвечает) перемещение копится до следующей реплики.
+   */
+  const waitingRef = useRef(false)
+  const lastReactionRef = useRef<number | null>(null)
+  const reactRef = useRef<(before: StoryState, heroId: string) => void>(() => {})
+  useEffect(() => {
+    waitingRef.current = waiting
+    reactRef.current = (before, heroId) => {
+      const after = appStore.getState().active
+      if (!after || after.id !== story.id || after.outOfGame || waitingRef.current) return
+      const where = currentLocation(after)
+      const significance = moveSignificance(before, after, heroId, where, MAP_REACTIONS)
+      if (!significance.rules.length) return
+      const now = Date.now()
+      if (!reactionDue(lastReactionRef.current, now, MAP_REACTIONS)) {
+        devLog.add({ kind: 'map', rules: significance.rules, sent: false })
+        return
+      }
+      const report = moveReportEvent(after, where, heroId, significance, MAP_REACTIONS, crypto.randomUUID())
+      if (appStore.dispatch({ ...report, note: report.note.slice(0, MAX_MOVE_TEXT) }, ENGINE)) return
+      lastReactionRef.current = now
+      devLog.add({ kind: 'map', rules: significance.rules, sent: true })
+      void askMaster()
+    }
+  })
 
   const handleRoll = (notation: string, mode: RollMode): string | null => {
     try {
@@ -598,7 +637,13 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     const heroId = lead.heroId
     const doors = story.world.doors[location.id] ?? {}
     const blocker = heroBlocker(location, story, heroId)
-    const moveTo = (to: CellPosition) => appStore.dispatch({ type: 'heroMoved', heroId, to }, player(heroId))
+    // quiet — перемещение — часть действия из меню («Подойти»): реплика уйдёт следом, реакция не нужна.
+    const moveTo = (to: CellPosition, quiet = false) => {
+      const before = appStore.getState().active ?? story
+      const reason = appStore.dispatch({ type: 'heroMoved', heroId, to }, player(heroId))
+      if (!reason && !quiet) reactRef.current(before, heroId)
+      return reason
+    }
     return {
       plan: (to) => heroMovePlan(location, story, heroId, to),
       reachable: () => heroReachable(location, story, heroId),
@@ -607,7 +652,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       approach: (area) => {
         const near = approachCell(location, story, heroId, area)
         if (!near) return 'Не подойти: путь перекрыт.'
-        return near.plan.path.length ? moveTo(near.cell) : null
+        return near.plan.path.length ? moveTo(near.cell, true) : null
       },
     }
   }, [readOnly, lead.heroId, location, story])

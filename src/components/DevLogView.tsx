@@ -86,6 +86,15 @@ function EntryView({ entry }: { entry: DevLogEntry }) {
         ))}
       </li>
     )
+  if (entry.kind === 'map')
+    return (
+      <li className="dev-log-entry" data-testid="dev-log-map" data-sent={entry.sent ? 'true' : 'false'}>
+        <strong>
+          {time(entry.at)} · Событие карты: {entry.sent ? 'реакция ведущего' : 'пауза между реакциями — уйдёт со следующей репликой'}
+        </strong>
+        <span>{entry.rules.join(', ')}</span>
+      </li>
+    )
   if (entry.kind === 'claims')
     return (
       <li className="dev-log-entry" data-testid="dev-log-claims">

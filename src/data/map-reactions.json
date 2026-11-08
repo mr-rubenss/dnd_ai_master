@@ -1,0 +1,12 @@
+{
+  "cooldownSeconds": 20,
+  "nearbyFeet": 30,
+  "nearbyLimit": 5,
+  "coverObjects": ["table", "bar", "barrel", "chest", "shelf", "bed", "fireplace", "debris", "rock", "tree", "building"],
+  "rules": [
+    { "id": "entered-room", "enabled": true, "title": "Герой вошёл в новую комнату" },
+    { "id": "adjacent-npc", "enabled": true, "title": "Герой подошёл вплотную к НПС" },
+    { "id": "hidden-zone", "enabled": true, "title": "Путь героя прошёл через скрытую зону (ловушка, засада)" },
+    { "id": "hid-from-sight", "enabled": true, "title": "Герой спрятался от чьего-то взгляда (НПС видел его и перестал)" }
+  ]
+}

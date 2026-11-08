@@ -7,13 +7,14 @@ import { passivePerception, savingThrowModifier, skillModifier } from '../engine
 import { CONDITION_DEFINITIONS } from '../engine/conditions'
 import { SKILL_DEFINITIONS, SKILLS } from '../engine/skills'
 import type { ItemCatalog } from '../types/items'
-import type { DoorState } from '../types/location'
+import { ZONE_KIND_NAMES, type DoorState } from '../types/location'
 import type { RulesData } from '../types/rules'
 import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
 import { armorClass } from './character'
 import { currentLocation, storyTime } from './storyActions'
 import { npcDigest } from './npcs'
+import { MAP_REACTIONS, positionsText } from './mapEvents'
 import { outdoorLight, partOfDay, timeText, type PartOfDay } from '../engine/time'
 import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
@@ -198,6 +199,9 @@ export function locationText(story: StoryState): string {
   ]
   const doors = location.doors.map((d) => `- ${d.name} — ${DOOR_STATE[doorStates[d.id] ?? d.state]}${d.description ? `: ${d.description}` : ''}`)
   const npcs = location.npcs.map(npcDigest)
+  const zones = (location.zones ?? []).map(
+    (z) => `- ${z.name} — ${ZONE_KIND_NAMES[z.kind]}, клетки ${z.x}–${z.x + z.w - 1} × ${z.y}–${z.y + z.h - 1}${z.description ? `: ${z.description}` : ''}`,
+  )
   return [
     `### ${location.name}`,
     location.description,
@@ -205,6 +209,7 @@ export function locationText(story: StoryState): string {
     rooms.length ? `Помещения: ${rooms.join('; ')}.` : '',
     objects.length ? `Объекты:\n${objects.join('\n')}` : '',
     doors.length ? `Двери:\n${doors.join('\n')}` : '',
+    zones.length ? `Скрытые зоны (игрок их не видит; путь героя через зону — сразу событие):\n${zones.join('\n')}` : '',
     npcs.length
       ? `НПС (личность — твои заметки: не выдавай сразу, раскрывай по крупицам; реплики — из цели и манеры речи):\n${npcs.join('\n')}`
       : 'НПС: никого.',
@@ -251,6 +256,7 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
     timeSectionText(story),
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
+    positionsText(story, currentLocation(story), MAP_REACTIONS),
     quests.length ? `## Задания\n${quests.join('\n')}` : '',
     story.pendingRest
       ? `## Отдых\nИгрок просит: ${REST_NAMES[story.pendingRest.kind].toLowerCase()}. Реши, безопасно ли здесь отдыхать: можно — вызови rest (kind: ${story.pendingRest.kind}), опасно — interrupt_rest с причиной. Если не вызовешь ни то ни другое, отряд отдохнёт.`

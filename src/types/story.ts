@@ -119,8 +119,30 @@ export interface StoryState {
    * storyTime (День 1, 8:00).
    */
   time?: number
+  /**
+   * Перемещения героев по карте, ещё не рассказанные ведущему (мелкие подряд склеены): уходят с ближайшей репликой
+   * игрока или событием «значимое перемещение». Нет поля — ничего не накоплено.
+   */
+  pendingMoves?: Record<string, PendingMove>
   /** Когда закончился последний долгий отдых (игровое время) — для правила «16 часов до следующего». */
   lastLongRestAt?: number
+}
+
+/** Накопленное перемещение героя (src/game/mapEvents.ts, mergeMove). */
+export interface PendingMove {
+  heroId: string
+  locationId: string
+  /** Где стоял до первого из склеенных перемещений. */
+  from: CellPosition
+  to: CellPosition
+  /** Сколько футов прошёл всего. */
+  feet: number
+  /** Сколько перемещений склеено. */
+  moves: number
+  /** Комнаты по пути (id, по порядку, без повторов). */
+  rooms: string[]
+  /** Скрытые зоны по пути (id) — знает только ведущий. */
+  zones: string[]
 }
 
 export type RestKind = 'short' | 'long'
@@ -184,7 +206,8 @@ export type StoryEvent =
   | { type: 'epilogueEdited'; epilogue: StoryEpilogue }
   /** Герой погиб. */
   | { type: 'heroDied'; heroId: string }
-  | { type: 'playerSpoke'; heroId: string; messageId: string; text: string; ooc?: boolean }
+  /** Реплика игрока; move — накопленные перемещения по карте (для ведущего, с обстановкой), уходят вместе с ней. */
+  | { type: 'playerSpoke'; heroId: string; messageId: string; text: string; ooc?: boolean; move?: string }
   /** Ответ ведущего; suggestions — 2–3 подсказки действий для игрока (кнопки под полем ввода). */
   | { type: 'masterNarrated'; messageId: string; text: string; suggestions?: string[]; ooc?: boolean }
   /** Игрок попросил переписать последний ответ ведущего: новый текст на месте старого (что случилось — не меняется). */
@@ -242,6 +265,11 @@ export type StoryEvent =
   | { type: 'npcMoved'; locationId: string; npcId: string; to: CellPosition }
   /** Игрок передвинул своего героя по карте (путь проверяет движок: стены, двери, занятые клетки). */
   | { type: 'heroMoved'; heroId: string; to: CellPosition }
+  /**
+   * Значимое перемещение (вошёл в комнату, вплотную к НПС, скрытая зона, скрылся из виду) — событие ведущему без
+   * реплики игрока (движок). text — для игрока в ленте, note — для ведущего (с тем, чего герой не знает).
+   */
+  | { type: 'heroMoveReported'; heroId: string; messageId: string; text: string; note: string; rules: string[] }
   /** Ведущий обновил НПС: занятие, цель, отношение и т. п. (пустая строка — убрать поле). */
   | { type: 'npcUpdated'; locationId: string; npcId: string; changes: NpcChanges }
   | { type: 'doorChanged'; locationId: string; doorId: string; state: DoorState }

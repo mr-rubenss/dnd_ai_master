@@ -63,6 +63,11 @@ export function masterSystemPrompt(story: StoryState, verbosity: Verbosity, ctx:
 /** Пометки вопроса и ответа вне игры в запросе к модели. */
 export const OOC_QUESTION_MARK = '[Вопрос вне игры]'
 export const OOC_ANSWER_MARK = '[Ответ вне игры]'
+/** Перемещения героя по карте до реплики игрока (склеенные мелкие). */
+export const MOVE_MARK = '[Перемещение на карте]'
+/** Значимое перемещение без реплики игрока: ведущий коротко реагирует. */
+export const MAP_EVENT_MARK =
+  '[Событие на карте — игрок ничего не писал; коротко (1–3 предложения) опиши, что герой видит и как реагирует мир, не решай за героя]'
 
 /** Сообщение ленты для модели: ведущий — assistant (с подсказками, как он их писал), игрок — user, броски — заметки. */
 export function chatToAi(story: StoryState, m: ChatMessage): AiMessage {
@@ -74,8 +79,10 @@ export function chatToAi(story: StoryState, m: ChatMessage): AiMessage {
     const multi = story.party.length > 1
     const name = story.party.find((p) => p.heroId === m.heroId)?.character.name ?? 'Игрок'
     const text = multi && m.heroId ? `${name}: ${m.text}` : m.text
-    return { role: 'user', content: m.ooc ? `${OOC_QUESTION_MARK} ${text}` : text }
+    if (m.ooc) return { role: 'user', content: `${OOC_QUESTION_MARK} ${text}` }
+    return { role: 'user', content: m.move ? `${MOVE_MARK} ${m.move}\n${text}` : text }
   }
+  if (m.mapEvent) return { role: 'user', content: `${MAP_EVENT_MARK} ${m.mapEvent.note}` }
   return { role: 'user', content: `[Код игры] ${m.text}` }
 }
 

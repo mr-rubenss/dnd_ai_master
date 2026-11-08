@@ -184,7 +184,9 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   /** Игрок заявил каст заклинания своего героя, а cast_spell не вызывался — просьба вызвать (часть сверки текста). */
   const spellClaims = (): string[] => {
     const rules = runtime?.tools.rules
-    const said = [...story.messages].reverse().find((m) => m.author === 'player')
+    // Только если ход начался с реплики игрока (а не с события карты: старую реплику не перепроверяем).
+    const last = [...story.messages].reverse().find((m) => !m.changes)
+    const said = last?.author === 'player' ? last : undefined
     if (!rules || !said || said.ooc) return []
     const hero = story.party.find((m) => m.heroId === said.heroId) ?? story.party[0]
     if (!hero) return []

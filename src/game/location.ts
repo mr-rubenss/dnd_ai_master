@@ -23,6 +23,7 @@ import {
   TILE_FLOOR,
   TILE_VOID,
   WALL_MATERIALS,
+  ZONE_KINDS,
   type CellPosition,
   type Door,
   type GridSegment,
@@ -31,10 +32,12 @@ import {
   type MapObjectType,
   type MapScale,
   type MapWindow,
+  type MapZone,
   type Npc,
   type Room,
   type WallEdge,
   type WallMaterial,
+  type ZoneKind,
 } from '../types/location'
 import { isInt, isNonEmptyString, isObject, isOneOf, ValidationError } from './validation'
 
@@ -370,6 +373,25 @@ export function parseLocation(input: unknown): LocationData {
     if (checkCell(npc, where) && !isFloorCell(npc.x, npc.y)) fail(`${where}: НПС должен стоять на полу, а клетка (${npc.x}, ${npc.y}) — пустота`)
   })
 
+  // ---------- Скрытые зоны ----------
+  if (raw.zones !== undefined && !Array.isArray(raw.zones)) fail('"zones" должно быть массивом')
+  const zones: MapZone[] = []
+  list('zones').forEach((zone, i) => {
+    if (!isObject(zone)) return fail(`zones[${i}]: должна быть объектом`)
+    const where = label(zone, `zones[${i}]`)
+    checkId(zone.id, where)
+    if (!isOneOf(ZONE_KINDS, zone.kind)) fail(`${where}: "kind" должно быть одним из: ${ZONE_KINDS.join(', ')}`)
+    if (!isNonEmptyString(zone.name)) fail(`${where}: "name" должно быть непустой строкой`)
+    checkOptionalText(zone, 'description', where)
+    if (!checkCell(zone, where)) return
+    if (!isInt(zone.w) || !isInt(zone.h) || (zone.w as number) < 1 || (zone.h as number) < 1) return fail(`${where}: "w" и "h" — положительные целые`)
+    if (zone.x + (zone.w as number) > width || zone.y + (zone.h as number) > height) return fail(`${where}: зона выходит за пределы карты ${width}×${height}`)
+    let hasFloor = false
+    for (let y = zone.y; y < zone.y + (zone.h as number); y++) for (let x = zone.x; x < zone.x + (zone.w as number); x++) if (isFloorCell(x, y)) hasFloor = true
+    if (!hasFloor) return fail(`${where}: в зоне нет ни одной клетки пола`)
+    zones.push(pickZone(zone))
+  })
+
   // ---------- Вход и достижимость ----------
   let start: CellPosition | null = null
   if (!isObject(raw.playerStart)) {
@@ -437,6 +459,20 @@ export function parseLocation(input: unknown): LocationData {
     windows: windows.map((w) => pick<MapWindow>(w, ['id', 'name', 'description', 'x1', 'y1', 'x2', 'y2'])),
     objects: objects as MapObject[],
     npcs: npcs as Npc[],
+    ...(zones.length ? { zones } : {}),
     playerStart: start as CellPosition,
+  }
+}
+
+function pickZone(zone: Record<string, unknown>): MapZone {
+  return {
+    id: zone.id as string,
+    kind: zone.kind as ZoneKind,
+    name: zone.name as string,
+    ...(typeof zone.description === 'string' ? { description: zone.description } : {}),
+    x: zone.x as number,
+    y: zone.y as number,
+    w: zone.w as number,
+    h: zone.h as number,
   }
 }

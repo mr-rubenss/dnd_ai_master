@@ -64,6 +64,10 @@ export function NarrationLog({ messages, pending = null, replacingId = null, onR
               </span>
             ))}
           </p>
+        ) : message.mapEvent ? (
+          <p key={message.id} className="map-event" data-testid="map-event">
+            <span className="map-event-label">На карте</span> {message.text}
+          </p>
         ) : message.check ? (
           <CheckCardView key={message.id} card={message.check} />
         ) : (

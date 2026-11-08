@@ -4207,6 +4207,22 @@ textarea {
 
 /* ---------- Строка изменений за ход (после ответа ведущего) ---------- */
 
+/* Событие на карте (значимое перемещение героя): приглушённая строка в ленте. */
+.map-event {
+  align-self: center;
+  max-width: 100%;
+  margin: 0;
+  font-size: var(--text-82);
+  font-style: italic;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.map-event-label {
+  font-style: normal;
+  font-weight: 600;
+  margin-right: var(--space-4);
+}
+
 .turn-changes {
   align-self: flex-start;
   display: flex;
