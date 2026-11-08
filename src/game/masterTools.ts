@@ -16,6 +16,8 @@ import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp,
 import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
 import { findMapTarget, limitBySpeed, routeToTarget } from './heroTargets'
+import { AREA_SHAPE_NAMES, AREA_SHAPES, areaTemplateProblem, COMPASS, directionBetween, DIRECTED_SHAPES, edgeOrigin, MAX_AREA_FEET, type AreaShape, type AreaTemplate, type CellRect } from '../engine/areas'
+import { areaResultText, mapAreaResult } from './mapAreas'
 import type { PriceList } from './prices'
 import { END_TURN_TOOL } from './turnChanges'
 import { checkSubjectOf } from './classOrder'
@@ -373,6 +375,28 @@ export const MASTER_TOOLS: AiTool[] = [
       y: int('Строка клетки (если без target).', 0),
       label: str('Короткая подпись у подсветки (до 40 символов): «сюда».'),
     }),
+  },
+  {
+    name: 'show_area',
+    description:
+      'Показать на карте область воздействия по правилам SRD (игра не меняется): «вот докуда достаёт свет факела» (sphere 20 от факела), ' +
+      '«конус дыхания накроет вот это» (cone 15 от героя к цели). Движок подсветит задетые клетки (стены и закрытые двери заслоняют) и вернёт, кто задет. ' +
+      'Начало — target (герой, НПС, объект, дверь) или x, y; без них — герой игрока. Конус, линия и куб начинаются у края начала и нужны toward или direction.',
+    parameters: object(
+      {
+        shape: oneOf(AREA_SHAPES, 'cone — конус, cube — куб, cylinder — цилиндр, emanation — излучение вокруг начала, line — линия, sphere — сфера.'),
+        size: int('Футы: длина конуса и линии, радиус сферы, цилиндра и излучения, сторона куба.', 1, MAX_AREA_FEET),
+        target: str('Начало: имя героя или id (название) НПС, объекта, двери.'),
+        x: int('Столбец клетки начала (если без target).', 0),
+        y: int('Строка клетки начала (если без target).', 0),
+        toward: str('Куда направить конус, линию или куб: имя героя или id (название) цели.'),
+        direction: oneOf(Object.keys(COMPASS), 'Или сторона света (north — вверх по карте).'),
+        width: int('Ширина линии, футов (по умолчанию 5).', 1, MAX_AREA_FEET),
+        height: int('Высота цилиндра, футов (для подписи).', 1, MAX_AREA_FEET),
+        label: str('Короткая подпись (до 40 символов): «Свет факела».'),
+      },
+      ['shape', 'size'],
+    ),
   },
   {
     name: 'add_effect',
@@ -1298,6 +1322,68 @@ const HANDLERS: Record<string, Handler> = {
     return {
       events: [{ event: { type: 'mapPinged', ping: { id: `ping-${ctx.newId()}`, locationId: location.id, ...area, ...(label ? { label } : {}) } }, author: MASTER }],
       result: { message: `На карте подсвечено: ${what}.` },
+    }
+  },
+
+  show_area(state, args, ctx) {
+    const location = currentLocationOf(state)
+    const label = text(args, 'label')
+    if (label && label.length > 40) reject('Подпись — до 40 символов.')
+    const shape = choice<AreaShape>(args, 'shape', AREA_SHAPES, true)!
+    const size = integer(args, 'size', true)!
+    const width = integer(args, 'width')
+    const height = integer(args, 'height')
+    // Начало и направление: герой, цель карты или клетка.
+    const spaceOf = (query: string): { space: CellRect; name: string } => {
+      const hero = state.party.find((m) => !m.fallen && (m.heroId === query || norm(m.character.name) === norm(query)))
+      if (hero) return { space: { ...hero.position, w: 1, h: 1 }, name: hero.character.name }
+      const target = findMapTarget(location, query)
+      if (typeof target === 'string') return reject(target)
+      if (target.hidden) reject(`«${target.name}» скрыт от игрока — сначала reveal (или не показывай).`)
+      return { space: target.area, name: `«${target.name}»` }
+    }
+    const query = text(args, 'target')
+    const x = integer(args, 'x')
+    const y = integer(args, 'y')
+    let from: { space: CellRect; name: string }
+    if (query) from = spaceOf(query)
+    else if (x !== undefined || y !== undefined) {
+      if (x === undefined || y === undefined) return reject('Укажи и x, и y (или target).')
+      from = { space: { x, y, w: 1, h: 1 }, name: `клетка (${x}, ${y})` }
+    } else {
+      const hero = heroOf(state, {})
+      from = { space: { ...hero.position, w: 1, h: 1 }, name: hero.character.name }
+    }
+    const center = { x: from.space.x + from.space.w / 2, y: from.space.y + from.space.h / 2 }
+    let direction: number | undefined
+    const toward = text(args, 'toward')
+    const compass = choice(args, 'direction', Object.keys(COMPASS))
+    if (toward) {
+      const to = spaceOf(toward).space
+      const toCenter = { x: to.x + to.w / 2, y: to.y + to.h / 2 }
+      if (toCenter.x === center.x && toCenter.y === center.y) reject('Цель направления совпадает с началом.')
+      direction = directionBetween(center, toCenter)
+    } else if (compass) direction = COMPASS[compass]
+    if (DIRECTED_SHAPES.includes(shape) && direction === undefined) reject(`У фигуры «${AREA_SHAPE_NAMES[shape]}» нужно направление: toward или direction.`)
+    const template: AreaTemplate = {
+      shape,
+      size,
+      origin: DIRECTED_SHAPES.includes(shape) ? edgeOrigin(from.space, direction!, shape) : center,
+      ...(DIRECTED_SHAPES.includes(shape) ? { direction: Math.round(direction! * 100) / 100 } : {}),
+      ...(shape === 'emanation' ? { space: from.space } : {}),
+      ...(shape === 'line' && width ? { width } : {}),
+      ...(shape === 'cylinder' && height ? { height } : {}),
+    }
+    const problem = areaTemplateProblem(template, location)
+    if (problem) reject(problem)
+    const result = mapAreaResult(location, state.party, template, state.world.doors[location.id] ?? {})
+    return {
+      events: [{ event: { type: 'areaShown', area: { id: `area-${ctx.newId()}`, locationId: location.id, template, ...(label ? { label } : {}) } }, author: MASTER }],
+      result: {
+        message: `На карте показана область от ${from.name}. ${areaResultText(template, result)}`,
+        cells: result.cells.length,
+        creatures: result.creatures.map((c) => (c.hidden ? `${c.name} (скрыт от игрока)` : c.name)),
+      },
     }
   },
 

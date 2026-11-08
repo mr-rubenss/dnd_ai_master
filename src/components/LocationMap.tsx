@@ -17,7 +17,10 @@ import {
   walkPath,
   type MapLight,
 } from '../game/mapView'
-import type { MapPing } from '../types/story'
+import type { MapPing, ShownArea } from '../types/story'
+import { mapAreaResult, type AreaCreature } from '../game/mapAreas'
+import { AreaOverlay, MeasureInfo, MeasureToolbar, RulerOverlay } from './MapMeasure'
+import { rulerText, templateFromDrag, type MeasureTool, type Measurement } from '../game/mapMeasure'
 import { useMapChanges } from './useMapChanges'
 import { EFFECT_KIND_NAMES, FLAT_OBJECT_TYPES, type MapEffect, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
 import type { HeroMovePlan } from '../game/heroMove'
@@ -118,6 +121,10 @@ interface Props {
   ping?: MapPing
   /** Туман войны: что отряд видит сейчас и что уже исследовано (ключи «x,y»); нет — видна вся карта. */
   vision?: MapVision
+  /** Область, показанная ведущим (show_area): видна AREA_SHOW_MS, если появилась при открытой карте. */
+  shownArea?: ShownArea
+  /** Другие герои отряда на карте — для списка задетых областью. */
+  companions?: readonly { id: string; name: string; position: CellPosition }[]
 }
 
 export interface MapVision {
@@ -129,6 +136,8 @@ export interface MapVision {
 const LEAVE_LINGER_MS = 900
 /** Сколько видна подсветка ведущего, мс. */
 export const PING_MS = 4000
+/** Сколько видна область ведущего (show_area), мс — успеть прочитать рассказ. */
+export const AREA_SHOW_MS = 30000
 
 /** Перетаскивание токена героя: клетка под пальцем или курсором, путь до неё или причина отказа. */
 interface DragState {
@@ -137,7 +146,7 @@ interface DragState {
   reachable: Set<string>
 }
 
-export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision }: Props) {
+export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision, shownArea, companions }: Props) {
   const { width, height } = location
   const [active, setActive] = useState<ActiveEntity | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -200,6 +209,19 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     const timer = window.setTimeout(() => setShownPing(null), PING_MS)
     return () => window.clearTimeout(timer)
   }, [shownPing])
+
+  // Область ведущего (show_area): только новая, на AREA_SHOW_MS или до «Скрыть».
+  const [areaSeen, setAreaSeen] = useState(shownArea?.id ?? null)
+  const [masterArea, setMasterArea] = useState<ShownArea | null>(null)
+  if ((shownArea?.id ?? null) !== areaSeen) {
+    setAreaSeen(shownArea?.id ?? null)
+    setMasterArea(shownArea && shownArea.locationId === location.id ? shownArea : null)
+  }
+  useEffect(() => {
+    if (!masterArea) return
+    const timer = window.setTimeout(() => setMasterArea(null), AREA_SHOW_MS)
+    return () => window.clearTimeout(timer)
+  }, [masterArea])
 
   const entities = useMemo(() => {
     const map = new Map<string, MapEntity>()
@@ -348,8 +370,98 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     window.addEventListener('pointercancel', finish)
   }
 
+  // ---------- Измерения: линейка и шаблоны областей (только клеточная карта) ----------
+  const measurable = scale.kind === 'tactical'
+  const [tool, setTool] = useState<MeasureTool | null>(null)
+  const [shapesOpen, setShapesOpen] = useState(false)
+  const [measure, setMeasure] = useState<Measurement | null>(null)
+  const chooseTool = (next: MeasureTool | null) => {
+    setTool(next)
+    setMeasure(null)
+    setActive(null)
+  }
+  useEffect(() => {
+    if (!tool) return
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setTool(null)
+      setMeasure(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tool])
+
+  /** Точка карты под точкой экрана (непрерывная, в клетках, в пределах карты). */
+  const pointAt = useCallback(
+    (clientX: number, clientY: number) => {
+      const m = svgRef.current?.getScreenCTM()
+      if (!m) return null
+      const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse())
+      return { x: Math.min(width, Math.max(0, p.x)), y: Math.min(height, Math.max(0, p.y)) }
+    },
+    [width, height],
+  )
+
+  /** Существо в клетке (герой или видимый НПС) — начало «от себя». */
+  const creatureAt = (c: CellPosition) =>
+    (c.x === player.x && c.y === player.y) || npcsShown.some((n) => n.x === c.x && n.y === c.y) ? { x: c.x, y: c.y, w: 1, h: 1 } : null
+
+  const startMeasure = (event: PointerEvent) => {
+    if (!tool || (event.pointerType === 'mouse' && event.button !== 0)) return
+    event.stopPropagation()
+    event.preventDefault()
+    const start = pointAt(event.clientX, event.clientY)
+    if (!start) return
+    const startCell = { x: Math.min(width - 1, Math.floor(start.x)), y: Math.min(height - 1, Math.floor(start.y)) }
+    const creature = creatureAt(startCell)
+    const box = boxRef.current
+    if (box) box.dataset.tokenDrag = '1'
+    const update = (clientX: number, clientY: number) => {
+      const p = pointAt(clientX, clientY)
+      if (!p) return
+      if (tool.kind === 'ruler') setMeasure({ kind: 'ruler', from: startCell, to: { x: Math.min(width - 1, Math.floor(p.x)), y: Math.min(height - 1, Math.floor(p.y)) } })
+      else setMeasure({ kind: 'area', template: templateFromDrag(tool.shape, start, p, creature, location.cellFeet) })
+    }
+    update(event.clientX, event.clientY)
+    const onMove = (e: globalThis.PointerEvent) => {
+      if (e.pointerId === event.pointerId) update(e.clientX, e.clientY)
+    }
+    const finish = (e: globalThis.PointerEvent) => {
+      if (e.pointerId !== event.pointerId) return
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      if (box) delete box.dataset.tokenDrag
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+  }
+
+  /** Кто на карте виден игроку — для списка задетых (скрытых и невидимых в тумане НПС игрок не знает). */
+  const visibleCreatures = useMemo<AreaCreature[]>(
+    () => [
+      { kind: 'hero', id: PLAYER_ID, name: 'Вы', space: { x: player.x, y: player.y, w: 1, h: 1 } },
+      ...(companions ?? []).map((m) => ({ kind: 'hero' as const, id: m.id, name: m.name, space: { x: m.position.x, y: m.position.y, w: 1, h: 1 } })),
+      ...npcsShown.map((n) => ({ kind: 'npc' as const, id: n.id, name: n.name, space: { x: n.x, y: n.y, w: 1, h: 1 } })),
+    ],
+    [player.x, player.y, companions, npcsShown],
+  )
+  const areaOf = useCallback(
+    (template: Measurement & { kind: 'area' }) => {
+      const result = mapAreaResult(location, [], template.template, doors)
+      const set = new Set(result.cells.map((c) => `${c.x},${c.y}`))
+      const hit = visibleCreatures.filter((c) => set.has(`${c.space.x},${c.space.y}`)).map((c) => c.name)
+      return { cells: result.cells, creatures: hit }
+    },
+    [location, doors, visibleCreatures],
+  )
+  const measured = useMemo(() => (measure?.kind === 'area' ? areaOf(measure) : null), [measure, areaOf])
+  const mastered = useMemo(() => (masterArea ? areaOf({ kind: 'area', template: masterArea.template }) : null), [masterArea, areaOf])
+
   /** Нажатие на пустое место карты: закрыть меню, а если меню не было — идти в эту клетку. */
   const onBoardClick = (event: React.MouseEvent) => {
+    if (tool) return
     if (active) return setActive(null)
     if (!movement) return
     const cell = cellAt(event.clientX, event.clientY)
@@ -371,196 +483,237 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
   const tokenR = profile.tokenRadius
 
   return (
-    <div className="map-canvas">
-      <div
-        className="map-board"
-        style={{ '--board-w': cols, '--board-h': rows } as CSSProperties}
-        onClick={onBoardClick}
-        data-map-kind={scale.kind}
-        data-testid="map-board"
-      >
-        <div className="map-viewport" ref={boxRef} data-testid="map-viewport" data-zoom={viewport.view.scale.toFixed(2)}>
-          <div className="map-zoom" ref={zoomRef}>
-            <svg ref={svgRef} viewBox={`${-MAP_PAD} ${-MAP_PAD} ${cols} ${rows}`} className="map-svg" role="img" aria-label={`Карта: ${location.name}`}>
-              <MapDefs lights={lights} />
+    <>
+      {measurable && <MeasureToolbar tool={tool} open={shapesOpen} onTool={chooseTool} onOpen={setShapesOpen} />}
+      <div className="map-canvas">
+        <div
+          className="map-board"
+          style={{ '--board-w': cols, '--board-h': rows } as CSSProperties}
+          onClick={onBoardClick}
+          data-map-kind={scale.kind}
+          data-testid="map-board"
+        >
+          <div className="map-viewport" ref={boxRef} data-testid="map-viewport" data-zoom={viewport.view.scale.toFixed(2)}>
+            <div className="map-zoom" ref={zoomRef}>
+              <svg ref={svgRef} viewBox={`${-MAP_PAD} ${-MAP_PAD} ${cols} ${rows}`} className="map-svg" role="img" aria-label={`Карта: ${location.name}`}>
+                <MapDefs lights={lights} />
 
-              <FloorLayer location={location} grid={profile.grid} />
+                <FloorLayer location={location} grid={profile.grid} />
 
-              <g className="map-layer map-layer--walls">
-                <WallLines location={location} />
-                {location.windows.map((win) => (
-                  <g key={win.id} {...interactiveProps(`window:${win.id}`)} data-testid={`window-${win.id}`}>
-                    <rect {...hitBox(entities.get(`window:${win.id}`))} className="hit-area" />
-                    <WindowIcon window={win} />
-                  </g>
-                ))}
-                {location.doors.map((door) => {
-                  const state = doorState(door, doors)
-                  return (
-                    <g key={door.id} {...interactiveProps(`door:${door.id}`)} data-testid={`door-${door.id}`} data-state={state}>
-                      <rect {...hitBox(entities.get(`door:${door.id}`))} className="hit-area" />
-                      <DoorIcon door={door} state={state} location={location} />
+                <g className="map-layer map-layer--walls">
+                  <WallLines location={location} />
+                  {location.windows.map((win) => (
+                    <g key={win.id} {...interactiveProps(`window:${win.id}`)} data-testid={`window-${win.id}`}>
+                      <rect {...hitBox(entities.get(`window:${win.id}`))} className="hit-area" />
+                      <WindowIcon window={win} />
                     </g>
-                  )
-                })}
-              </g>
-
-              <g className="map-layer map-layer--objects">
-                {objects.map((obj) => (
-                  <g
-                    key={obj.id}
-                    {...interactiveProps(`obj:${obj.id}`)}
-                    data-testid={`object-${obj.id}`}
-                    data-type={obj.type}
-                    data-x={obj.x}
-                    data-y={obj.y}
-                    data-flat={FLAT_OBJECT_TYPES.includes(obj.type) || undefined}
-                    data-fresh={changes.fresh.has(obj.id) || undefined}
-                  >
-                    {/* Сдвиг объекта (update_object) — плавный переход, а не прыжок. */}
-                    <g className={`map-object-pos${changes.fresh.has(obj.id) ? ' is-appearing' : ''}`} style={{ transform: `translate(${obj.x}px, ${obj.y}px)` }}>
-                      <rect width={obj.w ?? 1} height={obj.h ?? 1} className="hit-area" />
-                      <MapObjectIcon object={{ ...obj, x: 0, y: 0 }} />
-                    </g>
-                  </g>
-                ))}
-                {changes.leavingObjects.map((obj) => (
-                  <g key={`gone-${obj.id}`} className="map-object-pos is-leaving" style={{ transform: `translate(${obj.x}px, ${obj.y}px)` }} data-testid={`object-leaving-${obj.id}`} pointerEvents="none">
-                    <MapObjectIcon object={{ ...obj, x: 0, y: 0 }} />
-                  </g>
-                ))}
-              </g>
-
-              <g className="map-layer map-layer--tokens">
-                {leavingShown.map((npc) => {
-                  const pos = walks.pos[npc.id] ?? npc
-                  return (
-                    <g key={`gone-${npc.id}`} className="npc-leaving" data-testid={`npc-leaving-${npc.id}`} data-x={pos.x} data-y={pos.y} pointerEvents="none">
-                      <g className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
-                        <circle cx={0.5} cy={0.5} r={tokenR} className={`npc-token npc-token--${npc.attitude ?? 'neutral'}`} />
-                        <text x={0.5} y={0.52} className="npc-initial">
-                          {npc.name[0]}
-                        </text>
-                      </g>
-                    </g>
-                  )
-                })}
-                {npcsShown.map((npc) => {
-                  const pos = walks.pos[npc.id] ?? npc
-                  return (
-                    <g
-                      key={npc.id}
-                      {...interactiveProps(`npc:${npc.id}`)}
-                      data-testid={`npc-${npc.id}`}
-                      data-x={pos.x}
-                      data-y={pos.y}
-                      data-walking={walks.walking.has(npc.id) || undefined}
-                      data-fresh={changes.fresh.has(npc.id) || undefined}
-                    >
-                      <g className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
-                        <rect width={1} height={1} className="hit-area" />
-                        <ellipse cx={0.56} cy={0.62} rx={tokenR} ry={tokenR * 0.8} className="token-shadow" />
-                        <circle cx={0.5} cy={0.5} r={tokenR} className={`npc-token npc-token--${npc.attitude ?? 'neutral'}`} />
-                        <text x={0.5} y={0.52} className="npc-initial">
-                          {npc.name[0]}
-                        </text>
-                      </g>
-                    </g>
-                  )
-                })}
-                <g
-                  className={`player-token${movement ? ' is-draggable' : ''}${drag ? ' is-dragging' : ''}`}
-                  aria-label="Вы"
-                  data-testid="player-token"
-                  data-x={heroPos.x}
-                  data-y={heroPos.y}
-                  data-walking={walks.walking.has(PLAYER_ID) || undefined}
-                  data-draggable={movement ? 'true' : undefined}
-                  onPointerDown={movement ? startDrag : undefined}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
-                    <ellipse cx={0.56} cy={0.64} rx={0.44} ry={0.36} className="token-shadow" />
-                    <circle cx={0.5} cy={0.5} r={0.46} className="player-ring" />
-                    <circle cx={0.5} cy={0.5} r={0.36} fill="url(#player-fill)" className="player-core" />
-                  </g>
-                </g>
-              </g>
-
-              <EffectLayer effects={location.effects} />
-
-              <LightLayer width={width} height={height} lights={lights} darkness={darkness} />
-
-              {vision && <FogLayer location={location} vision={vision} />}
-
-              <g className="map-layer map-layer--ui" pointerEvents="none">
-                {drag && <DragOverlay location={location} drag={drag} hero={heroPos} />}
-                {shownPing && <PingMarker key={shownPing.id} ping={shownPing} />}
-                {profile.labels &&
-                  npcsShown.map((npc) => {
-                    const pos = walks.pos[npc.id] ?? npc
+                  ))}
+                  {location.doors.map((door) => {
+                    const state = doorState(door, doors)
                     return (
-                      <g key={npc.id} className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
-                        <text x={0.5} y={1.3} className="npc-label">
-                          {npc.name}
-                        </text>
+                      <g key={door.id} {...interactiveProps(`door:${door.id}`)} data-testid={`door-${door.id}`} data-state={state}>
+                        <rect {...hitBox(entities.get(`door:${door.id}`))} className="hit-area" />
+                        <DoorIcon door={door} state={state} location={location} />
                       </g>
                     )
                   })}
-                <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
-                  <text x={0.5} y={0.53} className="player-label">
-                    Вы
-                  </text>
                 </g>
-              </g>
-            </svg>
+
+                <g className="map-layer map-layer--objects">
+                  {objects.map((obj) => (
+                    <g
+                      key={obj.id}
+                      {...interactiveProps(`obj:${obj.id}`)}
+                      data-testid={`object-${obj.id}`}
+                      data-type={obj.type}
+                      data-x={obj.x}
+                      data-y={obj.y}
+                      data-flat={FLAT_OBJECT_TYPES.includes(obj.type) || undefined}
+                      data-fresh={changes.fresh.has(obj.id) || undefined}
+                    >
+                      {/* Сдвиг объекта (update_object) — плавный переход, а не прыжок. */}
+                      <g className={`map-object-pos${changes.fresh.has(obj.id) ? ' is-appearing' : ''}`} style={{ transform: `translate(${obj.x}px, ${obj.y}px)` }}>
+                        <rect width={obj.w ?? 1} height={obj.h ?? 1} className="hit-area" />
+                        <MapObjectIcon object={{ ...obj, x: 0, y: 0 }} />
+                      </g>
+                    </g>
+                  ))}
+                  {changes.leavingObjects.map((obj) => (
+                    <g key={`gone-${obj.id}`} className="map-object-pos is-leaving" style={{ transform: `translate(${obj.x}px, ${obj.y}px)` }} data-testid={`object-leaving-${obj.id}`} pointerEvents="none">
+                      <MapObjectIcon object={{ ...obj, x: 0, y: 0 }} />
+                    </g>
+                  ))}
+                </g>
+
+                <g className="map-layer map-layer--tokens">
+                  {leavingShown.map((npc) => {
+                    const pos = walks.pos[npc.id] ?? npc
+                    return (
+                      <g key={`gone-${npc.id}`} className="npc-leaving" data-testid={`npc-leaving-${npc.id}`} data-x={pos.x} data-y={pos.y} pointerEvents="none">
+                        <g className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+                          <circle cx={0.5} cy={0.5} r={tokenR} className={`npc-token npc-token--${npc.attitude ?? 'neutral'}`} />
+                          <text x={0.5} y={0.52} className="npc-initial">
+                            {npc.name[0]}
+                          </text>
+                        </g>
+                      </g>
+                    )
+                  })}
+                  {npcsShown.map((npc) => {
+                    const pos = walks.pos[npc.id] ?? npc
+                    return (
+                      <g
+                        key={npc.id}
+                        {...interactiveProps(`npc:${npc.id}`)}
+                        data-testid={`npc-${npc.id}`}
+                        data-x={pos.x}
+                        data-y={pos.y}
+                        data-walking={walks.walking.has(npc.id) || undefined}
+                        data-fresh={changes.fresh.has(npc.id) || undefined}
+                      >
+                        <g className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+                          <rect width={1} height={1} className="hit-area" />
+                          <ellipse cx={0.56} cy={0.62} rx={tokenR} ry={tokenR * 0.8} className="token-shadow" />
+                          <circle cx={0.5} cy={0.5} r={tokenR} className={`npc-token npc-token--${npc.attitude ?? 'neutral'}`} />
+                          <text x={0.5} y={0.52} className="npc-initial">
+                            {npc.name[0]}
+                          </text>
+                        </g>
+                      </g>
+                    )
+                  })}
+                  <g
+                    className={`player-token${movement ? ' is-draggable' : ''}${drag ? ' is-dragging' : ''}`}
+                    aria-label="Вы"
+                    data-testid="player-token"
+                    data-x={heroPos.x}
+                    data-y={heroPos.y}
+                    data-walking={walks.walking.has(PLAYER_ID) || undefined}
+                    data-draggable={movement ? 'true' : undefined}
+                    onPointerDown={movement ? startDrag : undefined}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
+                      <ellipse cx={0.56} cy={0.64} rx={0.44} ry={0.36} className="token-shadow" />
+                      <circle cx={0.5} cy={0.5} r={0.46} className="player-ring" />
+                      <circle cx={0.5} cy={0.5} r={0.36} fill="url(#player-fill)" className="player-core" />
+                    </g>
+                  </g>
+                </g>
+
+                <EffectLayer effects={location.effects} />
+
+                <LightLayer width={width} height={height} lights={lights} darkness={darkness} />
+
+                {masterArea && mastered && <AreaOverlay key={masterArea.id} template={masterArea.template} cells={mastered.cells} cellFeet={location.cellFeet} master />}
+                {measure?.kind === 'area' && measured && <AreaOverlay template={measure.template} cells={measured.cells} cellFeet={location.cellFeet} />}
+
+                {vision && <FogLayer location={location} vision={vision} />}
+
+                <g className="map-layer map-layer--ui" pointerEvents="none">
+                  {drag && <DragOverlay location={location} drag={drag} hero={heroPos} />}
+                  {shownPing && <PingMarker key={shownPing.id} ping={shownPing} />}
+                  {measure?.kind === 'ruler' && <RulerOverlay from={measure.from} to={measure.to} cellFeet={location.cellFeet} />}
+                  {profile.labels &&
+                    npcsShown.map((npc) => {
+                      const pos = walks.pos[npc.id] ?? npc
+                      return (
+                        <g key={npc.id} className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+                          <text x={0.5} y={1.3} className="npc-label">
+                            {npc.name}
+                          </text>
+                        </g>
+                      )
+                    })}
+                  <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
+                    <text x={0.5} y={0.53} className="player-label">
+                      Вы
+                    </text>
+                  </g>
+                </g>
+
+                {/* Пока выбран инструмент измерения, нажатия и жесты по карте идут ему (не меню и не шагам героя). */}
+                {tool && (
+                  <rect
+                    x={-MAP_PAD}
+                    y={-MAP_PAD}
+                    width={cols}
+                    height={rows}
+                    className="measure-surface"
+                    data-draggable="true"
+                    data-testid="measure-surface"
+                    onPointerDown={startMeasure}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+              </svg>
+            </div>
           </div>
-        </div>
 
-        {activeEntity && (
-          <MapTooltip
-            entity={activeEntity}
-            cols={cols}
-            rows={rows}
-            view={viewport.view}
-            box={viewport.box}
-            menu={active?.pinned && actions ? { disabled: actions.disabled, run: (a) => runAction(activeEntity, a) } : undefined}
-          />
-        )}
-
-        <div className="map-controls" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="map-control" onClick={viewport.zoomIn} aria-label="Приблизить" title="Приблизить" data-testid="map-zoom-in">
-            +
-          </button>
-          <button type="button" className="map-control" onClick={viewport.zoomOut} aria-label="Отдалить" title="Отдалить" disabled={viewport.view.scale <= 1} data-testid="map-zoom-out">
-            −
-          </button>
-          <button
-            type="button"
-            className="map-control map-control--wide"
-            onClick={() => viewport.centerOn(heroPos.x + 0.5 + MAP_PAD, heroPos.y + 0.5 + MAP_PAD, cols, rows)}
-            data-testid="map-center-hero"
-          >
-            К герою
-          </button>
-          {viewport.view.scale > 1 && (
-            <button type="button" className="map-control map-control--wide" onClick={viewport.reset} data-testid="map-reset">
-              Вся карта
-            </button>
+          {activeEntity && (
+            <MapTooltip
+              entity={activeEntity}
+              cols={cols}
+              rows={rows}
+              view={viewport.view}
+              box={viewport.box}
+              menu={active?.pinned && actions ? { disabled: actions.disabled, run: (a) => runAction(activeEntity, a) } : undefined}
+            />
           )}
+
+          <div className="map-controls" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="map-control" onClick={viewport.zoomIn} aria-label="Приблизить" title="Приблизить" data-testid="map-zoom-in">
+              +
+            </button>
+            <button type="button" className="map-control" onClick={viewport.zoomOut} aria-label="Отдалить" title="Отдалить" disabled={viewport.view.scale <= 1} data-testid="map-zoom-out">
+              −
+            </button>
+            <button
+              type="button"
+              className="map-control map-control--wide"
+              onClick={() => viewport.centerOn(heroPos.x + 0.5 + MAP_PAD, heroPos.y + 0.5 + MAP_PAD, cols, rows)}
+              data-testid="map-center-hero"
+            >
+              К герою
+            </button>
+            {viewport.view.scale > 1 && (
+              <button type="button" className="map-control map-control--wide" onClick={viewport.reset} data-testid="map-reset">
+                Вся карта
+              </button>
+            )}
+          </div>
+
+          {(measure || (masterArea && mastered)) && (
+            <div className="map-measure-panel">
+              {masterArea && mastered && (
+                <MeasureInfo
+                  master
+                  title={masterArea.label}
+                  template={masterArea.template}
+                  cells={mastered.cells.length}
+                  creatures={mastered.creatures}
+                  onClose={() => setMasterArea(null)}
+                />
+              )}
+              {measure?.kind === 'ruler' && <MeasureInfo title={`Линейка: ${rulerText(measure.from, measure.to, location.cellFeet)}`} onClose={() => setMeasure(null)} />}
+              {measure?.kind === 'area' && measured && (
+                <MeasureInfo template={measure.template} cells={measured.cells.length} creatures={measured.creatures} onClose={() => setMeasure(null)} />
+              )}
+            </div>
+          )}
+
+          {notice && (
+            <p className="map-notice" role="status" data-testid="map-notice">
+              {notice}
+            </p>
+          )}
+
+          <span className="map-scale" data-testid="map-scale">
+            {scaleLabel(location)}
+          </span>
         </div>
-
-        {notice && (
-          <p className="map-notice" role="status" data-testid="map-notice">
-            {notice}
-          </p>
-        )}
-
-        <span className="map-scale" data-testid="map-scale">
-          {scaleLabel(location)}
-        </span>
       </div>
-    </div>
+    </>
   )
 }
 

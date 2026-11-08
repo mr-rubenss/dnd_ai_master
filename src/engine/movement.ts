@@ -170,3 +170,42 @@ export function hasLineOfSight(location: LocationData, from: CellPosition, to: C
   }
   return true
 }
+
+/** Что перекрывает прямую: `sight` — стены и закрытые двери (как hasLineOfSight); `solid` — ещё и окна (полное укрытие). */
+export type SegmentMode = 'sight' | 'solid'
+
+/**
+ * Перекрыта ли прямая между двумя любыми точками карты (в клетках, непрерывные координаты) — для областей воздействия:
+ * SRD «If all straight lines extending from the point of origin to a location are blocked…». Касание угла стены тоже
+ * перекрывает. Точка на самой линии сетки (угол, середина стороны клетки) сдвигается на волосок к другой точке —
+ * так стена, на которой лежит начало, перекрывает прямые сквозь себя.
+ */
+export function segmentBlocked(location: LocationData, from: { x: number; y: number }, to: { x: number; y: number }, doors: DoorStates = {}, mode: SegmentMode = 'solid'): boolean {
+  const len = Math.hypot(to.x - from.x, to.y - from.y)
+  if (len === 0) return false
+  const nudge = 1e-7 / len
+  const onLine = (v: number) => Number.isInteger(v)
+  const ax = onLine(from.x) ? from.x + (to.x - from.x) * nudge : from.x
+  const ay = onLine(from.y) ? from.y + (to.y - from.y) * nudge : from.y
+  const bx = to.x
+  const by = to.y
+  const blocks = (side: EdgeSide, x: number, y: number) => {
+    const content = edgeContent(location, { side, x, y }, doors)
+    return mode === 'solid' ? blocksMovement(content) : blocksSight(content)
+  }
+  if (ax !== bx) {
+    for (let X = Math.floor(Math.min(ax, bx)) + 1; X < Math.max(ax, bx); X++) {
+      const y = ay + ((by - ay) * (X - ax)) / (bx - ax)
+      if (blocks('v', X, Math.floor(y))) return true
+      if (onLine(y) && blocks('v', X, y - 1)) return true
+    }
+  }
+  if (ay !== by) {
+    for (let Y = Math.floor(Math.min(ay, by)) + 1; Y < Math.max(ay, by); Y++) {
+      const x = ax + ((bx - ax) * (Y - ay)) / (by - ay)
+      if (blocks('h', Math.floor(x), Y)) return true
+      if (onLine(x) && blocks('h', x - 1, Y)) return true
+    }
+  }
+  return false
+}

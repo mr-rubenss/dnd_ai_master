@@ -2,6 +2,7 @@
 // Состояние истории не меняют напрямую: оно получается применением действий (StoryAction) по порядку
 // (src/game/storyActions.ts). Журнал действий хранится вместе с историей (src/game/repository.ts).
 
+import type { AreaTemplate } from '../engine/areas'
 import type { ActiveCondition } from '../engine/conditions'
 import type { Character, Equipment, Inventory, InvocationChoice } from './character'
 import type { Coins } from '../game/coins'
@@ -130,6 +131,8 @@ export interface StoryState {
   combat?: CombatState
   /** Последняя подсветка ведущего на карте (показывается несколько секунд после события). */
   ping?: MapPing
+  /** Последняя область, показанная ведущим на карте (show_area). */
+  shownArea?: ShownArea
   /** Когда закончился последний долгий отдых (игровое время) — для правила «16 часов до следующего». */
   lastLongRestAt?: number
 }
@@ -151,6 +154,14 @@ export interface MapPing {
   y: number
   w: number
   h: number
+  label?: string
+}
+
+/** Область воздействия, показанная ведущим на карте (show_area): «вот докуда достаёт свет факела». */
+export interface ShownArea {
+  id: string
+  locationId: string
+  template: AreaTemplate
   label?: string
 }
 
@@ -302,6 +313,7 @@ export type StoryEvent =
   | { type: 'effectRemoved'; locationId: string; effectId: string }
   /** Ведущий указывает на клетку или объект («вот эта дверь») — подсветка на карте. */
   | { type: 'mapPinged'; ping: MapPing }
+  | { type: 'areaShown'; area: ShownArea }
   /** Скрытый НПС или объект обнаружен (проверка героя или решение ведущего) — теперь виден на карте. */
   /** Отряд увидел новые клетки (туман войны): индексы y × ширина + x. */
   | { type: 'areaExplored'; locationId: string; cells: number[] }
