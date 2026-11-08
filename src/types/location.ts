@@ -151,6 +151,8 @@ export interface MapObject extends CellPosition {
   w?: number
   /** Высота в клетках (по умолчанию 1). */
   h?: number
+  /** Скрыт от игрока (тайник, потайная дверца): не виден на карте, пока его не раскроют (reveal или проверка). */
+  hidden?: boolean
   /** Свет, если объект светит иначе, чем обычно для своего типа (`DEFAULT_LIGHTS`), в футах; 0/0 — погашен. */
   light?: LightRadius
 }
@@ -160,6 +162,24 @@ export interface Npc extends CellPosition, NpcPersonality {
   name: string
   description?: string
   attitude?: NpcAttitude
+  /** Скрыт от игрока (спрятавшийся вор): не виден на карте, пока его не обнаружат проверкой или ведущий не раскроет. */
+  hidden?: boolean
+}
+
+/** Эффекты на карте (ставит ведущий): огонь, дым, магическая тьма, лужа, магическое свечение — с областью. */
+export const EFFECT_KINDS = ['fire', 'smoke', 'darkness', 'puddle', 'glow'] as const
+export type EffectKind = (typeof EFFECT_KINDS)[number]
+export const EFFECT_KIND_NAMES: Record<EffectKind, string> = { fire: 'огонь', smoke: 'дым', darkness: 'тьма', puddle: 'лужа', glow: 'магическое свечение' }
+
+/** Эффект — прямоугольник клеток поверх пола и обстановки; проходу не мешает (опасность обыгрывает ведущий). */
+export interface MapEffect {
+  id: string
+  kind: EffectKind
+  name?: string
+  x: number
+  y: number
+  w: number
+  h: number
 }
 
 /**
@@ -222,6 +242,8 @@ export interface LocationData {
   windows: MapWindow[]
   objects: MapObject[]
   npcs: Npc[]
+  /** Эффекты на карте (огонь, дым, тьма…). Нет поля — эффектов нет. */
+  effects?: MapEffect[]
   /** Скрытые зоны (ловушки, засады) — только для ведущего. Нет поля — зон нет. */
   zones?: MapZone[]
   playerStart: CellPosition

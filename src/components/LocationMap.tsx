@@ -13,10 +13,13 @@ import {
   profileOf,
   scaleLabel,
   scaleOf,
+  MAX_WALK_STEPS,
   walkPath,
   type MapLight,
 } from '../game/mapView'
-import { FLAT_OBJECT_TYPES, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
+import type { MapPing } from '../types/story'
+import { useMapChanges } from './useMapChanges'
+import { EFFECT_KIND_NAMES, FLAT_OBJECT_TYPES, type MapEffect, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
 import type { HeroMovePlan } from '../game/heroMove'
 import { entityActions } from '../game/mapActions'
 import { MapDefs } from './MapDefs'
@@ -24,7 +27,7 @@ import { MapObjectIcon } from './MapIcons'
 import { DOOR_STATE_LABELS, floorPatternId, segmentBox } from './mapDrawing'
 import { DoorIcon, WallLines, WindowIcon } from './MapWalls'
 import { useMapViewport } from './useMapViewport'
-import { useWalks } from './useWalk'
+import { useWalks, WALK_STEP_MS } from './useWalk'
 
 const OBJECT_TYPE_LABELS: Record<MapObjectType, string> = {
   table: 'Стол',
@@ -111,7 +114,14 @@ interface Props {
   doors?: DoorStates
   movement?: HeroMovement
   actions?: MapActions
+  /** Подсветка ведущего (ping): показывается несколько секунд, если появилась при открытой карте. */
+  ping?: MapPing
 }
+
+/** Сколько ушедший НПС стоит у выхода, прежде чем исчезнуть, мс. */
+const LEAVE_LINGER_MS = 900
+/** Сколько видна подсветка ведущего, мс. */
+export const PING_MS = 4000
 
 /** Перетаскивание токена героя: клетка под пальцем или курсором, путь до неё или причина отказа. */
 interface DragState {
@@ -120,7 +130,7 @@ interface DragState {
   reachable: Set<string>
 }
 
-export function LocationMap({ location, player, doors = {}, movement, actions }: Props) {
+export function LocationMap({ location, player, doors = {}, movement, actions, ping }: Props) {
   const { width, height } = location
   const [active, setActive] = useState<ActiveEntity | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -140,16 +150,39 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
     (from: CellPosition, to: CellPosition, id: string) => (id === PLAYER_ID && movement ? movement.path(from, to) : walkPath(location, from, to, doors)),
     [location, doors, movement],
   )
+  // Изменения от ведущего: новые НПС идут от входа, ушедшие — к выходу; объекты проявляются и тают; скрытых не видно.
+  const exit = location.playerStart
+  const changes = useMapChanges(location, (npc) => {
+    const steps = walkPath(location, npc, exit, doors)?.length ?? 1
+    // Дойти до выхода и ещё немного постоять у двери — чтобы уход было видно.
+    return Math.min(steps, MAX_WALK_STEPS) * WALK_STEP_MS + LEAVE_LINGER_MS
+  })
+  const spawned = changes.spawned
+  const spawn = useCallback((id: string) => (spawned.has(id) ? exit : null), [spawned, exit])
   const targets = useMemo(() => {
     const t: Record<string, CellPosition> = { [PLAYER_ID]: player }
-    for (const npc of location.npcs) t[npc.id] = { x: npc.x, y: npc.y }
+    for (const npc of changes.npcs) t[npc.id] = { x: npc.x, y: npc.y }
+    for (const npc of changes.leavingNpcs) t[npc.id] = exit
     return t
-  }, [location.npcs, player])
-  const walks = useWalks(targets, path)
+  }, [changes.npcs, changes.leavingNpcs, player, exit])
+  const walks = useWalks(targets, path, spawn)
+
+  // Подсветка ведущего: только новая (не та, что была при открытии карты), на PING_MS.
+  const [pingSeen, setPingSeen] = useState(ping?.id ?? null)
+  const [shownPing, setShownPing] = useState<MapPing | null>(null)
+  if ((ping?.id ?? null) !== pingSeen) {
+    setPingSeen(ping?.id ?? null)
+    setShownPing(ping && ping.locationId === location.id ? ping : null)
+  }
+  useEffect(() => {
+    if (!shownPing) return
+    const timer = window.setTimeout(() => setShownPing(null), PING_MS)
+    return () => window.clearTimeout(timer)
+  }, [shownPing])
 
   const entities = useMemo(() => {
     const map = new Map<string, MapEntity>()
-    for (const obj of location.objects) {
+    for (const obj of changes.objects) {
       map.set(`obj:${obj.id}`, { key: `obj:${obj.id}`, kind: 'object', type: obj.type, name: obj.name, kindLabel: OBJECT_TYPE_LABELS[obj.type], description: obj.description, x: obj.x, y: obj.y, w: obj.w ?? 1, h: obj.h ?? 1 })
     }
     for (const door of location.doors) {
@@ -166,7 +199,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
     for (const win of location.windows) {
       map.set(`window:${win.id}`, { key: `window:${win.id}`, kind: 'window', name: win.name ?? 'Окно', kindLabel: 'Окно', description: win.description, ...segmentBox(win, 0.3) })
     }
-    for (const npc of location.npcs) {
+    for (const npc of changes.npcs) {
       map.set(`npc:${npc.id}`, {
         key: `npc:${npc.id}`,
         kind: 'npc',
@@ -181,7 +214,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
       })
     }
     return map
-  }, [location, doors])
+  }, [location, doors, changes.objects, changes.npcs])
 
   // Закрыть подсказку по Escape.
   useEffect(() => {
@@ -312,7 +345,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
     }
     actions.send(action.text)
   }
-  const objects = useMemo(() => [...location.objects].sort((a, b) => OBJECT_ORDER(a) - OBJECT_ORDER(b)), [location.objects])
+  const objects = useMemo(() => [...changes.objects].sort((a, b) => OBJECT_ORDER(a) - OBJECT_ORDER(b)), [changes.objects])
   const heroPos = walks.pos[PLAYER_ID] ?? player
   const tokenR = profile.tokenRadius
 
@@ -353,15 +386,45 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
 
               <g className="map-layer map-layer--objects">
                 {objects.map((obj) => (
-                  <g key={obj.id} {...interactiveProps(`obj:${obj.id}`)} data-testid={`object-${obj.id}`} data-type={obj.type} data-flat={FLAT_OBJECT_TYPES.includes(obj.type) || undefined}>
-                    <rect x={obj.x} y={obj.y} width={obj.w ?? 1} height={obj.h ?? 1} className="hit-area" />
-                    <MapObjectIcon object={obj} />
+                  <g
+                    key={obj.id}
+                    {...interactiveProps(`obj:${obj.id}`)}
+                    data-testid={`object-${obj.id}`}
+                    data-type={obj.type}
+                    data-x={obj.x}
+                    data-y={obj.y}
+                    data-flat={FLAT_OBJECT_TYPES.includes(obj.type) || undefined}
+                    data-fresh={changes.fresh.has(obj.id) || undefined}
+                  >
+                    {/* Сдвиг объекта (update_object) — плавный переход, а не прыжок. */}
+                    <g className={`map-object-pos${changes.fresh.has(obj.id) ? ' is-appearing' : ''}`} style={{ transform: `translate(${obj.x}px, ${obj.y}px)` }}>
+                      <rect width={obj.w ?? 1} height={obj.h ?? 1} className="hit-area" />
+                      <MapObjectIcon object={{ ...obj, x: 0, y: 0 }} />
+                    </g>
+                  </g>
+                ))}
+                {changes.leavingObjects.map((obj) => (
+                  <g key={`gone-${obj.id}`} className="map-object-pos is-leaving" style={{ transform: `translate(${obj.x}px, ${obj.y}px)` }} data-testid={`object-leaving-${obj.id}`} pointerEvents="none">
+                    <MapObjectIcon object={{ ...obj, x: 0, y: 0 }} />
                   </g>
                 ))}
               </g>
 
               <g className="map-layer map-layer--tokens">
-                {location.npcs.map((npc) => {
+                {changes.leavingNpcs.map((npc) => {
+                  const pos = walks.pos[npc.id] ?? npc
+                  return (
+                    <g key={`gone-${npc.id}`} className="npc-leaving" data-testid={`npc-leaving-${npc.id}`} data-x={pos.x} data-y={pos.y} pointerEvents="none">
+                      <g className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+                        <circle cx={0.5} cy={0.5} r={tokenR} className={`npc-token npc-token--${npc.attitude ?? 'neutral'}`} />
+                        <text x={0.5} y={0.52} className="npc-initial">
+                          {npc.name[0]}
+                        </text>
+                      </g>
+                    </g>
+                  )
+                })}
+                {changes.npcs.map((npc) => {
                   const pos = walks.pos[npc.id] ?? npc
                   return (
                     <g
@@ -371,6 +434,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
                       data-x={pos.x}
                       data-y={pos.y}
                       data-walking={walks.walking.has(npc.id) || undefined}
+                      data-fresh={changes.fresh.has(npc.id) || undefined}
                     >
                       <g className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
                         <rect width={1} height={1} className="hit-area" />
@@ -402,12 +466,15 @@ export function LocationMap({ location, player, doors = {}, movement, actions }:
                 </g>
               </g>
 
+              <EffectLayer effects={location.effects} />
+
               <LightLayer width={width} height={height} lights={lights} darkness={darkness} />
 
               <g className="map-layer map-layer--ui" pointerEvents="none">
                 {drag && <DragOverlay location={location} drag={drag} hero={heroPos} />}
+                {shownPing && <PingMarker key={shownPing.id} ping={shownPing} />}
                 {profile.labels &&
-                  location.npcs.map((npc) => {
+                  changes.npcs.map((npc) => {
                     const pos = walks.pos[npc.id] ?? npc
                     return (
                       <g key={npc.id} className="map-token" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
@@ -520,6 +587,47 @@ const LightLayer = memo(function LightLayer({ width, height, lights, darkness }:
     </g>
   )
 })
+
+/** Эффекты ведущего (огонь, дым, тьма, лужа, свечение) — области поверх обстановки и фишек. */
+const EffectLayer = memo(function EffectLayer({ effects }: { effects?: MapEffect[] }) {
+  if (!effects?.length) return null
+  return (
+    <g className="map-layer map-layer--map-effects" pointerEvents="none">
+      {effects.map((e) => (
+        <rect
+          key={e.id}
+          x={e.x + 0.05}
+          y={e.y + 0.05}
+          width={e.w - 0.1}
+          height={e.h - 0.1}
+          rx={Math.min(0.45, e.w / 2, e.h / 2)}
+          className={`map-effect map-effect--${e.kind}`}
+          data-testid={`effect-${e.id}`}
+          data-kind={e.kind}
+        >
+          <title>{e.name ?? EFFECT_KIND_NAMES[e.kind]}</title>
+        </rect>
+      ))}
+    </g>
+  )
+})
+
+/** Подсветка ведущего: пульсирующая рамка вокруг цели и подпись. */
+function PingMarker({ ping }: { ping: MapPing }) {
+  const cx = ping.x + ping.w / 2
+  const cy = ping.y + ping.h / 2
+  return (
+    <g className="map-ping" data-testid="map-ping" data-x={ping.x} data-y={ping.y}>
+      <rect x={ping.x - 0.1} y={ping.y - 0.1} width={ping.w + 0.2} height={ping.h + 0.2} rx={0.25} className="map-ping-frame" />
+      <circle cx={cx} cy={cy} r={Math.max(ping.w, ping.h) / 2 + 0.3} className="map-ping-wave" />
+      {ping.label && (
+        <text x={cx} y={ping.y - 0.35} className="drag-label map-ping-label">
+          {ping.label}
+        </text>
+      )}
+    </g>
+  )
+}
 
 /** Подсветка при перетаскивании: недоступные клетки, путь по центрам клеток, длина в футах, тень токена в цели. */
 function DragOverlay({ location, drag, hero }: { location: LocationData; drag: DragState; hero: CellPosition }) {

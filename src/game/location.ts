@@ -12,6 +12,7 @@ import {
   AMBIENT_LIGHTS,
   DISTANCE_UNITS,
   DOOR_STATES,
+  EFFECT_KINDS,
   FLAT_OBJECT_TYPES,
   FLOOR_TYPES,
   MAP_KIND_OBJECTS,
@@ -26,6 +27,8 @@ import {
   ZONE_KINDS,
   type CellPosition,
   type Door,
+  type EffectKind,
+  type MapEffect,
   type GridSegment,
   type LocationData,
   type MapObject,
@@ -314,6 +317,7 @@ export function parseLocation(input: unknown): LocationData {
       fail(`${where}: на карте вида «${kind}» объекты «${obj.type}» не ставятся (можно: ${MAP_KIND_OBJECTS[kind].join(', ')})`)
     if (!isNonEmptyString(obj.name)) fail(`${where}: "name" должно быть непустой строкой`)
     checkOptionalText(obj, 'description', where)
+    if (obj.hidden !== undefined && typeof obj.hidden !== 'boolean') fail(`${where}: "hidden" — true или false`)
     if (obj.light !== undefined) {
       const l = obj.light
       if (!isObject(l) || !isInt(l.bright) || !isInt(l.dim) || (l.bright as number) < 0 || (l.dim as number) < 0)
@@ -367,10 +371,34 @@ export function parseLocation(input: unknown): LocationData {
       checkOptionalText(npc, key, where)
       if (typeof npc[key] === 'string' && (npc[key] as string).length > NPC_PERSONALITY_LIMITS[key]) fail(`${where}: "${key}" — не длиннее ${NPC_PERSONALITY_LIMITS[key]} символов`)
     }
+    if (npc.hidden !== undefined && typeof npc.hidden !== 'boolean') fail(`${where}: "hidden" — true или false`)
     if (npc.attitude !== undefined && !isOneOf(NPC_ATTITUDES, npc.attitude)) {
       fail(`${where}: "attitude" должно быть одним из: ${NPC_ATTITUDES.join(', ')}`)
     }
     if (checkCell(npc, where) && !isFloorCell(npc.x, npc.y)) fail(`${where}: НПС должен стоять на полу, а клетка (${npc.x}, ${npc.y}) — пустота`)
+  })
+
+  // ---------- Эффекты ----------
+  if (raw.effects !== undefined && !Array.isArray(raw.effects)) fail('"effects" должно быть массивом')
+  const effects: MapEffect[] = []
+  list('effects').forEach((effect, i) => {
+    if (!isObject(effect)) return fail(`effects[${i}]: должен быть объектом`)
+    const where = label(effect, `effects[${i}]`)
+    checkId(effect.id, where)
+    if (!isOneOf(EFFECT_KINDS, effect.kind)) fail(`${where}: "kind" должно быть одним из: ${EFFECT_KINDS.join(', ')}`)
+    checkOptionalText(effect, 'name', where)
+    if (!checkCell(effect, where)) return
+    if (!isInt(effect.w) || !isInt(effect.h) || (effect.w as number) < 1 || (effect.h as number) < 1) return fail(`${where}: "w" и "h" — положительные целые`)
+    if (effect.x + (effect.w as number) > width || effect.y + (effect.h as number) > height) return fail(`${where}: эффект выходит за пределы карты ${width}×${height}`)
+    effects.push({
+      id: effect.id as string,
+      kind: effect.kind as EffectKind,
+      ...(typeof effect.name === 'string' ? { name: effect.name } : {}),
+      x: effect.x,
+      y: effect.y,
+      w: effect.w as number,
+      h: effect.h as number,
+    })
   })
 
   // ---------- Скрытые зоны ----------
@@ -459,6 +487,7 @@ export function parseLocation(input: unknown): LocationData {
     windows: windows.map((w) => pick<MapWindow>(w, ['id', 'name', 'description', 'x1', 'y1', 'x2', 'y2'])),
     objects: objects as MapObject[],
     npcs: npcs as Npc[],
+    ...(effects.length ? { effects } : {}),
     ...(zones.length ? { zones } : {}),
     playerStart: start as CellPosition,
   }

@@ -668,7 +668,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} />
+          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} />
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}

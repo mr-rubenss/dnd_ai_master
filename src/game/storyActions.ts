@@ -10,7 +10,7 @@ import { isFloor } from '../engine/movement'
 import type { CharacterSheet, Equipment } from '../types/character'
 import type { ChatMessage } from '../types/game'
 import type { ItemCatalog } from '../types/items'
-import { FLAT_OBJECT_TYPES, OBJECT_TYPES, type LocationData } from '../types/location'
+import { EFFECT_KINDS, FLAT_OBJECT_TYPES, OBJECT_TYPES, type LocationData } from '../types/location'
 import {
   QUEST_STATUSES,
   type ActionAuthor,
@@ -24,7 +24,7 @@ import {
 import type { AdventureData } from './adventure'
 import { equipItem, unequipSlot, type EquipmentSlot } from './equipment'
 import { placementProblem } from './mapPlacement'
-import { heroMovePlan } from './heroMove'
+import { heroBlocker, heroMovePlan } from './heroMove'
 import { mergeMove } from './mapEvents'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
@@ -346,10 +346,36 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       return updateLocation(state, action.locationId, (l) => ({ ...l, npcs: l.npcs.map((n) => (n.id === action.npcId ? applyNpcChanges(n, action.changes) : n)) }))
     case 'heroMoved': {
       // Мелкие перемещения подряд склеиваются (src/game/mapEvents.ts) — уйдут ведущему со следующей репликой.
-      const move = mergeMove(state, currentLocation(state), action.heroId, action.to)
-      const moved = updateMember(state, action.heroId, (m) => ({ ...m, position: { x: action.to.x, y: action.to.y } }))
-      return move ? { ...moved, pendingMoves: { ...state.pendingMoves, [action.heroId]: move } } : moved
+      const location = currentLocation(state)
+      const move = mergeMove(state, location, action.heroId, action.to)
+      let moved = updateMember(state, action.heroId, (m) => ({ ...m, position: { x: action.to.x, y: action.to.y } }))
+      // Перемещение по просьбе ведущего (move_hero) он и так знает — копятся только шаги игрока.
+      if (move && action.author.kind === 'player') moved = { ...moved, pendingMoves: { ...state.pendingMoves, [action.heroId]: move } }
+      // В бою шаги тратят скорость героя (перемещение по сюжету — нет).
+      if (state.combat && !action.forced) {
+        const feet = heroMovePlan(location, state, action.heroId, action.to, { ignoreBudget: true })
+        const spent = typeof feet === 'string' ? 0 : feet.feet
+        moved = { ...moved, combat: { ...state.combat, moved: { ...state.combat.moved, [action.heroId]: (state.combat.moved[action.heroId] ?? 0) + spent } } }
+      }
+      if (action.notice) moved = { ...moved, messages: [...moved.messages, { id: `${action.id}-note`, author: 'system', text: action.notice, heroId: action.heroId, mapNote: true }] }
+      return moved
     }
+    case 'combatChanged': {
+      const { combat: _c, ...rest } = state
+      return action.combat ? { ...rest, combat: action.combat } : rest
+    }
+    case 'effectAdded':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, effects: [...(l.effects ?? []), action.effect] }))
+    case 'effectRemoved':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, effects: (l.effects ?? []).filter((e) => e.id !== action.effectId) }))
+    case 'mapPinged':
+      return { ...state, ping: action.ping }
+    case 'entityRevealed':
+      return updateLocation(state, action.locationId, (l) =>
+        action.kind === 'npc'
+          ? { ...l, npcs: l.npcs.map((n) => (n.id === action.entityId ? withoutHidden(n) : n)) }
+          : { ...l, objects: l.objects.map((o) => (o.id === action.entityId ? withoutHidden(o) : o)) },
+      )
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]
       const npcs = location.npcs.map((n) => (n.id === action.npcId ? { ...n, x: action.to.x, y: action.to.y } : n))
@@ -404,6 +430,12 @@ export interface ActionContext {
 /** Что ведущий и движок могут записать во время вопроса вне игры: только ответ (и его переписывание). */
 /** Описание перемещений для ведущего — не длиннее (символов). */
 export const MAX_MOVE_TEXT = 1500
+
+/** Без пометки «скрыт» (раскрыт). */
+function withoutHidden<T extends { hidden?: boolean }>(value: T): T {
+  const { hidden: _h, ...rest } = value
+  return rest as T
+}
 
 /** Убрать накопленное перемещение героя (рассказано ведущему). */
 function withoutPendingMove<T extends Pick<StoryState, 'pendingMoves'>>(state: T, heroId: string): T {
@@ -693,11 +725,59 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       return isFloor(location, action.npc.x, action.npc.y) ? null : 'НПС может стоять только на полу.'
     }
     case 'heroMoved': {
-      // Героя двигает его игрок (или движок); путь — по правилам карты.
-      if (action.author.kind === 'master') return 'Героя передвигает игрок, а не ведущий.'
+      // Героя двигает его игрок (или движок — move_hero ведущего); путь — по правилам карты.
+      if (action.author.kind === 'master') return 'Героя передвигает игрок или движок, а не ведущий напрямую (инструмент move_hero).'
       if (action.author.kind === 'player' && action.author.heroId !== action.heroId) return 'Игрок двигает только своего героя.'
+      if (action.notice !== undefined && (!isNonEmptyString(action.notice) || action.notice.length > MAX_MOVE_TEXT)) return 'Пустая или слишком длинная строка о перемещении.'
+      if (action.forced !== undefined) {
+        // По сюжету («отбросило») — без пути и скорости, но только на свободный пол и только движком.
+        if (action.author.kind !== 'engine') return 'Перемещение по сюжету делает только движок.'
+        if (!isNonEmptyString(action.forced)) return 'У перемещения по сюжету нужна причина.'
+        const location = currentLocation(state)
+        const { x, y } = action.to
+        if (!Number.isInteger(x) || !Number.isInteger(y) || !isFloor(location, x, y)) return 'Туда не встать: там нет пола.'
+        const occupant = heroBlocker(location, state, action.heroId)(action.to)
+        return occupant ? `Клетка занята: ${occupant}.` : needMember(action.heroId)
+      }
       const plan = heroMovePlan(currentLocation(state), state, action.heroId, action.to)
       return typeof plan === 'string' ? plan : null
+    }
+    case 'combatChanged': {
+      if (action.author.kind === 'player') return 'Бой начинает и ведёт ведущий.'
+      const c = action.combat
+      if (!c) return state.combat ? null : 'Боя и так нет.'
+      if (!Number.isInteger(c.round) || c.round < 1) return 'Раунд — целое от 1.'
+      const bad = Object.values({ ...c.speed, ...c.moved }).some((v) => !Number.isInteger(v) || v < 0)
+      return bad ? 'Скорость и пройденное — целые футы не меньше 0.' : null
+    }
+    case 'effectAdded': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      const e = action.effect
+      if (!isNonEmptyString(e.id) || (location.effects ?? []).some((x) => x.id === e.id)) return 'У эффекта нужен новый id.'
+      if (!EFFECT_KINDS.includes(e.kind)) return `Вид эффекта — один из: ${EFFECT_KINDS.join(', ')}.`
+      if (![e.x, e.y, e.w, e.h].every(Number.isInteger) || e.w < 1 || e.h < 1 || e.x < 0 || e.y < 0 || e.x + e.w > location.width || e.y + e.h > location.height)
+        return `Область эффекта выходит за карту ${location.width}×${location.height}.`
+      return null
+    }
+    case 'effectRemoved': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      return (location.effects ?? []).some((e) => e.id === action.effectId) ? null : 'Такого эффекта на карте нет.'
+    }
+    case 'mapPinged': {
+      const p = action.ping
+      const location = state.world.locations[p.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      if (![p.x, p.y, p.w, p.h].every((v) => typeof v === 'number' && Number.isFinite(v)) || p.w <= 0 || p.h <= 0) return 'Неверная область подсветки.'
+      return p.x < 0 || p.y < 0 || p.x + p.w > location.width + 0.5 || p.y + p.h > location.height + 0.5 ? 'Подсветка за пределами карты.' : null
+    }
+    case 'entityRevealed': {
+      const location = state.world.locations[action.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      const target = action.kind === 'npc' ? location.npcs.find((n) => n.id === action.entityId) : location.objects.find((o) => o.id === action.entityId)
+      if (!target) return action.kind === 'npc' ? 'В этой локации нет такого НПС.' : 'В этой локации нет такого объекта.'
+      return target.hidden ? null : `«${target.name}» и так на виду.`
     }
     case 'npcMoved': {
       const location = state.world.locations[action.locationId]

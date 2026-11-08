@@ -14,6 +14,7 @@ import { changeList, END_TURN, ledgerOf, turnDelta, verifyEndTurn } from './turn
 import { isObject } from './validation'
 import { MASTER } from './storyActions'
 import { changeNames } from './rest'
+import { mapProblems } from './mapClaims'
 import { castProblems, claimProblems, claimReminder } from './claimCheck'
 import { knownSpells } from './magic'
 
@@ -181,12 +182,15 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     return { role: 'tool', toolCallId: call.id, content: JSON.stringify(outcome.result) }
   }
 
+  /** Реплика игрока, с которой начался ход (а не событие карты: старую реплику не перепроверяем). */
+  const turnPlayerMessage = () => {
+    const last = [...story.messages].reverse().find((m) => !m.changes)
+    return last?.author === 'player' ? last : undefined
+  }
   /** Игрок заявил каст заклинания своего героя, а cast_spell не вызывался — просьба вызвать (часть сверки текста). */
   const spellClaims = (): string[] => {
     const rules = runtime?.tools.rules
-    // Только если ход начался с реплики игрока (а не с события карты: старую реплику не перепроверяем).
-    const last = [...story.messages].reverse().find((m) => !m.changes)
-    const said = last?.author === 'player' ? last : undefined
+    const said = turnPlayerMessage()
     if (!rules || !said || said.ooc) return []
     const hero = story.party.find((m) => m.heroId === said.heroId) ?? story.party[0]
     if (!hero) return []
@@ -201,7 +205,12 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   const settle = (text: string, suggestions: string[], response: AiResponse, calls: AiToolCall[], results: AiMessage[]): MasterTurnResult | null => {
     if (!runtime || outOfGame || claimChecked) return finish(text, suggestions, response)
     claimChecked = true
-    const problems = [...claimProblems([...narratedTexts, text].join('\n'), turnDelta(ledger!, ledgerOf(current(), catalog!)), toolCalls), ...spellClaims()]
+    const narrated = [...narratedTexts, text].join('\n')
+    const problems = [
+      ...claimProblems(narrated, turnDelta(ledger!, ledgerOf(current(), catalog!)), toolCalls),
+      ...spellClaims(),
+      ...mapProblems(narrated, story, current(), toolCalls, turnPlayerMessage()),
+    ]
     if (problems.length === 0) return finish(text, suggestions, response)
     claims = problems
     pending = { text, suggestions }

@@ -216,7 +216,7 @@ test('подсказки ведущего под полем ввода и «Пе
   await page.goto('./')
   await startQuickGame(page)
   const input = page.locator('.player-input textarea')
-  await input.fill('Подхожу к стойке')
+  await input.fill('Заказываю эль у стойки')
   await input.press('Enter')
 
   const last = page.locator('.message--master').last()

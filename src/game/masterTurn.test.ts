@@ -25,7 +25,7 @@ function story(extra: [StoryEvent, ActionAuthor][] = []): StoryState {
   let state = newStorySeed({ id: 's1', title: 'Тень над трактом', tone: 'detective', adventure, locations, party: [ratibor], now: 1 })
   const events: [StoryEvent, ActionAuthor][] = [
     [{ type: 'masterNarrated', messageId: 'm1', text: 'Таверна шумит.' }, MASTER],
-    [{ type: 'playerSpoke', heroId: 'ratibor', messageId: 'p1', text: 'Подхожу к стойке.' }, player('ratibor')],
+    [{ type: 'playerSpoke', heroId: 'ratibor', messageId: 'p1', text: 'Облокачиваюсь на стойку.' }, player('ratibor')],
     ...extra,
   ]
   events.forEach(([event, author], i) => (state = applyAction(state, makeAction('s1', i + 1, event, author, 2 + i, `a${i}`))))
@@ -190,12 +190,12 @@ describe('актуальное состояние игры в каждом за�
     expect(text).toContain('### Таверна «Пьяный грифон»')
     expect(text).toContain(location.description)
     expect(text).toContain('Помещения: У стойки')
-    expect(text).toContain('- Барная стойка (3, 2): Длинная стойка')
+    expect(text).toContain('- Барная стойка [bar] (3, 2): Длинная стойка')
     expect(text).toMatch(/- Стул ×\d+/)
-    expect(text).toContain('- Входная дверь — закрыта')
-    expect(text).toContain('- Дверь в кладовую — заперта')
-    for (const n of location.npcs) expect(text).toContain(`- ${n.name} (${n.x}, ${n.y})`)
-    expect(text).toMatch(/Гуннар \(\d+, \d+\), отношение: (дружелюбное|нейтральное|враждебное)/)
+    expect(text).toContain('- Входная дверь [entrance] — закрыта')
+    expect(text).toContain('- Дверь в кладовую [storage-door] — заперта')
+    for (const n of location.npcs) expect(text).toContain(`- ${n.name} [${n.id}] (${n.x}, ${n.y})`)
+    expect(text).toMatch(/Гуннар \[gunnar\] \(\d+, \d+\), отношение: (дружелюбное|нейтральное|враждебное)/)
     expect(text).toContain(`Положение на карте: клетка (${location.playerStart.x}, ${location.playerStart.y})`)
   })
 
@@ -210,10 +210,10 @@ describe('актуальное состояние игры в каждом за�
       [{ type: 'factRecorded', fact: { id: 'f1', text: 'Тобиас работает на гильдию воров', at: 1 } }, MASTER],
     ])
     const text = masterMessages(after, 'normal', context)[0].content as string
-    expect(text).toContain('- Входная дверь — открыта')
+    expect(text).toContain('- Входная дверь [entrance] — открыта')
     expect(text).toContain('Состояния: Отравлен.')
     expect(text).toMatch(/Кинжал ×\d/)
-    expect(text).toContain('- Гуннар (5, 3)')
+    expect(text).toContain('- Гуннар [gunnar] (5, 3)')
     expect(text).toContain('- Вернуть кошелёк — в работе')
     expect(text).toContain('- Тобиас работает на гильдию воров')
   })
@@ -223,7 +223,7 @@ describe('актуальное состояние игры в каждом за�
     expect(messages[0].role).toBe('system')
     expect(messages.slice(-2)).toEqual([
       { role: 'assistant', content: 'Таверна шумит.' },
-      { role: 'user', content: 'Подхожу к стойке.' },
+      { role: 'user', content: 'Облокачиваюсь на стойку.' },
     ])
   })
 })
@@ -460,7 +460,7 @@ describe('цикл с инструментами: ответ модели → и
     expect(requests[1].messages[0].content).toContain('Кошелёк: 15 зм')
     expect(result.verification).toEqual({ status: 'ok' })
     expect(result.changes.map((c) => c.text)).toEqual(['−3 зм (кинжал)', '+1 кинжал'])
-    expect(requests[1].messages[0].content).toContain('- Опрокинутый стол (9, 7)')
+    expect(requests[1].messages[0].content).toMatch(/- Опрокинутый стол \[[^\]]+\] \(9, 7\)/)
   })
 
   it('движок отклонил запись — модель получает причину', async () => {

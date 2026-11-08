@@ -56,7 +56,7 @@ describe('перемещение героя', () => {
     const s = fresh()
     const next = act(s, { type: 'heroMoved', heroId: 'ratibor', to: { x: 12, y: 11 } }, player('ratibor')) as StoryState
     expect(next.party[0].position).toEqual({ x: 12, y: 11 })
-    expect(act(s, { type: 'heroMoved', heroId: 'ratibor', to: { x: 12, y: 11 } }, MASTER)).toBe('Героя передвигает игрок, а не ведущий.')
+    expect(act(s, { type: 'heroMoved', heroId: 'ratibor', to: { x: 12, y: 11 } }, MASTER)).toBe('Героя передвигает игрок или движок, а не ведущий напрямую (инструмент move_hero).')
     expect(act(s, { type: 'heroMoved', heroId: 'ratibor', to: { x: 12, y: 11 } }, player('someone'))).toBe('Этого героя нет в отряде истории.')
     expect(act(s, { type: 'heroMoved', heroId: 'ratibor', to: { x: 16, y: 2 } }, ENGINE)).toMatch(/^Туда не дойти/)
   })

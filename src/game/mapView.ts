@@ -93,6 +93,8 @@ export interface MapLight {
 export function lightSources(location: LocationData): MapLight[] {
   const feet = scaleOf(location).unit === 'ft' ? location.cellFeet : Infinity
   return location.objects.flatMap((o: MapObject) => {
+    // Скрытый объект не выдаёт себя светом.
+    if (o.hidden) return []
     const light = o.light ?? DEFAULT_LIGHTS[o.type]
     if (!light || light.bright + light.dim <= 0 || !Number.isFinite(feet)) return []
     const w = o.w ?? 1

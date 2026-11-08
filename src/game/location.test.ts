@@ -55,7 +55,10 @@ describe('parseLocation: таверна «Пьяный грифон»', () => {
   it('принимается и сохраняет обстановку', () => {
     expect(tavern.name).toBe('Таверна «Пьяный грифон»')
     expect(tavern.objects.filter((obj) => obj.type === 'table')).toHaveLength(5)
-    expect(tavern.npcs).toHaveLength(4)
+    expect(tavern.npcs).toHaveLength(5)
+    // Скрытые: карманник в тени и тайник за камнем — на карте не видны, пока их не обнаружат.
+    expect(tavern.npcs.filter((n) => n.hidden).map((n) => n.id)).toEqual(['pickpocket'])
+    expect(tavern.objects.filter((o) => o.hidden).map((o) => o.id)).toEqual(['hearth-cache'])
   })
 
   it('стены не съедают клетки: вся карта 20×14 — пол', () => {

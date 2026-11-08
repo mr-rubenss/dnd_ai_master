@@ -48,7 +48,7 @@ export const hasPersonality = (npc: Npc) => NPC_PERSONALITY_FIELDS.some((k) => B
  * страх, речь, прошлое). У старых НПС без личности — как раньше: только описание.
  */
 export function npcDigest(npc: Npc): string {
-  const head = `- ${npc.name} (${npc.x}, ${npc.y})${npc.attitude ? `, отношение: ${ATTITUDE[npc.attitude] ?? npc.attitude}` : ''}${npc.description ? `: ${npc.description}` : ''}`
+  const head = `- ${npc.name} [${npc.id}] (${npc.x}, ${npc.y})${npc.hidden ? ' — СКРЫТ от игрока (не виден на карте; раскрыть — reveal или проверка с reveals)' : ''}${npc.attitude ? `, отношение: ${ATTITUDE[npc.attitude] ?? npc.attitude}` : ''}${npc.description ? `: ${npc.description}` : ''}`
   if (!hasPersonality(npc)) return head
   const order: (keyof NpcPersonality)[] = ['activity', 'goal', 'fear', 'speech', 'backstory']
   const parts = order.filter((k) => npc[k]?.trim()).map((k) => `${NPC_FIELD_LABELS[k]}: ${npc[k]!.trim()}`)

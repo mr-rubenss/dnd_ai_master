@@ -166,7 +166,7 @@ test('«слишком длинный контекст»: сжатие и оди
   await page.goto('./')
   await startQuickGame(page)
   await fillFeed(page, 4)
-  await send(page, 'Подсаживаюсь к нему.')
+  await send(page, 'Киваю ему через зал.')
   await expect(page.locator('.message--master').last()).toHaveText(/Человек в капюшоне поднимает взгляд\./)
   await expect(page.getByTestId('master-error')).toHaveCount(0)
   const kinds = bodies.map(kindOf)

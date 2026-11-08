@@ -326,6 +326,51 @@ textarea {
 .map-token { transition: transform 140ms linear; }
 :root[data-motion='reduce'] .map-token { transition: none; }
 
+/* Объекты: сдвиг (update_object) — плавно; новый или раскрытый проявляется, убранный тает. */
+.map-object-pos { transition: transform 420ms ease-out; }
+.map-object-pos.is-appearing { animation: map-appear 450ms ease-out both; }
+.map-object-pos.is-leaving { animation: map-vanish 450ms ease-in both; }
+.map-entity[data-fresh] .map-token > * { animation: map-appear 450ms ease-out both; }
+/* Ушедший НПС идёт к выходу полупрозрачным и тает в конце. */
+.npc-leaving { opacity: 0.6; }
+@keyframes map-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes map-vanish {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+:root[data-motion='reduce'] .map-object-pos { transition: none; animation: none; }
+:root[data-motion='reduce'] .map-object-pos.is-leaving { opacity: 0; }
+:root[data-motion='reduce'] .map-entity[data-fresh] .map-token > * { animation: none; }
+
+/* Эффекты ведущего: огонь, дым, тьма, лужа, магическое свечение. */
+.map-effect { stroke-width: 0.04; }
+.map-effect--fire { fill: var(--map-flame); stroke: var(--map-fire-glow); opacity: 0.55; animation: map-flicker 1.4s ease-in-out infinite alternate; }
+.map-effect--smoke { fill: var(--map-wall-stone); stroke: none; opacity: 0.55; }
+.map-effect--darkness { fill: var(--map-darkness); stroke: none; opacity: 0.88; }
+.map-effect--puddle { fill: var(--map-window-glass); stroke: var(--map-window-frame); opacity: 0.5; }
+.map-effect--glow { fill: var(--map-highlight); stroke: var(--map-selection); opacity: 0.35; animation: map-flicker 2.4s ease-in-out infinite alternate; }
+:root[data-motion='reduce'] .map-effect { animation: none; }
+@media (pointer: coarse) {
+  .map-effect { animation: none; }
+}
+
+/* Подсветка ведущего (ping): пульсирующая рамка вокруг цели. */
+.map-ping-frame { fill: none; stroke: var(--map-highlight); stroke-width: 0.1; animation: map-ping 1s ease-in-out infinite alternate; }
+.map-ping-wave { fill: none; stroke: var(--map-selection); stroke-width: 0.06; animation: map-ping-wave 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes map-ping {
+  from { opacity: 1; }
+  to { opacity: 0.45; }
+}
+@keyframes map-ping-wave {
+  from { opacity: 0.9; transform: scale(0.6); }
+  to { opacity: 0; transform: scale(1.3); }
+}
+:root[data-motion='reduce'] .map-ping-frame,
+:root[data-motion='reduce'] .map-ping-wave { animation: none; }
+
 /* Кнопки масштаба карты. */
 .map-controls {
   position: absolute;

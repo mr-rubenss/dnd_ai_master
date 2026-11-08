@@ -17,6 +17,8 @@ export interface PlacementIgnore {
   creature?: boolean
   /** Плоский объект (ковёр, свеча): клетку не занимает — ложится поверх пола или стола. */
   flat?: boolean
+  /** Описание для игрока: скрытый НПС или объект — «что-то», без имени. */
+  playerView?: boolean
 }
 
 /** Кто или что стоит в клетке: «объект «Стол»», «НПС «Гуннар»», «герой Ратибор» или null. */
@@ -27,7 +29,7 @@ export function cellOccupant(
   ignore: PlacementIgnore = {},
 ): string | null {
   const npc = location.npcs.find((n) => n.id !== ignore.npcId && n.x === cell.x && n.y === cell.y)
-  if (npc) return `НПС «${npc.name}»`
+  if (npc) return npc.hidden && ignore.playerView ? 'что-то (не видно, но мешает)' : `НПС «${npc.name}»`
   const hero = heroes.find((h) => h.position.x === cell.x && h.position.y === cell.y)
   if (hero) return `герой ${hero.name}`
   const object = location.objects.find(
@@ -37,6 +39,7 @@ export function cellOccupant(
       !(ignore.creature && o.type === 'chair') &&
       objectCells(o).some((c) => c.x === cell.x && c.y === cell.y),
   )
+  if (object?.hidden && ignore.playerView) return 'что-то (не видно, но мешает)'
   return object ? `объект «${object.name}»` : null
 }
 

@@ -7,7 +7,8 @@ import { passivePerception, savingThrowModifier, skillModifier } from '../engine
 import { CONDITION_DEFINITIONS } from '../engine/conditions'
 import { SKILL_DEFINITIONS, SKILLS } from '../engine/skills'
 import type { ItemCatalog } from '../types/items'
-import { ZONE_KIND_NAMES, type DoorState } from '../types/location'
+import { EFFECT_KIND_NAMES, ZONE_KIND_NAMES, type DoorState } from '../types/location'
+import { combatBudget } from './heroMove'
 import type { RulesData } from '../types/rules'
 import type { PartyMember, StoryState } from '../types/story'
 import { weaponAttacks } from './attacks'
@@ -192,12 +193,15 @@ export function locationText(story: StoryState): string {
   const rooms = location.rooms.filter((r) => r.name).map((r) => `${r.name} (клетки ${r.x}–${r.x + r.w - 1} × ${r.y}–${r.y + r.h - 1})`)
   // Объекты с описанием — по одному; одинаковые без описания (стулья) — одной строкой с количеством.
   const plain = new Map<string, number>()
-  for (const o of location.objects) if (!o.description) plain.set(o.name, (plain.get(o.name) ?? 0) + 1)
+  for (const o of location.objects) if (!o.description && !o.hidden) plain.set(o.name, (plain.get(o.name) ?? 0) + 1)
+  const hiddenMark = ' — СКРЫТ от игрока (раскрыть — reveal или проверка с reveals)'
   const objects = [
-    ...location.objects.filter((o) => o.description).map((o) => `- ${o.name} ${cell(o)}: ${o.description}`),
+    ...location.objects
+      .filter((o) => o.description || o.hidden)
+      .map((o) => `- ${o.name} [${o.id}] ${cell(o)}${o.hidden ? hiddenMark : ''}${o.description ? `: ${o.description}` : ''}`),
     ...[...plain].map(([name, n]) => `- ${name}${n > 1 ? ` ×${n}` : ''}`),
   ]
-  const doors = location.doors.map((d) => `- ${d.name} — ${DOOR_STATE[doorStates[d.id] ?? d.state]}${d.description ? `: ${d.description}` : ''}`)
+  const doors = location.doors.map((d) => `- ${d.name} [${d.id}] — ${DOOR_STATE[doorStates[d.id] ?? d.state]}${d.description ? `: ${d.description}` : ''}`)
   const npcs = location.npcs.map(npcDigest)
   const zones = (location.zones ?? []).map(
     (z) => `- ${z.name} — ${ZONE_KIND_NAMES[z.kind]}, клетки ${z.x}–${z.x + z.w - 1} × ${z.y}–${z.y + z.h - 1}${z.description ? `: ${z.description}` : ''}`,
@@ -209,6 +213,9 @@ export function locationText(story: StoryState): string {
     rooms.length ? `Помещения: ${rooms.join('; ')}.` : '',
     objects.length ? `Объекты:\n${objects.join('\n')}` : '',
     doors.length ? `Двери:\n${doors.join('\n')}` : '',
+    location.effects?.length
+      ? `Эффекты на карте (remove_effect — убрать):\n${location.effects.map((e) => `- ${e.name ?? EFFECT_KIND_NAMES[e.kind]} [${e.id}] — ${EFFECT_KIND_NAMES[e.kind]}, клетки ${e.x}–${e.x + e.w - 1} × ${e.y}–${e.y + e.h - 1}`).join('\n')}`
+      : '',
     zones.length ? `Скрытые зоны (игрок их не видит; путь героя через зону — сразу событие):\n${zones.join('\n')}` : '',
     npcs.length
       ? `НПС (личность — твои заметки: не выдавай сразу, раскрывай по крупицам; реплики — из цели и манеры речи):\n${npcs.join('\n')}`
@@ -257,6 +264,12 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
     positionsText(story, currentLocation(story), MAP_REACTIONS),
+    story.combat
+      ? `## Бой (раунд ${story.combat.round})\nПеремещения героя тратят скорость. Осталось: ${story.party
+          .filter((m) => !m.fallen)
+          .map((m) => `${m.character.name} ${combatBudget(story, m.heroId)} из ${story.combat!.speed[m.heroId] ?? 30} фт.`)
+          .join(', ')}. Новый раунд — set_combat next_round, конец боя — set_combat end.`
+      : '',
     quests.length ? `## Задания\n${quests.join('\n')}` : '',
     story.pendingRest
       ? `## Отдых\nИгрок просит: ${REST_NAMES[story.pendingRest.kind].toLowerCase()}. Реши, безопасно ли здесь отдыхать: можно — вызови rest (kind: ${story.pendingRest.kind}), опасно — interrupt_rest с причиной. Если не вызовешь ни то ни другое, отряд отдохнёт.`

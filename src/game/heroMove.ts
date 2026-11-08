@@ -11,7 +11,19 @@ import { cellOccupant } from './mapPlacement'
 /** Что мешает встать или пройти герою в этой локации (кроме него самого). */
 export function heroBlocker(location: LocationData, state: Pick<StoryState, 'party'>, heroId: string) {
   const others = state.party.filter((m) => m.heroId !== heroId && !m.fallen).map((m) => ({ name: m.character.name, position: m.position }))
-  return (cell: CellPosition) => cellOccupant(location, others, cell, { creature: true })
+  return (cell: CellPosition) => cellOccupant(location, others, cell, { creature: true, playerView: true })
+}
+
+/** Сколько футов герой ещё может пройти в этом раунде боя; null — боя нет (ходить можно сколько угодно). */
+export function combatBudget(state: Pick<StoryState, 'combat'>, heroId: string): number | null {
+  const combat = state.combat
+  if (!combat) return null
+  return Math.max(0, (combat.speed[heroId] ?? 30) - (combat.moved[heroId] ?? 0))
+}
+
+export interface MovePlanOptions {
+  /** Не учитывать скорость в бою (move_hero сам обрежет путь до остатка). */
+  ignoreBudget?: boolean
 }
 
 export interface HeroMovePlan {
@@ -20,7 +32,13 @@ export interface HeroMovePlan {
 }
 
 /** Путь героя в клетку `to` или причина, почему туда нельзя (за пределами, стена, занято, путь перекрыт). */
-export function heroMovePlan(location: LocationData, state: Pick<StoryState, 'party' | 'world'>, heroId: string, to: CellPosition): HeroMovePlan | string {
+export function heroMovePlan(
+  location: LocationData,
+  state: Pick<StoryState, 'party' | 'world' | 'combat'>,
+  heroId: string,
+  to: CellPosition,
+  options: MovePlanOptions = {},
+): HeroMovePlan | string {
   const member = state.party.find((m) => m.heroId === heroId)
   if (!member) return 'Такого героя нет в отряде.'
   if (member.fallen) return `${member.character.name} погиб.`
@@ -32,15 +50,22 @@ export function heroMovePlan(location: LocationData, state: Pick<StoryState, 'pa
   const blocker = heroBlocker(location, state, heroId)
   const path = findPath(location, member.position, to, { doors, blocked: (c) => blocker(c) !== null })
   if (!path) return 'Туда не дойти: путь перекрывают стены, закрытые двери или мебель.'
-  return { path, feet: pathFeet(path, location.cellFeet) }
+  const feet = pathFeet(path, location.cellFeet)
+  const budget = options.ignoreBudget ? null : combatBudget(state, heroId)
+  if (budget !== null && feet > budget)
+    return `Идёт бой: в этом раунде осталось ${budget} фт. скорости, а путь — ${feet} фт.`
+  return { path, feet }
 }
 
 /** Клетки, куда герой может дойти (ключ «x,y»). */
-export function heroReachable(location: LocationData, state: Pick<StoryState, 'party' | 'world'>, heroId: string): Set<string> {
+export function heroReachable(location: LocationData, state: Pick<StoryState, 'party' | 'world' | 'combat'>, heroId: string): Set<string> {
   const member = state.party.find((m) => m.heroId === heroId)
   if (!member) return new Set()
   const blocker = heroBlocker(location, state, heroId)
-  return reachableCells(location, member.position, { doors: state.world.doors[location.id] ?? {}, blocked: (c) => blocker(c) !== null })
+  const budget = combatBudget(state, heroId)
+  // В бою — только то, до чего хватает скорости в этом раунде.
+  const maxSteps = budget === null ? Infinity : Math.floor(budget / location.cellFeet)
+  return reachableCells(location, member.position, { doors: state.world.doors[location.id] ?? {}, blocked: (c) => blocker(c) !== null, maxSteps })
 }
 
 /**
@@ -49,9 +74,10 @@ export function heroReachable(location: LocationData, state: Pick<StoryState, 'p
  */
 export function approachCell(
   location: LocationData,
-  state: Pick<StoryState, 'party' | 'world'>,
+  state: Pick<StoryState, 'party' | 'world' | 'combat'>,
   heroId: string,
   area: { x: number; y: number; w: number; h: number },
+  options: MovePlanOptions = {},
 ): { cell: CellPosition; plan: HeroMovePlan } | null {
   const member = state.party.find((m) => m.heroId === heroId)
   if (!member) return null
@@ -64,7 +90,7 @@ export function approachCell(
     for (let x = Math.floor(area.x) - 1; x <= Math.ceil(area.x + area.w); x++) {
       const cell = { x, y }
       if (inside(cell) || !near(cell)) continue
-      const plan = heroMovePlan(location, state, heroId, cell)
+      const plan = heroMovePlan(location, state, heroId, cell, options)
       if (typeof plan !== 'string' && (!best || plan.path.length < best.plan.path.length)) best = { cell, plan }
     }
   return best

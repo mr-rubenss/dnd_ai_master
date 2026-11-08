@@ -73,6 +73,12 @@ describe('описания инструментов', () => {
       'remove_object',
       'update_object',
       'set_door',
+      'move_hero',
+      'ping',
+      'add_effect',
+      'remove_effect',
+      'reveal',
+      'set_combat',
     ])
     for (const t of MASTER_TOOLS) expect(t.parameters).toMatchObject({ type: 'object', additionalProperties: false })
   })
@@ -292,7 +298,7 @@ describe('допустимые вызовы меняют игру через д�
     // На стул можно сесть.
     expect(run(s, 'move_npc', { npc: 'Гуннар', x: 8, y: 7 }).outcome.ok).toBe(true)
     s = run(s, 'remove_npc', { npc: 'Тобиас' }).state
-    expect(s.world.locations[LOC].npcs.map((n) => n.name)).toEqual(['Гуннар', 'Брам', 'Лиара', 'Стражник'])
+    expect(s.world.locations[LOC].npcs.map((n) => n.name)).toEqual(['Гуннар', 'Брам', 'Лиара', 'Шнырь', 'Стражник'])
     s = run(s, 'add_object', { name: 'Упавшая люстра', type: 'debris', x: 6, y: 9, w: 2, description: 'Кованая люстра, свечи раскатились.' }).state
     expect(s.world.locations[LOC].objects.at(-1)).toMatchObject({ name: 'Упавшая люстра', type: 'debris', x: 6, y: 9, w: 2 })
     s = run(s, 'update_object', { object: 'table-2', name: 'Опрокинутый стол', description: 'Лежит на боку — укрытие.' }).state
@@ -496,7 +502,7 @@ describe('живые НПС: личность', () => {
     const npc = tavern(state).npcs.find((n) => n.name === 'Ведьма Марта')!
     expect(npc).toMatchObject({ goal: 'Продать корень мандрагоры подороже.', speech: 'Скрипучий голос, зовёт всех «милок», отвечает поговорками.' })
     const text = gameStateText(state, { catalog: itemCatalog, rules: rulesData })
-    expect(text).toContain('- Ведьма Марта (10, 10), отношение: нейтральное: Сгорбленная старуха с корзиной трав.\n  сейчас: Раскладывает пучки трав на столе. | цель: Продать корень мандрагоры подороже. | страх/слабость: Охотники на ведьм. | речь: Скрипучий голос')
+    expect(text).toContain(`- Ведьма Марта [${npc.id}] (10, 10), отношение: нейтральное: Сгорбленная старуха с корзиной трав.\n  сейчас: Раскладывает пучки трав на столе. | цель: Продать корень мандрагоры подороже. | страх/слабость: Охотники на ведьм. | речь: Скрипучий голос`)
     expect(text).toContain('не выдавай сразу, раскрывай по крупицам')
   })
 
@@ -521,7 +527,7 @@ describe('живые НПС: личность', () => {
     const plain = { ...loc.npcs[0], backstory: undefined, goal: undefined, fear: undefined, speech: undefined, activity: undefined }
     const old: StoryState = { ...state, world: { ...state.world, locations: { ...state.world.locations, [loc.id]: { ...loc, npcs: [plain] } } } }
     const text = gameStateText(old, { catalog: itemCatalog, rules: rulesData })
-    expect(text).toContain(`- ${plain.name} (${plain.x}, ${plain.y}), отношение: дружелюбное: ${plain.description}`)
+    expect(text).toContain(`- ${plain.name} [${plain.id}] (${plain.x}, ${plain.y}), отношение: дружелюбное: ${plain.description}`)
     expect(text).not.toContain('цель:')
     // Другая локация мира с НПС — в запрос не попадает.
     const elsewhere = { ...loc, id: 'far-away', name: 'Далёкая башня', npcs: [{ ...loc.npcs[1], id: 'hermit', name: 'Отшельник', goal: 'Секретная цель отшельника' }] }

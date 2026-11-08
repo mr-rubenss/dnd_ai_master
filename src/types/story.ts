@@ -8,7 +8,7 @@ import type { Coins } from '../game/coins'
 import type { CharacterMagic } from './spells'
 import type { ArmorType } from './items'
 import type { ChatMessage, CheckCard, RollRecord, TurnChange } from './game'
-import type { CellPosition, DoorState, LocationData, MapObject, Npc, NpcAttitude, NpcPersonality } from './location'
+import type { CellPosition, DoorState, LocationData, MapEffect, MapObject, Npc, NpcAttitude, NpcPersonality } from './location'
 
 /** Что меняет npcUpdated: поля личности, описание, отношение. Пустая строка в текстовом поле — убрать его. */
 export type NpcChanges = Partial<NpcPersonality & { description: string; attitude: NpcAttitude }>
@@ -124,8 +124,32 @@ export interface StoryState {
    * игрока или событием «значимое перемещение». Нет поля — ничего не накоплено.
    */
   pendingMoves?: Record<string, PendingMove>
+  /** Идёт бой: раунды и скорость. Нет поля — боя нет. */
+  combat?: CombatState
+  /** Последняя подсветка ведущего на карте (показывается несколько секунд после события). */
+  ping?: MapPing
   /** Когда закончился последний долгий отдых (игровое время) — для правила «16 часов до следующего». */
   lastLongRestAt?: number
+}
+
+/** Бой (заготовка боевой системы): раунд и скорость героев — сколько футов ещё можно пройти в этом раунде. */
+export interface CombatState {
+  round: number
+  /** Скорость героя в футах (из вида). */
+  speed: Record<string, number>
+  /** Пройдено в этом раунде, футов. */
+  moved: Record<string, number>
+}
+
+/** Подсветка ведущего на карте. */
+export interface MapPing {
+  id: string
+  locationId: string
+  x: number
+  y: number
+  w: number
+  h: number
+  label?: string
 }
 
 /** Накопленное перемещение героя (src/game/mapEvents.ts, mergeMove). */
@@ -264,7 +288,20 @@ export type StoryEvent =
   | { type: 'objectUpdated'; locationId: string; objectId: string; changes: Partial<Omit<MapObject, 'id'>> }
   | { type: 'npcMoved'; locationId: string; npcId: string; to: CellPosition }
   /** Игрок передвинул своего героя по карте (путь проверяет движок: стены, двери, занятые клетки). */
-  | { type: 'heroMoved'; heroId: string; to: CellPosition }
+  /**
+   * Герой передвинулся: игрок (перетащил токен) или движок по просьбе ведущего (move_hero — к цели по пути A*).
+   * forced — перемещение по сюжету без пути и без траты скорости («тебя отбросило»), с причиной; notice — строка игроку
+   * в ленте («скорости хватило на 30 фт.»).
+   */
+  | { type: 'heroMoved'; heroId: string; to: CellPosition; forced?: string; notice?: string }
+  /** Бой: начался, новый раунд (скорость восстановлена) или закончился (null). */
+  | { type: 'combatChanged'; combat: CombatState | null }
+  | { type: 'effectAdded'; locationId: string; effect: MapEffect }
+  | { type: 'effectRemoved'; locationId: string; effectId: string }
+  /** Ведущий указывает на клетку или объект («вот эта дверь») — подсветка на карте. */
+  | { type: 'mapPinged'; ping: MapPing }
+  /** Скрытый НПС или объект обнаружен (проверка героя или решение ведущего) — теперь виден на карте. */
+  | { type: 'entityRevealed'; locationId: string; kind: 'npc' | 'object'; entityId: string }
   /**
    * Значимое перемещение (вошёл в комнату, вплотную к НПС, скрытая зона, скрылся из виду) — событие ведущему без
    * реплики игрока (движок). text — для игрока в ленте, note — для ведущего (с тем, чего герой не знает).

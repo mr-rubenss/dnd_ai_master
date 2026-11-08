@@ -260,6 +260,22 @@
   локации (`trap`/`ambush`/`hazard`/`secret`, только ведущему; в таверне — «Скрипучие половицы»). «Подойти» из меню
   реакции не вызывает — перемещение уходит с репликой. Правило — раздел «Карта: где стоит герой» в `dm-prompt.md`,
   сценарии 34–36; тесты — `mapEvents.test.ts`, e2e — `e2e/map-events.spec.ts`.
+- **Рассказ ведущего — на карте**: изменения от инструментов анимируются (`src/components/useMapChanges.ts`: новый НПС
+  идёт от входа `playerStart`, ушедший — к выходу и тает, объекты проявляются, тают и сдвигаются плавно; фишки — по
+  пути `useWalks` со `spawn`). Новые инструменты (`src/game/masterTools.ts`, цели — `src/game/heroTargets.ts`):
+  `move_hero` — к цели (`target`: id объекта, НПС, двери, окна; ближайшая свободная клетка рядом — `routeToTarget`,
+  A* в обход стен и мебели; не дойти — причина с названием двери) действием `heroMoved` от движка, или по сюжету
+  (`x`, `y`, `reason` → `heroMoved.forced`, без пути и скорости); в бою путь обрезается по скорости (`limitBySpeed`,
+  строка игроку — `heroMoved.notice` → системное сообщение `mapNote`). Бой — заготовка `StoryState.combat`
+  (`set_combat` start/next_round/end → `combatChanged`; скорость из вида; шаги игрока тоже тратят её — `combatBudget`
+  в `heroMovePlan`/`heroReachable`). `ping` (`mapPinged` → `StoryState.ping`, подсветка на `PING_MS`),
+  `add_effect`/`remove_effect` (`LocationData.effects`: fire/smoke/darkness/puddle/glow — `EffectLayer`, цвета —
+  существующие токены карты). Скрытые НПС и объекты (`hidden: true`; в таверне — карманник Шнырь и тайник за камнем)
+  игроку не видны, светом себя не выдают, клетку занимают («что-то мешает»); раскрывает `reveal` или `request_check`
+  с `reveals` при успехе (`entityRevealed`). Ведущему id целей — в квадратных скобках в состоянии игры. Сверка рассказа
+  с картой — `src/game/mapClaims.ts` (`mapProblems`: НПС «уходит»/«подходит», а на карте на месте; игрок «подхожу к
+  стойке», а `move_hero` не было) в общей просьбе `settle`. Правила — «Карта отражает рассказ» в `dm-prompt.md`,
+  сценарии 37–39; тесты — `mapTools.test.ts`, e2e — `e2e/map-story.spec.ts`.
 - **НПС — живые** (`src/game/npcs.ts`, тип — `Npc`/`NpcPersonality` в `src/types/location.ts`): необязательные поля
   личности — `backstory` (2–3 предложения), `goal`, `fear` (страх или слабость), `speech` (манера речи), `activity` (чем
   занят сейчас); пределы длины — `NPC_PERSONALITY_LIMITS` (проверяют `parseLocation`, `add_npc`, событие `npcUpdated`).

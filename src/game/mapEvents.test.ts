@@ -183,7 +183,9 @@ describe('значимые перемещения (правила из конф�
     const before = move(start(), { x: 13, y: 3 })
     const sig = moveSignificance(before, move(before, { x: 14, y: 0 }), HERO, location, only('hid-from-sight'))
     expect(sig.rules).toEqual(['hid-from-sight'])
-    expect(sig.master).toEqual(['скрылся от взгляда Тобиас'])
+    expect(sig.master).toContain('скрылся от взгляда Тобиас')
+    // Скрытый карманник — только ведущему.
+    expect(sig.player).toEqual(['скрылся от взгляда Тобиас'])
   })
 
   it('выключенное в конфиге правило не срабатывает', () => {

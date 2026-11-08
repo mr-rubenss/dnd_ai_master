@@ -18,15 +18,24 @@ export interface Walks {
   walking: Set<string>
 }
 
-export function useWalks(targets: Record<string, CellPosition>, path: (from: CellPosition, to: CellPosition, id: string) => CellPosition[] | null): Walks {
+/**
+ * spawn — откуда идёт фишка, которой не было (новый НПС — от входа); null — появляется сразу на месте.
+ */
+export function useWalks(
+  targets: Record<string, CellPosition>,
+  path: (from: CellPosition, to: CellPosition, id: string) => CellPosition[] | null,
+  spawn?: (id: string) => CellPosition | null,
+): Walks {
   const [state, setState] = useState<Walks>({ pos: targets, walking: new Set() })
   const current = useRef(targets)
   const queues = useRef<Record<string, CellPosition[]>>({})
   const timer = useRef(0)
   const pathRef = useRef(path)
+  const spawnRef = useRef(spawn)
   useEffect(() => {
     pathRef.current = path
-  }, [path])
+    spawnRef.current = spawn
+  }, [path, spawn])
   const key = Object.entries(targets)
     .map(([id, p]) => `${id}:${p.x},${p.y}`)
     .join('|')
@@ -35,10 +44,14 @@ export function useWalks(targets: Record<string, CellPosition>, path: (from: Cel
     const next = { ...current.current }
     for (const id of Object.keys(next)) if (!(id in targets)) delete next[id]
     for (const [id, to] of Object.entries(targets)) {
-      const from = next[id]
+      let from = next[id]
       if (!from) {
-        next[id] = to
-        continue
+        const start = spawnRef.current?.(id)
+        if (!start || (start.x === to.x && start.y === to.y)) {
+          next[id] = to
+          continue
+        }
+        next[id] = from = start
       }
       if (from.x === to.x && from.y === to.y) {
         delete queues.current[id]

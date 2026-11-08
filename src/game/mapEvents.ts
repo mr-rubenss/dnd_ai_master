@@ -224,12 +224,14 @@ export function moveSignificance(before: StoryState, after: StoryState, heroId: 
   const toRoom = roomAt(location, now.position)
   if (toRoom && toRoom.id !== fromRoom?.id) add('entered-room', `вошёл в «${toRoom.name ?? toRoom.id}»`)
   const near = (cell: CellPosition, n: Npc) => cellsTo(cell, n) === 1
-  for (const n of location.npcs) if (near(now.position, n) && !near(was.position, n)) add('adjacent-npc', `подошёл вплотную к ${n.name}`)
+  for (const n of location.npcs)
+    if (near(now.position, n) && !near(was.position, n)) add('adjacent-npc', `подошёл вплотную к ${n.name}${n.hidden ? ' (скрыт от игрока)' : ''}`, n.hidden ? null : `подошёл вплотную к ${n.name}`)
   const path = pathOf(before, location, was, now.position)
   for (const z of zonesOnPath(location, path))
     add('hidden-zone', `прошёл через скрытую зону «${z.name}» (${ZONE_KIND_NAMES[z.kind]}${z.description ? `: ${z.description}` : ''})`, null)
   for (const n of location.npcs)
-    if (npcSees(location, before, n, was.position) && !npcSees(location, after, n, now.position)) add('hid-from-sight', `скрылся от взгляда ${n.name}`)
+    if (npcSees(location, before, n, was.position) && !npcSees(location, after, n, now.position))
+      add('hid-from-sight', `скрылся от взгляда ${n.name}`, n.hidden ? null : `скрылся от взгляда ${n.name}`)
   return result
 }
 

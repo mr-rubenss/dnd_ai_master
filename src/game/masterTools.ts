@@ -9,12 +9,13 @@ import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition
 import { DiceError, roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
-import { DOOR_STATES, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
+import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type EffectKind, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
 import { placementProblem } from './mapPlacement'
+import { findMapTarget, limitBySpeed, routeToTarget } from './heroTargets'
 import type { PriceList } from './prices'
 import { END_TURN_TOOL } from './turnChanges'
 import { checkSubjectOf } from './classOrder'
@@ -66,6 +67,7 @@ export const MASTER_TOOLS: AiTool[] = [
         mode: oneOf(['normal', 'advantage', 'disadvantage'], 'Преимущество или помеха от обстоятельств (состояния героя движок учтёт сам).'),
         hidden: { type: 'boolean', description: 'true — скрытая проверка: бросок не показывается игроку, только твой рассказ.' },
         passive: { type: 'boolean', description: 'true — пассивная проверка без броска (10 + модификатор против Сл); всегда скрыта от игрока.' },
+        reveals: str('id скрытого НПС или объекта (помечены «скрыт» в состоянии игры): при успехе движок сам раскроет его на карте (Внимательность — заметить вора, Анализ — найти тайник).'),
       },
       ['dc', 'reason'],
     ),
@@ -347,6 +349,67 @@ export const MASTER_TOOLS: AiTool[] = [
       'state',
     ]),
   },
+  {
+    name: 'move_hero',
+    description:
+      'Передвинуть героя по карте. Игрок пишет о перемещении («подхожу к стойке», «сажусь у камина», «иду к Тобиасу») — вызови с target: id объекта, НПС или двери. ' +
+      'Движок сам найдёт ближайшую свободную клетку рядом с целью и проведёт героя по пути в обход стен и мебели. Не дойти (заперта дверь, путь перекрыт) — получишь причину: обыграй её. ' +
+      'В бою путь тратит скорость героя: не хватит — герой пройдёт, сколько может. ' +
+      'Перемещение по сюжету («тебя отбросило взрывом», «тебя втащили в повозку») — x, y и reason: без пути и без траты скорости. Координаты для обычной ходьбы не задавай.',
+    parameters: object({
+      hero: HERO,
+      target: str('id (или название) цели: объект, НПС, дверь, окно — герой встанет рядом.'),
+      x: int('Столбец клетки — только для перемещения по сюжету (с reason).', 0),
+      y: int('Строка клетки — только для перемещения по сюжету (с reason).', 0),
+      reason: str('Причина перемещения по сюжету: «отбросило взрывом».'),
+    }),
+  },
+  {
+    name: 'ping',
+    description: 'Подсветить на карте цель или клетку на несколько секунд: «ведущий указывает на дверь», «вот тот стол». Игра не меняется.',
+    parameters: object({
+      target: str('id (или название) объекта, НПС, двери или окна.'),
+      x: int('Столбец клетки (если без target).', 0),
+      y: int('Строка клетки (если без target).', 0),
+      label: str('Короткая подпись у подсветки (до 40 символов): «сюда».'),
+    }),
+  },
+  {
+    name: 'add_effect',
+    description:
+      'Поставить на карту эффект с областью: fire — огонь, smoke — дым, darkness — тьма, puddle — лужа, glow — магическое свечение. ' +
+      'Проходу не мешает: опасность (урон огня, помеха в дыму) обыгрывай проверками и change_hp с кубиками. Убрать — remove_effect.',
+    parameters: object(
+      {
+        kind: oneOf(EFFECT_KINDS, 'Вид эффекта.'),
+        x: int('Столбец левой верхней клетки.', 0),
+        y: int('Строка левой верхней клетки.', 0),
+        w: int('Ширина в клетках (по умолчанию 1).', 1, 20),
+        h: int('Высота в клетках (по умолчанию 1).', 1, 20),
+        name: str('Название: «Горящая солома».'),
+      },
+      ['kind', 'x', 'y'],
+    ),
+  },
+  {
+    name: 'remove_effect',
+    description: 'Убрать эффект с карты (огонь потушили, дым рассеялся).',
+    parameters: object({ effect: str('id или название эффекта.') }, ['effect']),
+  },
+  {
+    name: 'reveal',
+    description:
+      'Раскрыть скрытого НПС или скрытый объект (в состоянии игры помечены «скрыт»): вор вышел из тени, тайник нашли. ' +
+      'Обычно — по успешной проверке героя (request_check с reveals раскроет сам) или когда скрытый сам себя выдал.',
+    parameters: object({ target: str('id или имя скрытого НПС или объекта.') }, ['target']),
+  },
+  {
+    name: 'set_combat',
+    description:
+      'Бой (заготовка: раунды и скорость передвижения; атак боевой системы пока нет). start — бой начался, next_round — новый раунд ' +
+      '(скорость героев восстановлена), end — бой окончен. В бою перемещения героя тратят его скорость.',
+    parameters: object({ state: oneOf(['start', 'next_round', 'end'], 'start, next_round или end.') }, ['state']),
+  },
 ]
 
 /** Инструменты хода ведущего: все инструменты игры и служебный end_turn (сверка изменений за ход). */
@@ -478,6 +541,22 @@ function itemOf(catalog: ItemCatalog, query: string) {
 }
 
 const currentLocationOf = (state: StoryState) => state.world.locations[state.world.currentLocationId]
+
+/** Скорость, если у вида её нет в данных (фт.). */
+const DEFAULT_SPEED = 30
+
+/** reveals у проверки: скрытый НПС или объект текущей локации. */
+function revealsOf(state: StoryState, args: Args): { kind: 'npc' | 'object'; id: string; name: string } | null {
+  const query = text(args, 'reveals')
+  if (!query) return null
+  const location = currentLocationOf(state)
+  const hidden = [
+    ...location.npcs.filter((n) => n.hidden).map((n) => ({ id: n.id, name: n.name, kind: 'npc' as const })),
+    ...location.objects.filter((o) => o.hidden).map((o) => ({ id: o.id, name: o.name, kind: 'object' as const })),
+  ]
+  if (!hidden.length) return reject('reveals: скрытых НПС и объектов здесь нет.')
+  return findByName(hidden, query, 'Скрытого')
+}
 const heroesOnMap = (state: StoryState) => state.party.filter((m) => !m.fallen).map((m) => ({ name: m.character.name, position: m.position }))
 
 /** id из названия: латиница/цифры не обязательны — берём короткий случайный хвост. */
@@ -539,6 +618,10 @@ const HANDLERS: Record<string, Handler> = {
     }
     const id = ctx.newId()
     const roll = check.roll ? { id: `roll-${id}`, label: check.label, timestamp: ctx.now(), result: check.roll } : undefined
+    // Успех раскрывает скрытого НПС или объект (reveals).
+    const revealed = revealsOf(state, args)
+    const revealEvent: ToolEvent[] =
+      revealed && check.success ? [{ event: { type: 'entityRevealed', locationId: currentLocationOf(state).id, kind: revealed.kind, entityId: revealed.id }, author: ENGINE }] : []
     return {
       events: [
         {
@@ -550,8 +633,10 @@ const HANDLERS: Record<string, Handler> = {
           },
           author: ENGINE,
         },
+        ...revealEvent,
       ],
       result: {
+        ...(revealEvent.length ? { revealed: revealed!.name, reveal_message: `«${revealed!.name}» обнаружен — теперь виден на карте.` } : {}),
         check: check.label,
         hero: member.character.name,
         dc,
@@ -1144,6 +1229,134 @@ const HANDLERS: Record<string, Handler> = {
     return {
       events: [{ event: { type: 'doorChanged', locationId: location.id, doorId: door.id, state: doorState }, author: MASTER }],
       result: { message: `${door.name}: ${doorState === 'open' ? 'открыта' : doorState === 'closed' ? 'закрыта' : 'заперта'}.` },
+    }
+  },
+
+  move_hero(state, args) {
+    const member = heroOf(state, args)
+    const location = currentLocationOf(state)
+    const name = member.character.name
+    const targetQuery = text(args, 'target')
+    const x = integer(args, 'x')
+    const y = integer(args, 'y')
+    const reason = text(args, 'reason')
+    if (targetQuery && (x !== undefined || y !== undefined)) reject('Укажи либо target (идти к цели), либо x, y с reason (по сюжету), но не оба.')
+    if (!targetQuery) {
+      if (x === undefined || y === undefined) reject('Укажи target — id объекта, НПС или двери, к которой идёт герой.')
+      if (!reason) reject('Координаты — только для перемещения по сюжету («отбросило взрывом»): укажи reason. Для обычной ходьбы — target.')
+      return {
+        events: [{ event: { type: 'heroMoved', heroId: member.heroId, to: { x: x!, y: y! }, forced: reason! }, author: ENGINE }],
+        result: { message: `${name} — в клетке (${x}, ${y}): ${reason}. Скорость не тратится.`, x, y },
+      }
+    }
+    const target = findMapTarget(location, targetQuery!)
+    if (typeof target === 'string') return reject(target)
+    const route = routeToTarget(location, state, member.heroId, target)
+    if ('blocked' in route) return reject(`${route.blocked} ${name} остаётся на месте — обыграй это в рассказе.`)
+    if (route.plan.path.length === 0) return { events: [], result: { message: `${name} уже рядом с «${target.name}».`, feet: 0 } }
+    const limited = limitBySpeed(state, member.heroId, route.plan, location.cellFeet)
+    if (limited.path.length === 0)
+      reject(`Идёт бой: скорость ${name} в этом раунде кончилась (осталось ${limited.budget} фт.) — до «${target.name}» ${route.plan.feet} фт. Двигаться можно в следующем раунде.`)
+    const to = limited.path.at(-1)!
+    const notice = limited.short
+      ? `${name}: скорости хватило на ${limited.feet} из ${route.plan.feet} фт. — до «${target.name}» ещё ${limited.short} фт.`
+      : undefined
+    return {
+      events: [{ event: { type: 'heroMoved', heroId: member.heroId, to, ...(notice ? { notice } : {}) }, author: ENGINE }],
+      result: {
+        message: limited.short
+          ? `${notice} Герой остановился в клетке (${to.x}, ${to.y}); игрок это видит. Дойдёт в следующем раунде.`
+          : `${name} подходит к «${target.name}»: клетка (${to.x}, ${to.y}), ${limited.feet} фт.`,
+        x: to.x,
+        y: to.y,
+        feet: limited.feet,
+        ...(limited.short ? { short_by: limited.short } : {}),
+      },
+    }
+  },
+
+  ping(state, args, ctx) {
+    const location = currentLocationOf(state)
+    const label = text(args, 'label')
+    if (label && label.length > 40) reject('Подпись — до 40 символов.')
+    const query = text(args, 'target')
+    let area: { x: number; y: number; w: number; h: number }
+    let what: string
+    if (query) {
+      const target = findMapTarget(location, query)
+      if (typeof target === 'string') return reject(target)
+      if (target.hidden) reject(`«${target.name}» скрыт от игрока — сначала reveal (или не показывай).`)
+      area = target.area
+      what = `«${target.name}»`
+    } else {
+      const x = integer(args, 'x')
+      const y = integer(args, 'y')
+      if (x === undefined || y === undefined) return reject('Укажи target или x и y.')
+      area = { x, y, w: 1, h: 1 }
+      what = `клетка (${x}, ${y})`
+    }
+    return {
+      events: [{ event: { type: 'mapPinged', ping: { id: `ping-${ctx.newId()}`, locationId: location.id, ...area, ...(label ? { label } : {}) } }, author: MASTER }],
+      result: { message: `На карте подсвечено: ${what}.` },
+    }
+  },
+
+  add_effect(state, args, ctx) {
+    const location = currentLocationOf(state)
+    const kind = choice<EffectKind>(args, 'kind', EFFECT_KINDS, true)!
+    const x = integer(args, 'x', true)!
+    const y = integer(args, 'y', true)!
+    const w = integer(args, 'w') ?? 1
+    const h = integer(args, 'h') ?? 1
+    const name = text(args, 'name')
+    if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > location.width || y + h > location.height) reject(`Область выходит за карту ${location.width}×${location.height}.`)
+    const effect: MapEffect = { id: slugId('fx', location.effects ?? [], ctx.newId), kind, ...(name ? { name } : {}), x, y, w, h }
+    return {
+      events: [{ event: { type: 'effectAdded', locationId: location.id, effect }, author: MASTER }],
+      result: { id: effect.id, message: `На карте: ${name ?? EFFECT_KIND_NAMES[kind]} (${x}, ${y}, ${w}×${h}).` },
+    }
+  },
+
+  remove_effect(state, args) {
+    const location = currentLocationOf(state)
+    const list = (location.effects ?? []).map((e) => ({ ...e, name: e.name ?? EFFECT_KIND_NAMES[e.kind] }))
+    const effect = findByName(list, text(args, 'effect', true)!, 'Эффекта')
+    return {
+      events: [{ event: { type: 'effectRemoved', locationId: location.id, effectId: effect.id }, author: MASTER }],
+      result: { message: `${effect.name} — убрано с карты.` },
+    }
+  },
+
+  reveal(state, args) {
+    const location = currentLocationOf(state)
+    const hidden = [
+      ...location.npcs.filter((n) => n.hidden).map((n) => ({ id: n.id, name: n.name, kind: 'npc' as const })),
+      ...location.objects.filter((o) => o.hidden).map((o) => ({ id: o.id, name: o.name, kind: 'object' as const })),
+    ]
+    const query = text(args, 'target', true)!
+    if (!hidden.length) reject('Скрытых НПС и объектов здесь нет — всё и так на виду.')
+    const target = findByName(hidden, query, 'Скрытого')
+    return {
+      events: [{ event: { type: 'entityRevealed', locationId: location.id, kind: target.kind, entityId: target.id }, author: MASTER }],
+      result: { message: `«${target.name}» теперь виден на карте.` },
+    }
+  },
+
+  set_combat(state, args, ctx) {
+    const what = choice<'start' | 'next_round' | 'end'>(args, 'state', ['start', 'next_round', 'end'], true)!
+    if (what === 'end') {
+      if (!state.combat) reject('Боя и так нет.')
+      return { events: [{ event: { type: 'combatChanged', combat: null }, author: MASTER }], result: { message: 'Бой окончен: ходить можно без ограничений.' } }
+    }
+    if (what === 'next_round' && !state.combat) reject('Боя нет — начни его: state: start.')
+    if (what === 'start' && state.combat) reject(`Бой уже идёт (раунд ${state.combat.round}).`)
+    const speed = Object.fromEntries(
+      state.party.filter((m) => !m.fallen).map((m) => [m.heroId, ctx.rules?.species?.[m.character.speciesId]?.speed ?? DEFAULT_SPEED]),
+    )
+    const round = what === 'start' ? 1 : state.combat!.round + 1
+    return {
+      events: [{ event: { type: 'combatChanged', combat: { round, speed, moved: {} } }, author: MASTER }],
+      result: { message: `Раунд ${round}. Скорость: ${state.party.filter((m) => !m.fallen).map((m) => `${m.character.name} ${speed[m.heroId]} фт.`).join(', ')}.` },
     }
   },
 }

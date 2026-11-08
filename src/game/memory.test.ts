@@ -174,7 +174,7 @@ describe('бюджет и окно контекста', () => {
     const summary = Array.from({ length: 60 }, (_, i) => `- Событие ${i}: герой обошёл ${i} домов`).join('\n')
     story = applyAction(story, makeAction('s1', 999, { type: 'memoryCompacted', summary, covered: 4, at: 5 }, MASTER, 5, 'mc'))
     const base = budgetAround({ ...story, world: { ...story.world, facts: [] }, memory: undefined }, 0).targetTokens
-    const budget = { contextWindow: base + 800 + 1_000, targetTokens: base, maxResponseTokens: 800 }
+    const budget = { contextWindow: base + 800 + 1_600, targetTokens: base, maxResponseTokens: 800 }
     const plan = buildMasterRequest(story, { verbosity: 'normal', context, tools: MASTER_TOOLS, budget })
     expect(plan.estimatedTokens).toBeLessThanOrEqual(hardLimitOf(budget))
     // Самые свежие факты остаются дольше всего.

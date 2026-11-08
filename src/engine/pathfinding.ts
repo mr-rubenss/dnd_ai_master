@@ -101,11 +101,12 @@ export function findPath(location: LocationData, from: CellPosition, to: CellPos
 }
 
 /** Все клетки, куда можно дойти из `from` (ключ «x,y»), — для подсветки недоступных при перетаскивании. */
-export function reachableCells(location: LocationData, from: CellPosition, options: PathOptions = {}): Set<string> {
-  const { doors = {}, blocked } = options
+export function reachableCells(location: LocationData, from: CellPosition, options: PathOptions & { maxSteps?: number } = {}): Set<string> {
+  const { doors = {}, blocked, maxSteps = Infinity } = options
   const seen = new Set<string>([`${from.x},${from.y}`])
   let frontier = [from]
-  while (frontier.length) {
+  // Обход «кольцами»: кольцо N — клетки в N шагах (в бою — не дальше, чем хватает скорости).
+  for (let step = 0; frontier.length && step < maxSteps; step++) {
     const next: CellPosition[] = []
     for (const c of frontier)
       for (const n of neighbours(c)) {
