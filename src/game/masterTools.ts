@@ -9,8 +9,9 @@ import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition
 import { DiceError, roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
-import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type EffectKind, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
+import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type EffectKind, type LocationData, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
+import { parseCreatedLocation } from './locationCreate'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
@@ -426,6 +427,21 @@ export const MASTER_TOOLS: AiTool[] = [
       'Раскрыть скрытого НПС или скрытый объект (в состоянии игры помечены «скрыт»): вор вышел из тени, тайник нашли. ' +
       'Обычно — по успешной проверке героя (request_check с reveals раскроет сам) или когда скрытый сам себя выдал.',
     parameters: object({ target: str('id или имя скрытого НПС или объекта.') }, ['target']),
+  },
+  {
+    name: 'create_location',
+    description:
+      'Создать новую локацию (место, куда ведёт выход: улица, подвал, лес) — JSON карты. Создавай, только если её ещё нет в «Локациях мира»: ' +
+      'созданная хранится в истории, и при возвращении это та же карта. Движок проверит JSON и вернёт ошибки списком — исправь и вызови снова. ' +
+      'Формат: id (латиница, kebab-case), name, description (1–2 предложения), cellFeet 5, width и height (клетки, 8–30), floor (wood|stone|tile|dirt|grass), ' +
+      'wallMaterial (stone|wood), rooms [{id, name, x, y, w, h}] — прямоугольники пола, стены по периметру ставятся сами (на улице — одна комната во всю карту), ' +
+      'openings [{x1,y1,x2,y2}] — проёмы в стенах, doors [{id, name, state: open|closed|locked, x1,y1,x2,y2}] — только на стенах, windows [{id, x1,y1,x2,y2}]. ' +
+      'Отрезки — по узлам сетки (узел (x,y) — левый верхний угол клетки), строго по горизонтали или вертикали. ' +
+      'objects [{id, type, name, description, x, y, w, h}] — на полу, не друг на друге и не поперёк стен (type как в add_object; ковёр и свеча клетку не занимают), ' +
+      'npcs [{id, name, description, attitude: friendly|neutral|hostile, x, y}] — на полу, по одному в клетке, ' +
+      'exits [{id, kind: door|road|stairs|edge, name, x, y, door, to}] — хотя бы один: клетка пола у выхода (edge — на краю карты, door — вплотную к двери, door — её id; to — id локации, куда ведёт), ' +
+      'playerStart {x, y} — клетка пола. Весь пол должен быть достижим от playerStart. Тексты — на русском, без раскрытия тайн.',
+    parameters: object({ location: { type: 'object', description: 'JSON локации в формате выше.' } }, ['location']),
   },
   {
     name: 'set_combat',
@@ -1425,6 +1441,33 @@ const HANDLERS: Record<string, Handler> = {
     return {
       events: [{ event: { type: 'entityRevealed', locationId: location.id, kind: target.kind, entityId: target.id }, author: MASTER }],
       result: { message: `«${target.name}» теперь виден на карте.` },
+    }
+  },
+
+  create_location(state, args) {
+    let input = args.location
+    // Модели иногда присылают JSON строкой — принимаем и так.
+    if (typeof input === 'string') {
+      try {
+        input = JSON.parse(input)
+      } catch {
+        reject('location — JSON-объект локации (строка не разобралась как JSON).')
+      }
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) reject('location — JSON-объект локации.')
+    const id = (input as Args).id
+    if (typeof id === 'string' && state.world.locations[id])
+      reject(`Локация «${id}» уже есть в мире этой истории («${state.world.locations[id].name}») — не создавай заново; новой нужен другой id.`)
+    const parsed = parseCreatedLocation(input)
+    if (!parsed.ok) reject(`Локация не создана, исправь и вызови снова:\n- ${parsed.problems.join('\n- ')}`)
+    const location = (parsed as { location: LocationData }).location
+    const exits = (location.exits ?? []).map((e) => `${e.name} [${e.id}] (${e.x}, ${e.y})${e.to ? ` → ${e.to}` : ''}`)
+    return {
+      events: [{ event: { type: 'locationCreated', location }, author: MASTER }],
+      result: {
+        id: location.id,
+        message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток, выходы: ${exits.join('; ')}. Она сохранена в мире истории — второй раз не создавай.`,
+      },
     }
   },
 

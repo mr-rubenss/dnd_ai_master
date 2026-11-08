@@ -29,6 +29,7 @@ import { heroBlocker, heroMovePlan } from './heroMove'
 import { mergeMove } from './mapEvents'
 import { mergeExplored } from './vision'
 import { markChangeProblem, markPlaceProblem } from './marks'
+import { createdLocationProblem } from './locationCreate'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -380,6 +381,8 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       const bits = mergeExplored(state.world.explored?.[action.locationId], location.width * location.height, action.cells)
       return { ...state, world: { ...state.world, explored: { ...state.world.explored, [action.locationId]: bits } } }
     }
+    case 'locationCreated':
+      return { ...state, world: { ...state.world, locations: { ...state.world.locations, [action.location.id]: structuredClone(action.location) } } }
     case 'markPlaced':
       return { ...state, world: { ...state.world, marks: [...(state.world.marks ?? []), action.mark] } }
     case 'markEdited':
@@ -806,6 +809,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const size = location.width * location.height
       return action.cells.length > 0 && action.cells.every((i) => Number.isInteger(i) && i >= 0 && i < size) ? null : 'Клетки за пределами карты.'
     }
+    case 'locationCreated':
+      if (action.author.kind !== 'master') return 'Новые локации создаёт ведущий.'
+      return createdLocationProblem(state, action.location)
     // Метки — заметки игрока: ставит, правит и убирает только он (ведущий на них лишь откликается).
     case 'markPlaced':
       if (action.author.kind !== 'player') return 'Метки на карте ставит игрок.'

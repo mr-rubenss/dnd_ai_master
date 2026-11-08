@@ -13,6 +13,7 @@ import {
   DISTANCE_UNITS,
   DOOR_STATES,
   EFFECT_KINDS,
+  EXIT_KINDS,
   FLAT_OBJECT_TYPES,
   FLOOR_TYPES,
   MAP_KIND_OBJECTS,
@@ -28,6 +29,8 @@ import {
   type CellPosition,
   type Door,
   type EffectKind,
+  type ExitKind,
+  type MapExit,
   type MapEffect,
   type GridSegment,
   type LocationData,
@@ -378,6 +381,44 @@ export function parseLocation(input: unknown): LocationData {
     if (checkCell(npc, where) && !isFloorCell(npc.x, npc.y)) fail(`${where}: НПС должен стоять на полу, а клетка (${npc.x}, ${npc.y}) — пустота`)
   })
 
+  // ---------- Выходы ----------
+  if (raw.exits !== undefined && !Array.isArray(raw.exits)) fail('"exits" должно быть массивом')
+  const exits: MapExit[] = []
+  list('exits').forEach((exit, i) => {
+    if (!isObject(exit)) return fail(`exits[${i}]: должен быть объектом`)
+    const where = label(exit, `exits[${i}]`)
+    checkId(exit.id, where)
+    if (!isOneOf(EXIT_KINDS, exit.kind)) fail(`${where}: "kind" должно быть одним из: ${EXIT_KINDS.join(', ')}`)
+    if (!isNonEmptyString(exit.name)) fail(`${where}: "name" должно быть непустой строкой`)
+    for (const key of ['description', 'door', 'to', 'toExit'] as const) checkOptionalText(exit, key, where)
+    if (!checkCell(exit, where)) return
+    if (!isFloorCell(exit.x, exit.y)) return fail(`${where}: клетка выхода (${exit.x}, ${exit.y}) должна быть полом`)
+    if (exit.kind === 'edge' && exit.x !== 0 && exit.y !== 0 && exit.x !== width - 1 && exit.y !== height - 1)
+      return fail(`${where}: выход «край карты» — клетка на краю карты (x = 0 или ${width - 1}, y = 0 или ${height - 1})`)
+    if (exit.kind === 'door' && exit.door === undefined) return fail(`${where}: у выхода-двери нужен "door" — id двери`)
+    if (exit.door !== undefined) {
+      const door = doors.find((d) => isObject(d) && d.id === exit.door) as (Record<string, unknown> & GridSegment) | undefined
+      if (!door) return fail(`${where}: двери "${exit.door}" нет в "doors"`)
+      const at = { x: exit.x as number, y: exit.y as number }
+      const touches = (segmentEdges(door) ?? []).some((e) => {
+        const [a, b] = e.side === 'h' ? [{ x: e.x, y: e.y - 1 }, { x: e.x, y: e.y }] : [{ x: e.x - 1, y: e.y }, { x: e.x, y: e.y }]
+        return (a.x === at.x && a.y === at.y) || (b.x === at.x && b.y === at.y)
+      })
+      if (!touches) return fail(`${where}: клетка выхода (${at.x}, ${at.y}) должна быть вплотную к двери "${exit.door}"`)
+    }
+    exits.push({
+      id: exit.id as string,
+      kind: exit.kind as ExitKind,
+      name: exit.name as string,
+      ...(typeof exit.description === 'string' ? { description: exit.description } : {}),
+      ...(typeof exit.door === 'string' ? { door: exit.door } : {}),
+      ...(typeof exit.to === 'string' ? { to: exit.to } : {}),
+      ...(typeof exit.toExit === 'string' ? { toExit: exit.toExit } : {}),
+      x: exit.x,
+      y: exit.y,
+    })
+  })
+
   // ---------- Эффекты ----------
   if (raw.effects !== undefined && !Array.isArray(raw.effects)) fail('"effects" должно быть массивом')
   const effects: MapEffect[] = []
@@ -489,6 +530,7 @@ export function parseLocation(input: unknown): LocationData {
     npcs: npcs as Npc[],
     ...(effects.length ? { effects } : {}),
     ...(zones.length ? { zones } : {}),
+    ...(exits.length ? { exits } : {}),
     playerStart: start as CellPosition,
   }
 }

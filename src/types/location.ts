@@ -68,6 +68,27 @@ export const ZONE_KINDS = ['trap', 'ambush', 'hazard', 'secret'] as const
 export type ZoneKind = (typeof ZONE_KINDS)[number]
 export const ZONE_KIND_NAMES: Record<ZoneKind, string> = { trap: 'ловушка', ambush: 'засада', hazard: 'опасное место', secret: 'тайник' }
 
+/** Выход с карты: дверь наружу, дорога, лестница, край карты. */
+export const EXIT_KINDS = ['door', 'road', 'stairs', 'edge'] as const
+export type ExitKind = (typeof EXIT_KINDS)[number]
+export const EXIT_KIND_NAMES: Record<ExitKind, string> = { door: 'дверь', road: 'дорога', stairs: 'лестница', edge: 'край карты' }
+
+/**
+ * Выход в другую локацию. Клетка (x, y) — пол у выхода: здесь герой уходит с карты и здесь же появляется, когда
+ * приходит этим путём. `to` — локация, куда ведёт (нет — ещё не создана), `toExit` — выход в ней, у которого появится герой.
+ */
+export interface MapExit extends CellPosition {
+  id: string
+  kind: ExitKind
+  /** Название для игрока и ведущего: «Входная дверь», «Дорога на север». */
+  name: string
+  description?: string
+  /** id двери этой локации, через которую выход (у kind door). */
+  door?: string
+  to?: string
+  toExit?: string
+}
+
 /** Скрытая зона — прямоугольник клеток. */
 export interface MapZone {
   id: string
@@ -246,5 +267,7 @@ export interface LocationData {
   effects?: MapEffect[]
   /** Скрытые зоны (ловушки, засады) — только для ведущего. Нет поля — зон нет. */
   zones?: MapZone[]
+  /** Выходы в другие локации. Нет поля — выходов не задано (старые шаблоны). */
+  exits?: MapExit[]
   playerStart: CellPosition
 }

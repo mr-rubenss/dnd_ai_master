@@ -343,6 +343,8 @@ export type StoryEvent =
   /** Скрытый НПС или объект обнаружен (проверка героя или решение ведущего) — теперь виден на карте. */
   /** Отряд увидел новые клетки (туман войны): индексы y × ширина + x. */
   | { type: 'areaExplored'; locationId: string; cells: number[] }
+  /** Ведущий создал новую локацию (create_location): проверенная, в полной записи; дальше она живёт в мире истории. */
+  | { type: 'locationCreated'; location: LocationData }
   /** Метки игрока на карте: поставить, изменить текст и значок, убрать (src/game/marks.ts). */
   | { type: 'markPlaced'; mark: PlayerMark }
   | { type: 'markEdited'; markId: string; icon: MarkIcon; text: string }

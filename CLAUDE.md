@@ -247,6 +247,15 @@
   (`useWalks`). Токены НПС игрок не двигает. Нажатие на НПС, предмет, дверь или окно — меню действий (`entityActions`
   в `src/game/mapActions.ts`: «Подойти» — сначала шаги героя, «Осмотреть», «Поговорить», «Открыть/Закрыть», «Взять»)
   → сообщение ведущему от имени героя (как реплика игрока; пока ведущий отвечает — недоступно). e2e — `e2e/hero-move.spec.ts`.
+- **Новые локации от ведущего** (6.1; `create_location` в `src/game/masterTools.ts`, проверка — `src/game/locationCreate.ts`):
+  JSON в формате `docs/location-format.md` → схема zod (`zod/mini`, `CREATED_LOCATION_SCHEMA`: типы, перечисления,
+  пределы `CREATED_LOCATION_LIMITS`; ошибки по пути поля по-русски — `schemaProblems`) → `parseLocation` → правила
+  созданной (`exits` ≥ 1, НПС и выходы не делят клетку, id не занят). Ошибки списком уходят модели (до
+  `MAX_REPORTED_PROBLEMS`). Действие `locationCreated` (только ведущий; `checkAction` перепроверяет локацию через
+  `locationInputOf` → `parseLocation`) кладёт её в `world.locations`: при возвращении — та же карта. Выходы `exits`
+  (`MapExit`: `door`/`road`/`stairs`/`edge`, клетка пола у выхода, `door` — id двери, `to`/`toExit` — куда ведёт) —
+  часть формата любой локации. Ведущему — «Выходы в другие локации» текущей и раздел «Локации мира»
+  (`worldLocationsText`), правило «Новые места» в `dm-prompt.md`, сценарий 43. Тесты — `locationCreate.test.ts`.
 - **Метки игрока** (5.7; `src/game/marks.ts`, UI — `src/components/MapMarks.tsx`): правый щелчок мышью или долгое
   нажатие пальцем (`LONG_PRESS_MS`) по клетке → окно «Поставить метку»: значок (вопрос, опасность, тайник, заметка —
   `MARK_ICONS`) и короткий текст (до `MARK_TEXT_MAX`); нажатие на метку — «Изменить» / «Удалить». Действия `markPlaced`

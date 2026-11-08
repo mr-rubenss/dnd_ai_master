@@ -7,7 +7,7 @@ import { passivePerception, savingThrowModifier, skillModifier } from '../engine
 import { CONDITION_DEFINITIONS } from '../engine/conditions'
 import { SKILL_DEFINITIONS, SKILLS } from '../engine/skills'
 import type { ItemCatalog } from '../types/items'
-import { EFFECT_KIND_NAMES, ZONE_KIND_NAMES, type DoorState } from '../types/location'
+import { EFFECT_KIND_NAMES, EXIT_KIND_NAMES, ZONE_KIND_NAMES, type DoorState } from '../types/location'
 import { combatBudget } from './heroMove'
 import type { RulesData } from '../types/rules'
 import type { PartyMember, StoryState } from '../types/story'
@@ -205,6 +205,10 @@ export function locationText(story: StoryState): string {
   ]
   const doors = location.doors.map((d) => `- ${d.name} [${d.id}] — ${DOOR_STATE[doorStates[d.id] ?? d.state]}${d.description ? `: ${d.description}` : ''}`)
   const npcs = location.npcs.map(npcDigest)
+  const exits = (location.exits ?? []).map((e) => {
+    const to = e.to ? story.world.locations[e.to] : undefined
+    return `- ${e.name} [${e.id}] — ${EXIT_KIND_NAMES[e.kind]}, клетка ${cell(e)}; ведёт: ${to ? `«${to.name}» [${to.id}]` : e.to ? `[${e.to}] (ещё не создана)` : 'не задано'}${e.description ? `: ${e.description}` : ''}`
+  })
   const zones = (location.zones ?? []).map(
     (z) => `- ${z.name} — ${ZONE_KIND_NAMES[z.kind]}, клетки ${z.x}–${z.x + z.w - 1} × ${z.y}–${z.y + z.h - 1}${z.description ? `: ${z.description}` : ''}`,
   )
@@ -215,6 +219,7 @@ export function locationText(story: StoryState): string {
     rooms.length ? `Помещения: ${rooms.join('; ')}.` : '',
     objects.length ? `Объекты:\n${objects.join('\n')}` : '',
     doors.length ? `Двери:\n${doors.join('\n')}` : '',
+    exits.length ? `Выходы в другие локации:\n${exits.join('\n')}` : '',
     location.effects?.length
       ? `Эффекты на карте (remove_effect — убрать):\n${location.effects.map((e) => `- ${e.name ?? EFFECT_KIND_NAMES[e.kind]} [${e.id}] — ${EFFECT_KIND_NAMES[e.kind]}, клетки ${e.x}–${e.x + e.w - 1} × ${e.y}–${e.y + e.h - 1}`).join('\n')}`
       : '',
@@ -225,6 +230,16 @@ export function locationText(story: StoryState): string {
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+/** Раздел «Локации мира»: какие карты уже есть в этой истории — их не создают заново (create_location). */
+export function worldLocationsText(story: StoryState): string {
+  const others = Object.values(story.world.locations).filter((l) => l.id !== story.world.currentLocationId)
+  return [
+    '## Локации мира',
+    `Уже есть в этой истории (не создавай их заново — при возвращении это те же карты): ${[currentLocation(story), ...others].map((l) => `«${l.name}» [${l.id}]`).join(', ')}.`,
+    'Новое место, которого здесь нет, — create_location.',
+  ].join('\n')
 }
 
 /** Раздел состояния игры, пока игрок задаёт вопрос вне игры. */
@@ -265,6 +280,7 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
     timeSectionText(story),
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
+    worldLocationsText(story),
     positionsText(story, currentLocation(story), MAP_REACTIONS),
     marksText(story, currentLocation(story)),
     visionText(story, currentLocation(story), ctx.rules),

@@ -79,6 +79,7 @@ describe('описания инструментов', () => {
       'add_effect',
       'remove_effect',
       'reveal',
+      'create_location',
       'set_combat',
     ])
     for (const t of MASTER_TOOLS) expect(t.parameters).toMatchObject({ type: 'object', additionalProperties: false })
@@ -87,6 +88,16 @@ describe('описания инструментов', () => {
 
 describe('недопустимые вызовы отклоняются, ничего не меняя', () => {
   const s = fresh()
+
+  it('create_location: без локации, без выходов, с занятым id, вне игры — отказ с причиной', () => {
+    expect(rejected(s, 'create_location', {})).toBe('location — JSON-объект локации.')
+    const noExits = { id: 'yard', name: 'Двор', description: 'Двор.', cellFeet: 5, width: 4, height: 4, floor: 'dirt', wallMaterial: 'stone', rooms: [{ id: 'r', x: 0, y: 0, w: 4, h: 4 }], objects: [], npcs: [], exits: [], playerStart: { x: 1, y: 1 } }
+    expect(rejected(s, 'create_location', { location: noExits })).toContain('exits: нужно хотя бы 1')
+    expect(rejected(s, 'create_location', { location: { ...noExits, id: LOC } })).toContain('уже есть в мире этой истории')
+    const ok = { ...noExits, exits: [{ id: 'gate', kind: 'edge', name: 'Ворота', x: 0, y: 1 }] }
+    expect(rejected({ ...s, outOfGame: true }, 'create_location', { location: ok })).toContain('вопрос вне игры')
+    expect(run(s, 'create_location', { location: ok }).state.world.locations.yard.exits).toHaveLength(1)
+  })
 
   it('нельзя отнять предмет, которого нет, или больше, чем есть', () => {
     expect(rejected(s, 'remove_item', { item: 'dagger' })).toBe('У героя нет предмета «Кинжал».')
