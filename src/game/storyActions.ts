@@ -28,6 +28,7 @@ import { placementProblem } from './mapPlacement'
 import { heroBlocker, heroMovePlan } from './heroMove'
 import { mergeMove } from './mapEvents'
 import { mergeExplored } from './vision'
+import { markChangeProblem, markPlaceProblem } from './marks'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -379,6 +380,15 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       const bits = mergeExplored(state.world.explored?.[action.locationId], location.width * location.height, action.cells)
       return { ...state, world: { ...state.world, explored: { ...state.world.explored, [action.locationId]: bits } } }
     }
+    case 'markPlaced':
+      return { ...state, world: { ...state.world, marks: [...(state.world.marks ?? []), action.mark] } }
+    case 'markEdited':
+      return {
+        ...state,
+        world: { ...state.world, marks: (state.world.marks ?? []).map((m) => (m.id === action.markId ? { ...m, icon: action.icon, text: action.text, at: action.at } : m)) },
+      }
+    case 'markRemoved':
+      return { ...state, world: { ...state.world, marks: (state.world.marks ?? []).filter((m) => m.id !== action.markId) } }
     case 'entityRevealed':
       return updateLocation(state, action.locationId, (l) =>
         action.kind === 'npc'
@@ -796,6 +806,16 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const size = location.width * location.height
       return action.cells.length > 0 && action.cells.every((i) => Number.isInteger(i) && i >= 0 && i < size) ? null : 'Клетки за пределами карты.'
     }
+    // Метки — заметки игрока: ставит, правит и убирает только он (ведущий на них лишь откликается).
+    case 'markPlaced':
+      if (action.author.kind !== 'player') return 'Метки на карте ставит игрок.'
+      return markPlaceProblem(state, action.mark, action.author.heroId)
+    case 'markEdited':
+      if (action.author.kind !== 'player') return 'Метки на карте правит игрок.'
+      return markChangeProblem(state, action.markId, action.author.heroId, { icon: action.icon, text: action.text })
+    case 'markRemoved':
+      if (action.author.kind !== 'player') return 'Метки на карте убирает игрок.'
+      return markChangeProblem(state, action.markId, action.author.heroId)
     case 'entityRevealed': {
       const location = state.world.locations[action.locationId]
       if (!location) return 'В мире этой истории нет такой локации.'

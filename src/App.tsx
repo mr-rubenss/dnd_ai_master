@@ -15,6 +15,8 @@ import { needsSheetCompletion } from './game/sheetCompletion'
 import { GameClock } from './components/GameClock'
 import { MapPanel } from './components/MapPanel'
 import type { HeroMovement, MapActions, MapVision } from './components/LocationMap'
+import type { MarkEditor } from './components/MapMarks'
+import { marksOf } from './game/marks'
 import { exploredCells, newlyExplored, partyVision } from './game/vision'
 import { useAppearance } from './theme/appearanceStore'
 import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
@@ -676,6 +678,22 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     return { visible: seenNow, explored }
   }, [appearance.settings.fogOfWar, story, location, seenNow])
 
+  // Метки игрока: ставит, правит и убирает игрок своего героя (действия хранилища; проверки — src/game/marks.ts).
+  const mapMarks = useMemo(() => marksOf(story.world, location.id), [story.world, location.id])
+  const markEditor = useMemo<MarkEditor | undefined>(() => {
+    if (readOnly) return undefined
+    const heroId = lead.heroId
+    return {
+      place: (cell, icon, text) =>
+        appStore.dispatch(
+          { type: 'markPlaced', mark: { id: crypto.randomUUID(), heroId, locationId: location.id, x: cell.x, y: cell.y, icon, text, at: Date.now() } },
+          player(heroId),
+        ),
+      edit: (markId, icon, text) => appStore.dispatch({ type: 'markEdited', markId, icon, text }, player(heroId)),
+      remove: (markId) => appStore.dispatch({ type: 'markRemoved', markId }, player(heroId)),
+    }
+  }, [readOnly, lead.heroId, location.id])
+
   const companions = useMemo(
     () => story.party.filter((m) => m.heroId !== lead.heroId && !m.fallen).map((m) => ({ id: m.heroId, name: m.character.name, position: m.position })),
     [story.party, lead.heroId],
@@ -691,7 +709,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} shownArea={story.shownArea} companions={companions} />
+          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} shownArea={story.shownArea} companions={companions} marks={mapMarks} markEditor={markEditor} />
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}

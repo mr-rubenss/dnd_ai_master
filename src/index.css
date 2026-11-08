@@ -5080,3 +5080,70 @@ textarea {
 .map-action:hover:not(:disabled) { border-color: var(--color-accent); }
 .map-action:disabled { opacity: 0.45; cursor: default; }
 .map-action:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* Метки игрока на карте (MapMarks.tsx): кружок со значком в углу клетки и окно метки. */
+.map-mark { cursor: pointer; }
+.map-mark-badge { fill: var(--map-npc-label-outline); stroke: var(--map-highlight); stroke-width: 0.06; }
+.map-mark--danger .map-mark-badge { stroke: var(--color-danger-text); }
+.map-mark--cache .map-mark-badge { stroke: var(--map-flame); }
+.map-mark--note .map-mark-badge { stroke: var(--map-selection); }
+.map-mark-glyph {
+  font-family: var(--font-ui);
+  font-size: calc(var(--text-map-initial) * 0.8);
+  font-weight: 700;
+  fill: var(--map-npc-label);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.map-mark-lines { fill: none; stroke: var(--map-npc-label); stroke-width: 0.05; stroke-linecap: round; pointer-events: none; }
+.map-mark:focus-visible .map-mark-badge { stroke-width: 0.1; }
+.map-mark-panel {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-24);
+  z-index: 3;
+  width: min(300px, calc(100% - 2 * var(--space-6)));
+  box-sizing: border-box;
+  padding: var(--space-8) var(--space-10);
+  transform: translateX(-50%);
+  background: var(--color-tooltip-bg);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-tooltip);
+}
+.map-mark-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--text-100);
+  color: var(--color-accent-bright);
+  overflow-wrap: anywhere;
+}
+.map-mark-form { display: flex; flex-direction: column; gap: var(--space-6); }
+.map-mark-icons { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.map-mark-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-6);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-panel-raised);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: var(--text-75);
+  cursor: pointer;
+}
+.map-mark-icon svg { width: 1.3em; height: 1.3em; }
+.map-mark-icon.is-selected { border-color: var(--color-accent); background: var(--color-accent-tint-selected); }
+.map-mark-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: var(--text-input); /* иначе iOS увеличивает страницу при фокусе */
+}

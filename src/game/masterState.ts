@@ -17,6 +17,7 @@ import { currentLocation, storyTime } from './storyActions'
 import { npcDigest } from './npcs'
 import { MAP_REACTIONS, positionsText } from './mapEvents'
 import { visionText } from './vision'
+import { marksText } from './marks'
 import { outdoorLight, partOfDay, timeText, type PartOfDay } from '../engine/time'
 import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
@@ -265,6 +266,7 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
     positionsText(story, currentLocation(story), MAP_REACTIONS),
+    marksText(story, currentLocation(story)),
     visionText(story, currentLocation(story), ctx.rules),
     story.combat
       ? `## Бой (раунд ${story.combat.round})\nПеремещения героя тратят скорость. Осталось: ${story.party

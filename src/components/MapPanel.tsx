@@ -1,6 +1,7 @@
 import type { DoorStates } from '../engine/movement'
 import type { CellPosition, LocationData } from '../types/location'
-import type { MapPing, ShownArea } from '../types/story'
+import type { MapPing, PlayerMark, ShownArea } from '../types/story'
+import type { MarkEditor } from './MapMarks'
 import { LocationMap, type HeroMovement, type MapActions, type MapVision } from './LocationMap'
 
 interface Props {
@@ -13,9 +14,11 @@ interface Props {
   vision?: MapVision
   shownArea?: ShownArea
   companions?: readonly { id: string; name: string; position: CellPosition }[]
+  marks?: readonly PlayerMark[]
+  markEditor?: MarkEditor
 }
 
-export function MapPanel({ location, player, doors, movement, actions, ping, vision, shownArea, companions }: Props) {
+export function MapPanel({ location, player, doors, movement, actions, ping, vision, shownArea, companions, marks, markEditor }: Props) {
   return (
     <section className="panel map-panel" aria-label="Карта локации">
       <header className="panel-header">
@@ -23,7 +26,7 @@ export function MapPanel({ location, player, doors, movement, actions, ping, vis
         <p className="panel-subtitle">{location.description}</p>
       </header>
       {/* key сбрасывает состояние карты (подсказки) при смене локации */}
-      <LocationMap key={location.id} location={location} player={player} doors={doors} movement={movement} actions={actions} ping={ping} vision={vision} shownArea={shownArea} companions={companions} />
+      <LocationMap key={location.id} location={location} player={player} doors={doors} movement={movement} actions={actions} ping={ping} vision={vision} shownArea={shownArea} companions={companions} marks={marks} markEditor={markEditor} />
     </section>
   )
 }

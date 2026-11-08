@@ -17,7 +17,8 @@ import {
   walkPath,
   type MapLight,
 } from '../game/mapView'
-import type { MapPing, ShownArea } from '../types/story'
+import type { MapPing, PlayerMark, ShownArea } from '../types/story'
+import { MarkLayer, MarkPanel, type MarkEditor } from './MapMarks'
 import { mapAreaResult, type AreaCreature } from '../game/mapAreas'
 import { AreaOverlay, MeasureInfo, MeasureToolbar, RulerOverlay } from './MapMeasure'
 import { rulerText, templateFromDrag, type MeasureTool, type Measurement } from '../game/mapMeasure'
@@ -125,6 +126,10 @@ interface Props {
   shownArea?: ShownArea
   /** Другие герои отряда на карте — для списка задетых областью. */
   companions?: readonly { id: string; name: string; position: CellPosition }[]
+  /** Метки игрока на этой карте (видны всегда, и в тумане). */
+  marks?: readonly PlayerMark[]
+  /** Команды меток; нет — метки только видны (история только для чтения). */
+  markEditor?: MarkEditor
 }
 
 export interface MapVision {
@@ -139,6 +144,10 @@ export const PING_MS = 4000
 /** Сколько видна область ведущего (show_area), мс — успеть прочитать рассказ. */
 export const AREA_SHOW_MS = 30000
 
+/** Долгое нажатие пальцем или пером (мс) — меню метки; сдвиг больше LONG_PRESS_SLOP пикселей его отменяет. */
+export const LONG_PRESS_MS = 550
+const LONG_PRESS_SLOP = 10
+
 /** Перетаскивание токена героя: клетка под пальцем или курсором, путь до неё или причина отказа. */
 interface DragState {
   target: CellPosition | null
@@ -146,7 +155,7 @@ interface DragState {
   reachable: Set<string>
 }
 
-export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision, shownArea, companions }: Props) {
+export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision, shownArea, companions, marks = [], markEditor }: Props) {
   const { width, height } = location
   const [active, setActive] = useState<ActiveEntity | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -459,9 +468,69 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
   const measured = useMemo(() => (measure?.kind === 'area' ? areaOf(measure) : null), [measure, areaOf])
   const mastered = useMemo(() => (masterArea ? areaOf({ kind: 'area', template: masterArea.template }) : null), [masterArea, areaOf])
 
+  // ---------- Метки игрока: правый щелчок или долгое нажатие по клетке ----------
+  const [markCell, setMarkCell] = useState<CellPosition | null>(null)
+  const markHere = markCell ? (marks.find((m) => m.x === markCell.x && m.y === markCell.y) ?? null) : null
+  const openMark = (cell: CellPosition) => {
+    setActive(null)
+    setMarkCell({ x: cell.x, y: cell.y })
+  }
+  // Правый щелчок мышью (и «долгое нажатие» браузера на телефоне) — меню метки вместо меню браузера.
+  const onBoardContextMenu = (event: React.MouseEvent) => {
+    if (tool) return
+    const cell = cellAt(event.clientX, event.clientY)
+    if (!cell) return
+    event.preventDefault()
+    openMark(cell)
+  }
+  // Долгое нажатие пальцем: таймер, пока палец на месте; после него щелчок не считается шагом героя.
+  const pressRef = useRef<{ id: number; x: number; y: number; timer: number } | null>(null)
+  const suppressClickRef = useRef(false)
+  const cancelPress = () => {
+    if (pressRef.current) window.clearTimeout(pressRef.current.timer)
+    pressRef.current = null
+  }
+  useEffect(() => cancelPress, [])
+  useEffect(() => {
+    if (!markCell) return
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setMarkCell(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [markCell])
+  // Новое касание — новый жест: прежнее подавление щелчка снимается (и для кнопок окна метки).
+  const onBoardPointerDownCapture = () => {
+    suppressClickRef.current = false
+  }
+  const onBoardPointerDown = (event: PointerEvent) => {
+    cancelPress()
+    if (tool || event.pointerType === 'mouse' || !event.isPrimary) return
+    const { clientX, clientY, pointerId } = event
+    const timer = window.setTimeout(() => {
+      pressRef.current = null
+      const cell = cellAt(clientX, clientY)
+      if (!cell) return
+      suppressClickRef.current = true
+      openMark(cell)
+    }, LONG_PRESS_MS)
+    pressRef.current = { id: pointerId, x: clientX, y: clientY, timer }
+  }
+  const onBoardPointerMove = (event: PointerEvent) => {
+    const p = pressRef.current
+    if (p && (event.pointerId !== p.id || Math.hypot(event.clientX - p.x, event.clientY - p.y) > LONG_PRESS_SLOP)) cancelPress()
+  }
+  const onBoardClickCapture = (event: React.MouseEvent) => {
+    if (!suppressClickRef.current) return
+    suppressClickRef.current = false
+    event.stopPropagation()
+    event.preventDefault()
+  }
+
   /** Нажатие на пустое место карты: закрыть меню, а если меню не было — идти в эту клетку. */
   const onBoardClick = (event: React.MouseEvent) => {
     if (tool) return
+    if (markCell) return setMarkCell(null)
     if (active) return setActive(null)
     if (!movement) return
     const cell = cellAt(event.clientX, event.clientY)
@@ -490,6 +559,13 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
           className="map-board"
           style={{ '--board-w': cols, '--board-h': rows } as CSSProperties}
           onClick={onBoardClick}
+          onClickCapture={onBoardClickCapture}
+          onContextMenu={onBoardContextMenu}
+          onPointerDownCapture={onBoardPointerDownCapture}
+          onPointerDown={onBoardPointerDown}
+          onPointerMove={onBoardPointerMove}
+          onPointerUp={cancelPress}
+          onPointerCancel={cancelPress}
           data-map-kind={scale.kind}
           data-testid="map-board"
         >
@@ -610,6 +686,8 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
 
                 {vision && <FogLayer location={location} vision={vision} />}
 
+                <MarkLayer marks={marks} onOpen={openMark} />
+
                 <g className="map-layer map-layer--ui" pointerEvents="none">
                   {drag && <DragOverlay location={location} drag={drag} hero={heroPos} />}
                   {shownPing && <PingMarker key={shownPing.id} ping={shownPing} />}
@@ -700,6 +778,17 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                 <MeasureInfo template={measure.template} cells={measured.cells.length} creatures={measured.creatures} onClose={() => setMeasure(null)} />
               )}
             </div>
+          )}
+
+          {markCell && (
+            <MarkPanel
+              key={`${markCell.x},${markCell.y},${markHere?.id ?? ''},${markHere?.at ?? ''}`}
+              cell={markCell}
+              mark={markHere}
+              editor={markEditor}
+              onClose={() => setMarkCell(null)}
+              onError={say}
+            />
           )}
 
           {notice && (
