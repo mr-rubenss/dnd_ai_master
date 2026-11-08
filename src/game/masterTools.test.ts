@@ -75,6 +75,7 @@ describe('описания инструментов', () => {
       'set_door',
       'move_hero',
       'ping',
+      'show_area',
       'add_effect',
       'remove_effect',
       'reveal',

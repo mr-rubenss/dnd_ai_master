@@ -676,6 +676,11 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     return { visible: seenNow, explored }
   }, [appearance.settings.fogOfWar, story, location, seenNow])
 
+  const companions = useMemo(
+    () => story.party.filter((m) => m.heroId !== lead.heroId && !m.fallen).map((m) => ({ id: m.heroId, name: m.character.name, position: m.position })),
+    [story.party, lead.heroId],
+  )
+
   const handleEquipChange = (change: EquipmentChange): string | null => {
     const result = equipmentEvent(lead, itemCatalog, change)
     if (!result.ok) return result.reason
@@ -686,7 +691,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} />
+          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} shownArea={story.shownArea} companions={companions} />
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}

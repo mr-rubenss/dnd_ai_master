@@ -6,6 +6,7 @@
 
 import { CONDITIONS, MAX_EXHAUSTION } from '../engine/conditions'
 import { formatD20Test } from '../engine/checks'
+import { areaTemplateProblem } from '../engine/areas'
 import { isFloor } from '../engine/movement'
 import type { CharacterSheet, Equipment } from '../types/character'
 import type { ChatMessage } from '../types/game'
@@ -371,6 +372,8 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
       return updateLocation(state, action.locationId, (l) => ({ ...l, effects: (l.effects ?? []).filter((e) => e.id !== action.effectId) }))
     case 'mapPinged':
       return { ...state, ping: action.ping }
+    case 'areaShown':
+      return { ...state, shownArea: action.area }
     case 'areaExplored': {
       const location = state.world.locations[action.locationId]
       const bits = mergeExplored(state.world.explored?.[action.locationId], location.width * location.height, action.cells)
@@ -777,6 +780,14 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (!location) return 'В мире этой истории нет такой локации.'
       if (![p.x, p.y, p.w, p.h].every((v) => typeof v === 'number' && Number.isFinite(v)) || p.w <= 0 || p.h <= 0) return 'Неверная область подсветки.'
       return p.x < 0 || p.y < 0 || p.x + p.w > location.width + 0.5 || p.y + p.h > location.height + 0.5 ? 'Подсветка за пределами карты.' : null
+    }
+    case 'areaShown': {
+      const a = action.area
+      const location = state.world.locations[a.locationId]
+      if (!location) return 'В мире этой истории нет такой локации.'
+      if (a.label !== undefined && (typeof a.label !== 'string' || a.label.length > 40)) return 'Подпись области — до 40 символов.'
+      if (!a.template || typeof a.template !== 'object') return 'Нет шаблона области.'
+      return areaTemplateProblem(a.template, location)
     }
     case 'areaExplored': {
       if (action.author.kind === 'master') return 'Исследованное отмечает игра, а не ведущий.'

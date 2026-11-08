@@ -13,6 +13,7 @@ import { parseAdventure } from './adventure'
 import { parseCharacterSheet } from './character'
 import { heroMovePlan, heroReachable } from './heroMove'
 import { LocationValidationError, parseLocation } from './location'
+import { mapAreaCells } from './mapAreas'
 import { mapProblems } from './mapClaims'
 import { gameStateText } from './masterState'
 import { executeTool, type ToolContext, type ToolOutcome } from './masterTools'
@@ -187,6 +188,67 @@ describe('ping, эффекты, скрытое', () => {
     expect(problems({ effects: [{ id: 'e', kind: 'acid', x: 1, y: 1, w: 1, h: 1 }] })).toEqual(['effects[0] "e": "kind" должно быть одним из: fire, smoke, darkness, puddle, glow'])
     expect(problems({ effects: [{ id: 'e', kind: 'fire', x: 1, y: 1, w: 1, h: 1 }] })).toEqual([])
     expect(problems({ npcs: [{ id: 'x', name: 'X', x: 1, y: 12, hidden: 'yes' }] })).toEqual(['npcs[0] "x": "hidden" — true или false'])
+  })
+})
+
+describe('show_area: области воздействия на карте', () => {
+  it('сфера от факела: событие ведущего, клетки и кто задет; игра не меняется', () => {
+    const before = fresh()
+    const { outcome, state } = run(before, 'show_area', { shape: 'sphere', size: 20, target: 'torch-door', label: 'Свет факела' })
+    expect(outcome.events[0].author).toEqual({ kind: 'master' })
+    expect(state.shownArea).toEqual({ id: 'area-id1', locationId: LOC, template: { shape: 'sphere', size: 20, origin: { x: 12.5, y: 13.5 } }, label: 'Свет факела' })
+    expect(outcome.result.message).toMatch(/^На карте показана область от «Факел»\. Сфера 20 фт\.: \d+ кл\. Задеты: Ратибор\.$/)
+    expect(outcome.result.creatures).toEqual(['Ратибор'])
+    expect({ ...state, shownArea: undefined }).toEqual({ ...before, shownArea: undefined })
+  })
+
+  it('конус от героя к цели: начало у края клетки героя; скрытый НПС в списке с пометкой', () => {
+    const s = fresh()
+    const start = hero(s)
+    const { outcome, state } = run(s, 'show_area', { shape: 'cone', size: 30, toward: 'Тобиас' })
+    const t = state.shownArea!.template
+    expect(t.shape).toBe('cone')
+    expect(Math.max(Math.abs(t.origin.x - (start.x + 0.5)), Math.abs(t.origin.y - (start.y + 0.5)))).toBeCloseTo(0.5)
+    expect(outcome.result.cells).toBeGreaterThan(0)
+    const hidden = run(fresh(), 'show_area', { shape: 'sphere', size: 10, x: 18, y: 13 })
+    expect(hidden.outcome.result.creatures).toEqual(['Шнырь (скрыт от игрока)'])
+  })
+
+  it('стены и запертая дверь укрывают: за дверью кладовой клеток нет, пока она не открыта', () => {
+    const args = { shape: 'sphere', size: 10, x: 13, y: 1 }
+    const cellsOf = (st: StoryState) => mapAreaCells(tavern(st), st.shownArea!.template, st.world.doors[LOC] ?? {})
+    const locked = run(fresh(), 'show_area', args).state
+    expect(cellsOf(locked).some((c) => c.x >= 15)).toBe(false)
+    const opened = run(run(fresh(), 'set_door', { door: 'storage-door', state: 'open' }).state, 'show_area', args).state
+    expect(cellsOf(opened)).toContainEqual({ x: 15, y: 1 })
+    // Деревянная стена кладовой (y = 5) отделяет её от зала.
+    const hall = run(fresh(), 'show_area', { shape: 'sphere', size: 10, x: 17, y: 6 }).state
+    expect(cellsOf(hall).some((c) => c.y < 5 && c.x >= 15)).toBe(false)
+    expect(cellsOf(hall)).toContainEqual({ x: 17, y: 5 })
+  })
+
+  it('недопустимые вызовы отклоняются с причиной', () => {
+    expect(rejected(fresh(), 'show_area', { shape: 'cone', size: 15 })).toBe('У фигуры «Конус» нужно направление: toward или direction.')
+    expect(rejected(fresh(), 'show_area', { shape: 'star', size: 15 })).toMatch(/не из списка: cone, cube, cylinder, emanation, line, sphere/)
+    expect(rejected(fresh(), 'show_area', { shape: 'sphere', size: 0 })).toBe('Размер области — от 1 до 1000 футов.')
+    expect(rejected(fresh(), 'show_area', { shape: 'sphere', size: 10, target: 'pickpocket' })).toBe('«Шнырь» скрыт от игрока — сначала reveal (или не показывай).')
+    expect(rejected(fresh(), 'show_area', { shape: 'sphere', size: 10, target: 'дракон' })).toMatch(/^Цели «дракон» на карте нет/)
+    expect(rejected(fresh(), 'show_area', { shape: 'sphere', size: 10, x: 3 })).toBe('Укажи и x, и y (или target).')
+    expect(rejected(fresh(), 'show_area', { shape: 'line', size: 30, direction: 'up' })).toMatch(/не из списка: east, southeast/)
+    expect(rejected(fresh(), 'show_area', { shape: 'sphere', size: 10, label: 'x'.repeat(41) })).toBe('Подпись — до 40 символов.')
+  })
+
+  it('движок не примет событие с неверным шаблоном', () => {
+    const s = fresh()
+    const bad = (template: unknown) =>
+      checkAction(s, makeAction(s.id, 99, { type: 'areaShown', area: { id: 'a', locationId: LOC, template } } as StoryEvent, { kind: 'master' }, 1, 'x'), {
+        catalog: itemCatalog,
+        rules: rulesData,
+      })
+    expect(bad({ shape: 'sphere', size: 20, origin: { x: 50, y: 1 } })).toBe('Точка начала области за пределами карты.')
+    expect(bad({ shape: 'line', size: 20, origin: { x: 5, y: 1 } })).toBe('У фигуры «Линия» нужно направление.')
+    expect(bad(undefined)).toBe('Нет шаблона области.')
+    expect(bad({ shape: 'sphere', size: 20, origin: { x: 5, y: 1 } })).toBeNull()
   })
 })
 
