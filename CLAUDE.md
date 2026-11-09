@@ -266,6 +266,14 @@
   место» (`heroMoveReported` с `rules: ['exit']`, `travelNote`); карты нет — событие `missingMapNote`, и ведущий
   создаёт её (`create_location`) и переводит отряд инструментом `travel` (`exit`, `to`). Над картой — путь отряда
   (`MapPanel`, `map-trail`, последние `TRAIL_MAX`); туман — свой у каждой карты (`world.explored[locationId]`).
+  **Защита от тихого сбоя (6.6.1)**: в цикле хода (`runMasterTurn`) отказ `create_location`/`travel` в одном ответе
+  с `end_turn` не завершает ход (`PLACE_RETRY_MESSAGE`), удачный `travel` без рассказа — раунд на описание
+  (`ARRIVAL_MESSAGE`), после сверки — до `MAX_PLACE_FOLLOWUPS` раундов на создание и переход (`PLACE_CONTINUE_MESSAGE`);
+  сверка `mapProblems`: событие «карты нет» (`MISSING_MAP_MARK`), рассказ о прибытии (`PARTY_ARRIVES`) или реплика
+  «выхожу на улицу» (`HERO_LEAVES`) без успешного `travel` — просьба вызвать `create_location`/`travel`; отказ схемы
+  возвращает модели `MIN_LOCATION_EXAMPLE`; `GameScreen` после «Выйти» считает ходы ведущего, и если за
+  `EXIT_STUCK_TURNS` (2) карта не сменилась — сообщение `travel-stuck` с «Повторить» (только в памяти вкладки);
+  шаг героя на клетку выхода — подсказка «нажмите → «Выйти»». e2e — `e2e/travel-failures.spec.ts`, сценарий 45.
   В таверне — выход `tavern-door` (входная дверь). Старые истории: копия таверны в мире без выходов (данные истории
   не трогаем). Правило — «Переходы между картами» в `dm-prompt.md`, сценарий 44; тесты — `travel.test.ts`,
   e2e — `e2e/travel.spec.ts`.

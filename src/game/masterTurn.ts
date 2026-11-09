@@ -102,6 +102,17 @@ export const END_TURN_REMINDER =
   'сначала вызови нужные инструменты (change_gold, use_item, remove_item, give_item, change_hp, add_condition…), ' +
   'затем end_turn со списком изменений (или пустым списком). Новый текст не пиши.'
 
+/** Инструменты нового места: их отказ в ответе с end_turn не завершает ход. */
+const PLACE_TOOLS = ['create_location', 'travel']
+export const PLACE_RETRY_MESSAGE =
+  '[Код игры] Новое место не готово: вызов отклонён (ошибки — в результатах выше). Исправь и вызови снова: ' +
+  'create_location (если карты ещё нет), затем travel. Не описывай место, пока travel не прошёл.'
+export const PLACE_CONTINUE_MESSAGE =
+  '[Код игры] Переход не завершён: нужна карта места (create_location, если её ещё нет) и travel. Вызови недостающее; описывай место только после travel.'
+/** Сколько раундов после сверки даётся на создание места и переход. */
+const MAX_PLACE_FOLLOWUPS = 3
+export const ARRIVAL_MESSAGE = '[Код игры] Отряд на новой карте (она в состоянии игры). Опиши новое место по её карте: что видно, кто здесь. Затем end_turn.'
+
 /** Итог сверки end_turn за ход — для журнала разработчика и тестов. */
 export type TurnVerification =
   | { status: 'ok' }
@@ -133,6 +144,8 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
   let lastNarratedId: string | null = null
   /** Сверка текста с состоянием — один раз за ход; следующий раунд — ответ на просьбу привести их в соответствие. */
   let claimChecked = false
+  /** Сколько дополнительных раундов уже дано на создание места и переход после сверки. */
+  let placeFollowups = 0
   let claimRound = false
   let claims: string[] | undefined
   let pending: { text: string; suggestions: string[] } = { text: '', suggestions: [] }
@@ -262,7 +275,23 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     if (claimRound) {
       // Ответ на просьбу сверки: довызванные инструменты исполняются; новый текст заменяет ответ, пустой — ответ прежний.
       claimRound = false
-      for (const call of calls.filter((c) => c.name !== END_TURN)) await runCall(call)
+      const from = toolCalls.length
+      const claimResults: AiMessage[] = []
+      for (const call of calls.filter((c) => c.name !== END_TURN)) claimResults.push(await runCall(call))
+      // Довызов нового места: создание карты и переход — по шагам, пока travel не пройдёт и место не описано.
+      const placeCalls = toolCalls.slice(from).filter((t) => PLACE_TOOLS.includes(t.call.name))
+      const traveled = toolCalls.some((t) => t.call.name === 'travel' && t.outcome.ok)
+      if (placeCalls.length > 0 && placeFollowups < MAX_PLACE_FOLLOWUPS && (!traveled || !text)) {
+        placeFollowups++
+        const end = calls.find((c) => c.name === END_TURN)
+        turn.push({ role: 'assistant', content: response.text || null, toolCalls: calls }, ...claimResults)
+        if (end) turn.push({ role: 'tool', toolCallId: end.id, content: JSON.stringify({ ok: true }) })
+        turn.push({ role: 'user', content: traveled ? ARRIVAL_MESSAGE : PLACE_CONTINUE_MESSAGE })
+        claimRound = true
+        retryPending = true
+        runtime.onRound?.()
+        continue
+      }
       if (!text) return finish(pending.text, pending.suggestions, response)
       if (pending.text || !lastNarratedId) return finish(text, suggestions, response)
       const reason = await runtime.commit({ type: 'masterRewritten', messageId: lastNarratedId, text, ...(suggestions.length ? { suggestions } : {}) }, MASTER)
@@ -279,8 +308,22 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
     }
     const results: AiMessage[] = []
     for (const call of others) results.push(await runCall(call))
+    const outcomes = toolCalls.slice(toolCalls.length - others.length)
 
     if (endCall && outOfGame) return finish(others.length ? '' : text, suggestions, response)
+    // Новое место: отказ create_location/travel в одном ответе с end_turn — модель должна увидеть ошибки и исправить;
+    // удачный travel без рассказа — модель должна описать новое место (его карта — в состоянии следующего запроса).
+    const placeFailed = outcomes.some((t) => PLACE_TOOLS.includes(t.call.name) && !t.outcome.ok)
+    const arrivedSilently = outcomes.some((t) => t.call.name === 'travel' && t.outcome.ok) && !text && narratedTexts.length === 0
+    if (endCall && round < MAX_TOOL_ROUNDS && (placeFailed || arrivedSilently)) {
+      runtime.onRound?.()
+      turn.push({ role: 'assistant', content: response.text || null, toolCalls: [...others, endCall] }, ...results, {
+        role: 'tool',
+        toolCallId: endCall.id,
+        content: JSON.stringify({ ok: false, message: placeFailed ? PLACE_RETRY_MESSAGE : ARRIVAL_MESSAGE }),
+      })
+      continue
+    }
     if (endCall) {
       // Сверка: всё ли заявленное в end_turn сделано инструментами.
       const problems = verifyEndTurn(endCall.arguments, turnDelta(ledger!, ledgerOf(current(), catalog!)), current(), catalog!)

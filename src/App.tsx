@@ -17,7 +17,7 @@ import { MapPanel } from './components/MapPanel'
 import type { HeroMovement, MapActions, MapVision } from './components/LocationMap'
 import type { MarkEditor } from './components/MapMarks'
 import { marksOf } from './game/marks'
-import { exitLockProblem, missingMapNote, trailOf, travelNote, travelPlan, travelText } from './game/travel'
+import { EXIT_STUCK_TURNS, exitLockProblem, missingMapNote, trailOf, travelNote, travelPlan, travelText } from './game/travel'
 import { exploredCells, newlyExplored, partyVision } from './game/vision'
 import { useAppearance } from './theme/appearanceStore'
 import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
@@ -333,6 +333,32 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     [],
   )
 
+  /**
+   * Защита от тихого сбоя перехода: игрок нажал «Выйти», карты за выходом нет — ждём, что ведущий создаст её и переведёт
+   * отряд. Если за EXIT_STUCK_TURNS ходов ведущего карта не сменилась — сообщение и «Повторить» (только в памяти вкладки).
+   */
+  const exitWatchRef = useRef<{ from: string; exitId: string; turns: number } | null>(null)
+  const [travelStuck, setTravelStuck] = useState<{ exitId: string; name: string } | null>(null)
+  const watchExit = () => {
+    const w = exitWatchRef.current
+    const now = appStore.getState().active
+    if (!w || !now || now.id !== story.id) return
+    if (now.world.currentLocationId !== w.from) {
+      exitWatchRef.current = null
+      setTravelStuck(null)
+      return
+    }
+    w.turns++
+    if (w.turns >= EXIT_STUCK_TURNS) setTravelStuck({ exitId: w.exitId, name: currentLocation(now).exits?.find((e) => e.id === w.exitId)?.name ?? w.exitId })
+  }
+  // Отряд перешёл (ведущим или движком) — ждать больше нечего.
+  useEffect(() => {
+    if (exitWatchRef.current && exitWatchRef.current.from !== location.id) {
+      exitWatchRef.current = null
+      setTravelStuck(null)
+    }
+  }, [location.id])
+
   /** Что делает ведущий сейчас (и что повторит «Повторить» после ошибки): ход или переписывание ответа. */
   const [replacingId, setReplacingId] = useState<string | null>(null)
   const lastRequestRef = useRef<{ kind: 'turn' } | { kind: 'rewrite'; messageId: string }>({ kind: 'turn' })
@@ -367,6 +393,7 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
         appStore.dispatch(event, MASTER)
         // Без ведущего решать некому: отдых, о котором попросил игрок, просто проходит.
         if (!rewriteId && !outOfGame) completePendingRest()
+        if (!rewriteId && !outOfGame) watchExit()
         finish()
       }, 600)
       return
@@ -463,6 +490,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
       if (!controller.signal.aborted || cancelledRef.current) finish()
     }
     // Сжатие памяти — в фоне после ответа, игрок не ждёт.
+    // Ход закончился (ответом или ошибкой ведущего) — карта сменилась или нет? Отмену игроком не считаем.
+    if (!outOfGame && !rewriteId && !cancelledRef.current) watchExit()
     if (ok && !outOfGame) void compactNow('budget', session, false)
   }
 
@@ -686,7 +715,11 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     const name = hero.character.name
     const target = exit.to ? now.world.locations[exit.to] : undefined
     let report: { text: string; note: string }
-    if (!target) report = { text: `${name}: уходит через «${exit.name}».`, note: missingMapNote(from, exit, name) }
+    if (!target) {
+      report = { text: `${name}: уходит через «${exit.name}».`, note: missingMapNote(from, exit, name) }
+      exitWatchRef.current = { from: from.id, exitId: exit.id, turns: 0 }
+      setTravelStuck(null)
+    }
     else {
       const plan = travelPlan(now, exit.id)
       if (typeof plan === 'string') return plan
@@ -701,6 +734,24 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     devLog.add({ kind: 'map', rules: ['exit'], sent: true })
     void askMaster()
     return null
+  }
+  /** «Повторить» у сообщения «Карта не сменилась»: снова просим ведущего создать место за выходом и перевести отряд. */
+  const retryExit = () => {
+    const stuck = travelStuck
+    const now = appStore.getState().active
+    if (!stuck || !now) return
+    const from = currentLocation(now)
+    const exit = from.exits?.find((e) => e.id === stuck.exitId)
+    setTravelStuck(null)
+    if (!exit) return
+    const name = leadMember(now).character.name
+    const reason = appStore.dispatch(
+      { type: 'heroMoveReported', heroId: lead.heroId, messageId: crypto.randomUUID(), rules: ['exit'], text: `${name}: снова уходит через «${exit.name}».`, note: missingMapNote(from, exit, name, true).slice(0, MAX_MOVE_TEXT) },
+      ENGINE,
+    )
+    if (reason) return setAiError(reason)
+    exitWatchRef.current = { from: from.id, exitId: exit.id, turns: 0 }
+    void askMaster()
   }
   const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), leave: leaveVia, disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -773,6 +824,16 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
               <p className="master-notice" role="status" data-testid="master-notice">
                 {aiNotice}
               </p>
+            )}
+            {travelStuck && !waiting && (
+              <div className="master-error" role="alert" data-testid="travel-stuck">
+                <p>
+                  Карта не сменилась: ведущий не создал место за выходом «{travelStuck.name}» и не перевёл отряд. Можно попросить ещё раз.
+                </p>
+                <button type="button" className="item-action is-primary" onClick={retryExit}>
+                  Повторить
+                </button>
+              </div>
             )}
             {aiError && (
               <div className="master-error" role="alert" data-testid="master-error">

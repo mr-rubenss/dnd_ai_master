@@ -2,6 +2,7 @@
 // add_effect / remove_effect, reveal и request_check с reveals; сверка рассказа с картой (mapClaims) и ход ведущего
 // с подменённым ответом ИИ.
 import { describe, expect, it } from 'vitest'
+import { HERO_LEAVES, PARTY_ARRIVES } from './mapClaims'
 import { aiResponse, fakeMaster } from '../ai/testing'
 import type { AiToolCall } from '../ai/types'
 import { itemCatalog, priceList, rulesData } from '../data'
@@ -308,5 +309,16 @@ describe('сверка рассказа с картой', () => {
     expect(result.claims?.[0]).toMatch(/^игрок перемещает героя/)
     expect(near(hero(state), location.objects.find((o) => o.id === 'bar')!)).toBe(true)
     expect(result.text).toBe('Ты облокачиваешься на стойку, Гуннар поднимает бровь.')
+  })
+})
+
+describe('сверка: уход в другое место без перехода', () => {
+  it('узнаёт рассказ о прибытии и реплику «выхожу на улицу», но не «выхожу из-за стола»', () => {
+    for (const t of ['Ты выходишь на улицу, моросит дождь.', 'Ты уже снаружи.', 'Вы оказываетесь на площади.', 'Ты выходишь из таверны.', 'Ты спускаешься в подвал.'])
+      expect(PARTY_ARRIVES.test(t), t).toBe(true)
+    for (const t of ['Ты не выходишь на улицу.', 'Ты выходишь из-за стола.', 'Гуннар выходит на улицу.', 'Ты подходишь к двери.'])
+      expect(PARTY_ARRIVES.test(t), t).toBe(false)
+    expect(HERO_LEAVES.test('Выхожу на улицу.')).toBe(true)
+    expect(HERO_LEAVES.test('Выхожу из-за стола.')).toBe(false)
   })
 })

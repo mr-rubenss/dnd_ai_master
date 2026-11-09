@@ -160,10 +160,16 @@ export function travelNote(plan: TravelPlan, name: string): string {
   )
 }
 
+/** Начало заметки «карты за выходом нет» — по нему сверка хода узнаёт, что отряд ждёт перехода. */
+export const MISSING_MAP_MARK = 'уходит через выход'
+/** Сколько ходов ведущего ждать перехода, прежде чем сказать игроку, что карта не сменилась. */
+export const EXIT_STUCK_TURNS = 2
+
 /** Заметка ведущему: герой у выхода, а карты за ним ещё нет — создай и переведи. */
-export function missingMapNote(from: LocationData, exit: MapExit, name: string): string {
+export function missingMapNote(from: LocationData, exit: MapExit, name: string, repeat = false): string {
   return (
-    `${name} уходит через выход «${exit.name}» [${exit.id}] (${EXIT_KIND_NAMES[exit.kind]}) из «${from.name}». Карты места за ним ещё нет: ` +
-    `создай её create_location (выход назад — to: "${from.id}", toExit: "${exit.id}"), затем travel (exit: "${exit.id}", to: id новой локации) и опиши новое место.`
+    `${repeat ? 'Повтор: карта так и не сменилась. ' : ''}${name} ${MISSING_MAP_MARK} «${exit.name}» [${exit.id}] (${EXIT_KIND_NAMES[exit.kind]}) из «${from.name}». ` +
+    `Карты места за ним ещё нет. Обязательно в этом ответе: create_location (выход назад — to: "${from.id}", toExit: "${exit.id}"), ` +
+    `затем travel (exit: "${exit.id}", to: id новой локации), и только потом опиши новое место (можно длиннее обычного). Описание без перехода недопустимо.`
   )
 }

@@ -11,9 +11,10 @@ import { parseCharacterSheet } from './character'
 import { parseLocation } from './location'
 import { DM_PROMPT, masterMessages, masterSystemPrompt } from './masterPrompt'
 import { gameStateText } from './masterState'
-import { END_TURN_REMINDER, MAX_TOOL_ROUNDS, REWRITE_REQUEST, runMasterRewrite, runMasterTurn } from './masterTurn'
+import { END_TURN_REMINDER, MAX_TOOL_ROUNDS, PLACE_CONTINUE_MESSAGE, PLACE_RETRY_MESSAGE, REWRITE_REQUEST, runMasterRewrite, runMasterTurn } from './masterTurn'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, OUT_OF_GAME_REFUSAL, player } from './storyActions'
 import { transcript } from './memory'
+import { MISSING_MAP_MARK } from './travel'
 
 const context = { catalog: itemCatalog, rules: rulesData }
 const location = parseLocation(drunkenGriffinJson)
@@ -665,6 +666,60 @@ describe('цикл с инструментами: ответ модели → и
       const env = runtimeFor(asked('Что будет, если я найду доспех?'))
       const { master, requests } = fakeMaster([() => aiResponse({ text: 'Если ты находишь доспех, мастер вызывает give_item с источником.' })])
       await runMasterTurn(master, asked('Что будет, если я найду доспех?'), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(requests).toHaveLength(1)
+    })
+  })
+
+  describe('новое место: create_location и travel', () => {
+    const street = {
+      id: 'griffin-street', name: 'Улица у таверны', description: 'Грязная улица.', cellFeet: 5, width: 12, height: 8, floor: 'dirt', wallMaterial: 'stone',
+      rooms: [{ id: 'street', x: 0, y: 0, w: 12, h: 8 }], objects: [], npcs: [],
+      exits: [{ id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7, to: 'drunken-griffin', toExit: 'tavern-door' }],
+      playerStart: { x: 5, y: 6 },
+    }
+    /** Ход начался с события «карты за выходом нет» (игрок нажал «Выйти»). */
+    const leaving = () =>
+      story([[{ type: 'heroMoveReported', heroId: 'ratibor', messageId: 'e1', rules: ['exit'], text: 'Ратибор: уходит через «Входная дверь».', note: `Ратибор ${MISSING_MAP_MARK} «Входная дверь» [tavern-door]. Карты нет.` }, ENGINE]])
+
+    it('отказ create_location в одном ответе с end_turn — ход не кончается: модель видит ошибки, исправляет, переходит и описывает', async () => {
+      const env = runtimeFor(leaving())
+      const { master, requests } = fakeMaster([
+        () => aiResponse({ toolCalls: [toolCall('create_location', { location: { ...street, exits: [] } }), endTurn()] }),
+        () => aiResponse({ toolCalls: [toolCall('create_location', { location: street }), toolCall('travel', { exit: 'tavern-door', to: 'griffin-street' }), endTurn()] }),
+        () => aiResponse({ text: 'Ты на грязной улице.', toolCalls: [endTurn()] }),
+      ])
+      const result = await runMasterTurn(master, leaving(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(env.current().world.currentLocationId).toBe('griffin-street')
+      expect(result.text).toBe('Ты на грязной улице.')
+      const toolMessages = requests[1].messages.filter((m) => m.role === 'tool').map((m) => m.content).join('\n')
+      expect(toolMessages).toContain('exits: нужно хотя бы 1')
+      expect(toolMessages).toContain('Пример минимальной локации')
+      expect(toolMessages).toContain(PLACE_RETRY_MESSAGE.slice(0, 40))
+      // После перехода без рассказа — просьба описать место по новой карте (она уже в состоянии игры).
+      expect(requests[2].messages.filter((m) => m.role === 'tool').map((m) => m.content).join('\n')).toContain('Отряд на новой карте')
+      expect(requests[2].messages[0].content).toContain('### Улица у таверны')
+    })
+
+    it('ведущий ответил только текстом о прибытии — сверка просит create_location и travel и даёт довести переход', async () => {
+      const env = runtimeFor(leaving())
+      const { master, requests } = fakeMaster([
+        () => aiResponse({ text: 'Ты выходишь на улицу: моросит дождь.', toolCalls: [endTurn()] }),
+        () => aiResponse({ toolCalls: [toolCall('create_location', { location: street })] }),
+        () => aiResponse({ toolCalls: [toolCall('travel', { exit: 'tavern-door', to: 'griffin-street' })] }),
+        () => aiResponse({ text: 'Улица под дождём.' }),
+      ])
+      const result = await runMasterTurn(master, leaving(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(env.current().world.currentLocationId).toBe('griffin-street')
+      expect(result.claims?.[0]).toContain('create_location')
+      expect(String(requests[1].messages.at(-1)?.content)).toContain('travel')
+      expect(String(requests[2].messages.at(-1)?.content)).toBe(PLACE_CONTINUE_MESSAGE)
+      expect(result.text).toBe('Улица под дождём.')
+    })
+
+    it('обычная реплика без ухода — просьбы о переходе нет', async () => {
+      const env = runtimeFor(story())
+      const { master, requests } = fakeMaster([() => aiResponse({ text: 'Гуннар протирает кружку.', toolCalls: [endTurn()] })])
+      await runMasterTurn(master, story(), { verbosity: 'normal', context, runtime: env.runtime })
       expect(requests).toHaveLength(1)
     })
   })
