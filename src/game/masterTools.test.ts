@@ -131,13 +131,13 @@ describe('недопустимые вызовы отклоняются, ниче
   it('НПС: неизвестный, за картой, в занятую клетку (объект, НПС, герой), не на пол', () => {
     expect(rejected(s, 'move_npc', { npc: 'Саурон', x: 5, y: 5 })).toMatch(/^НПС «Саурон» здесь нет\. Есть: Гуннар \(gunnar\)/)
     expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 25, y: 3 })).toBe('Клетка (25, 3) за пределами карты 20×14.')
-    expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 3, y: 2 })).toBe('Клетка (3, 2) занята: объект «Барная стойка».')
-    expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 2, y: 8 })).toBe('Клетка (2, 8) занята: НПС «Брам».')
-    expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 10, y: 13 })).toBe('Клетка (10, 13) занята: герой Ратибор.')
+    expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 3, y: 2 })).toBe('Клетка (3, 2) занята: объект «Барная стойка». Свободно рядом: (2, 1), (3, 1), (4, 1). Или укажи target — движок сам найдёт место.')
+    expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 2, y: 8 })).toMatch(/^Клетка \(2, 8\) занята: НПС «Брам»\. Свободно рядом: (\(\d+, \d+\)(, )?){1,3}\. Или укажи target/)
+    expect(rejected(s, 'move_npc', { npc: 'Гуннар', x: 10, y: 13 })).toBe('Клетка (10, 13) занята: герой Ратибор. Свободно рядом: (9, 12), (10, 12), (11, 12). Или укажи target — движок сам найдёт место.')
     const holey = structuredClone(s)
     holey.world.locations[LOC].floorPlan[6] = '.......... .........'
-    expect(rejected(holey, 'move_npc', { npc: 'Гуннар', x: 10, y: 6 })).toBe('Клетка (10, 6) — не пол.')
-    expect(rejected(s, 'add_npc', { name: 'Стражник', x: 1, y: 7 })).toBe('Клетка (1, 7) занята: НПС «Лиара».')
+    expect(rejected(holey, 'move_npc', { npc: 'Гуннар', x: 10, y: 6 })).toMatch(/^Клетка \(10, 6\) — не пол\. Свободно рядом: /)
+    expect(rejected(s, 'add_npc', { name: 'Стражник', x: 1, y: 7 })).toMatch(/^Клетка \(1, 7\) занята: НПС «Лиара»\. Свободно рядом: /)
     expect(rejected(s, 'add_npc', { name: 'Стражник', x: 5, y: 5, attitude: 'angry' })).toContain('«attitude»')
     expect(rejected(s, 'remove_npc', { npc: 'Саурон' })).toContain('НПС «Саурон» здесь нет')
   })
