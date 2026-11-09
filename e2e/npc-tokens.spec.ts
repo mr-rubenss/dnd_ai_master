@@ -141,24 +141,8 @@ test('регрессия: герой ходил, история перезагр
   expect(errors).toEqual([])
 })
 
-const street = {
-  id: 'griffin-street',
-  name: 'Улица у таверны',
-  description: 'Грязная улица под фонарём.',
-  cellFeet: 5,
-  width: 12,
-  height: 8,
-  floor: 'dirt',
-  wallMaterial: 'stone',
-  rooms: [{ id: 'street', name: 'Улица', x: 0, y: 0, w: 12, h: 8 }],
-  objects: [{ id: 'cart', type: 'debris', name: 'Сломанная телега', x: 3, y: 4, w: 2 }],
-  npcs: [{ id: 'beggar', name: 'Нищий', x: 8, y: 2 }],
-  exits: [
-    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7, to: 'drunken-griffin', toExit: 'tavern-door' },
-    { id: 'east-road', kind: 'edge', name: 'Дорога на восток', x: 11, y: 4 },
-  ],
-  playerStart: { x: 5, y: 6 },
-}
+/** Улица у таверны — каркас строит движок (60×42, герой у двери в (30, 28)); телегу и нищего добавляет ведущий. */
+const CART = { x: 24, y: 30, w: 2, h: 1 }
 const nearArea = (p: { x: number; y: number }, a: { x: number; y: number; w: number; h: number }) =>
   p.x >= a.x - 1 && p.x <= a.x + a.w && p.y >= a.y - 1 && p.y <= a.y + a.h
 const tokenAt = async (page: Page, testId: string) => ({
@@ -166,17 +150,17 @@ const tokenAt = async (page: Page, testId: string) => ({
   y: Number(await page.getByTestId(testId).getAttribute('data-y')),
 })
 
-test('после travel на карту из create_location и обратно: «идёт к» и «заходит» без инструмента → просьба → фишки на месте', async ({ page, isMobile }) => {
+test('после перехода на карту окрестностей (каркас движка) и обратно: «идёт к» и «заходит» без инструмента → просьба → фишки на месте', async ({ page, isMobile }) => {
   const errors = collectPageErrors(page)
   const results = await mockMaster(page, [
     // После просьбы сверки и довызова инструментов ход заканчивается без ещё одного запроса к модели.
-    // Выход из таверны: карты улицы нет — ведущий создаёт и переводит отряд.
-    tools(['create_location', { location: street }]),
-    tools(['travel', { exit: 'tavern-door', to: 'griffin-street' }]),
+    // Выход из таверны: каркас улицы строит движок, ведущий дополняет — телега и нищий.
+    tools(['add_object', { name: 'Сломанная телега', type: 'debris', ...CART }]),
+    tools(['add_npc', { name: 'Нищий', x: 34, y: 30, description: 'Кряхтит у забора.' }]),
     say('Ты выходишь на грязную улицу.'),
     // На созданной карте: текст без инструмента → просьба → move_npc к цели.
     say('Нищий кряхтит и бредёт к сломанной телеге.'),
-    tools(['move_npc', { npc: 'beggar', target: 'cart' }]),
+    tools(['move_npc', { npc: 'Нищий', target: 'Сломанная телега' }]),
     // Новый на созданной карте (дверей нет — цель рядом с героем).
     say('Из-за угла на улицу заходит стражник с фонарём.'),
     tools(['add_npc', { name: 'Стражник', target: 'Ратибор', description: 'Стражник с фонарём.' }]),
@@ -190,15 +174,18 @@ test('после travel на карту из create_location и обратно: 
 
   await press('door-entrance')
   await menu.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page.locator('.map-panel h2')).toHaveText('Улица у таверны')
-  await expect(npc(page, 'beggar')).toHaveAttribute('data-x', '8')
+  await expect(page.locator('.map-panel h2')).toHaveText('Снаружи: Таверна «Пьяный грифон»')
+  const beggar = page.locator('[data-testid^="npc-"]').filter({ has: page.locator('text=Н') })
+  await expect(beggar).toHaveAttribute('data-x', '34')
+  await expect(page.locator('.message--master').last()).toContainText('грязную улицу')
 
   await send(page, 'Оглядываю улицу.')
   await expect.poll(() => results.reminders.length).toBe(1)
   expect(results.reminders[0]).toContain('Нищий')
-  await expect(npc(page, 'beggar')).not.toHaveAttribute('data-x', '8')
-  await expect(npc(page, 'beggar')).not.toHaveAttribute('data-walking', 'true')
-  expect(nearArea(await tokenAt(page, 'npc-beggar'), { x: 3, y: 4, w: 2, h: 1 })).toBe(true)
+  await expect(beggar).not.toHaveAttribute('data-x', '34')
+  await expect(beggar).not.toHaveAttribute('data-walking', 'true')
+  const b = { x: Number(await beggar.getAttribute('data-x')), y: Number(await beggar.getAttribute('data-y')) }
+  expect(nearArea(b, CART)).toBe(true)
 
   await send(page, 'Жду.')
   await expect.poll(() => results.reminders.length).toBe(2)
@@ -209,7 +196,13 @@ test('после travel на карту из create_location и обратно: 
   const g = { x: Number(await guard.getAttribute('data-x')), y: Number(await guard.getAttribute('data-y')) }
   expect(Math.max(Math.abs(g.x - hero.x), Math.abs(g.y - hero.y))).toBe(1)
 
-  await press('exit-to-tavern')
+  // Обратно — через нарисованную входную дверь. Карта 60×42: на телефоне клетка мелкая — сначала приблизить к герою.
+  if (isMobile) {
+    await page.getByTestId('map-center-hero').tap()
+    await page.getByTestId('map-zoom-in').tap()
+    await expect(page.getByTestId('map-viewport')).toHaveAttribute('data-zoom', '3.00')
+  }
+  await press('door-drunken-griffin-door')
   await menu.getByRole('button', { name: 'Выйти' }).click()
   await expect(page.locator('.map-panel h2')).toHaveText('Таверна «Пьяный грифон»')
   await expect(npc(page, 'gunnar')).toHaveAttribute('data-x', '7')

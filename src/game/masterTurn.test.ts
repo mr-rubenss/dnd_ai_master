@@ -680,7 +680,8 @@ describe('цикл с инструментами: ответ модели → и
     const street = {
       id: 'griffin-street', name: 'Улица у таверны', description: 'Грязная улица.', cellFeet: 5, width: 12, height: 8, floor: 'dirt', wallMaterial: 'stone',
       rooms: [{ id: 'street', x: 0, y: 0, w: 12, h: 8 }], objects: [], npcs: [],
-      exits: [{ id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7, to: 'drunken-griffin', toExit: 'tavern-door' }],
+      // Выход не ведёт в здание: карта — не окрестности таверны (их строит движок), а просто новое место.
+      exits: [{ id: 'to-tavern', kind: 'road', name: 'Тропа назад', x: 5, y: 7 }],
       playerStart: { x: 5, y: 6 },
     }
     /** Ход начался с события «карты за выходом нет» (игрок нажал «Выйти»). */
@@ -726,7 +727,7 @@ describe('цикл с инструментами: ответ модели → и
       const env = runtimeFor(leaving())
       const bad = { location: { ...street, exits: [] } }
       const { master } = fakeMaster([
-        () => aiResponse({ toolCalls: [toolCall('travel', { exit: 'tavern-door' })] }),
+        () => aiResponse({ toolCalls: [toolCall('create_location', bad)] }),
         () => aiResponse({ toolCalls: [toolCall('create_location', bad)] }),
         () => aiResponse({ toolCalls: [toolCall('create_location', bad)] }),
         () => aiResponse({ toolCalls: [toolCall('create_location', { location: street })] }),

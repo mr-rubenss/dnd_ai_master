@@ -1,6 +1,6 @@
-// Переходы между картами: «Выйти» через входную дверь таверны → ведущий получает событие, создаёт улицу
-// (create_location) и переводит отряд (travel) → новая карта, герой у входа, путь над картой и туман обновлены;
-// обратно — через выход улицы (карта есть — переходит движок, ведущий только описывает). Ответы ИИ подменены.
+// Переходы между картами: «Выйти» через входную дверь таверны → движок строит каркас окрестностей и переводит отряд,
+// ведущий дополняет карту (объекты, эффекты, НПС, выходы) → новая карта, герой у нарисованной двери, путь над картой;
+// обратно — через нарисованную дверь (карта есть — переходит движок, ведущий только описывает). Ответы ИИ подменены.
 import type { Page, Route } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { collectPageErrors, expectNoHorizontalScroll, reloadAndContinue, startQuickGame, withEndTurn } from './helpers'
@@ -25,38 +25,21 @@ async function mockMaster(page: Page, rounds: string[]) {
   return bodies
 }
 
-const street = {
-  id: 'griffin-street',
-  name: 'Улица у таверны',
-  description: 'Грязная улица под фонарём.',
-  cellFeet: 5,
-  width: 12,
-  height: 8,
-  floor: 'dirt',
-  wallMaterial: 'stone',
-  rooms: [{ id: 'street', name: 'Улица', x: 0, y: 0, w: 12, h: 8 }],
-  objects: [{ id: 'cart', type: 'debris', name: 'Сломанная телега', x: 3, y: 4, w: 2 }],
-  npcs: [{ id: 'beggar', name: 'Нищий', x: 8, y: 2 }],
-  exits: [
-    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7, to: 'drunken-griffin', toExit: 'tavern-door' },
-    { id: 'east-road', kind: 'edge', name: 'Дорога на восток', x: 11, y: 4 },
-  ],
-  playerStart: { x: 5, y: 6 },
-}
-
-const hero = (page: Page) => page.getByTestId('player-token')
 const lastUser = (b: Body) => [...b.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((key) => localStorage.setItem('ai-master:api-key', key), KEY)
 })
 
-test('выход из таверны: ведущий создаёт улицу и переводит отряд; путь и туман обновляются; обратно — та же таверна', async ({ page, isMobile }, testInfo) => {
+test('выход из таверны: движок строит окрестности, ведущий их дополняет; путь и туман обновляются; обратно — та же таверна', async ({ page, isMobile }, testInfo) => {
   const errors = collectPageErrors(page)
   const bodies = await mockMaster(page, [
-    tool('create_location', { location: street }),
-    tool('travel', { exit: 'tavern-door', to: 'griffin-street' }),
-    say('Ты выходишь на грязную улицу; у стены дремлет нищий.'),
+    // Модель только дополняет каркас: повозка, лужа, прохожий, тропа.
+    tool('add_object', { name: 'Повозка с сеном', type: 'debris', x: 24, y: 30, w: 2 }),
+    tool('add_effect', { kind: 'puddle', x: 34, y: 29, w: 2, h: 1, name: 'Лужа' }),
+    tool('add_npc', { name: 'Нищий', x: 36, y: 31, description: 'Дремлет у забора.' }),
+    tool('add_exit', { kind: 'edge', name: 'Тропа к мельнице', x: 45, y: 41 }),
+    say('Ты выходишь на улицу: у забора дремлет нищий, рядом блестит лужа.'),
     say('Ты снова в шумной таверне.'),
   ])
   const press = async (testId: string) => (isMobile ? page.getByTestId(testId).tap() : page.getByTestId(testId).click())
@@ -65,37 +48,38 @@ test('выход из таверны: ведущий создаёт улицу �
   await expect(page.getByTestId('map-trail')).toHaveCount(0)
   await expect(page.getByTestId('fog-hidden')).toHaveCount(1)
 
-  // Входная дверь — выход: в меню «Выйти».
+  // Входная дверь — выход: «Выйти». Карты снаружи нет — каркас строит движок сразу, без ведущего.
   await press('door-entrance')
   const menu = page.getByTestId('map-actions')
   await menu.getByRole('button', { name: 'Выйти' }).click()
-
-  // Ведущий получил событие «карты нет» → создал улицу и перевёл отряд → описал.
-  await expect(page.locator('.message--master').last()).toContainText('у стены дремлет нищий')
-  expect(lastUser(bodies[0])).toContain('Карты места за ним ещё нет')
-  expect(lastUser(bodies[0])).toContain('toExit: "tavern-door"')
-  await expect(page.locator('.map-panel h2')).toHaveText('Улица у таверны')
-  await expect(page.locator('.map-svg')).toHaveAttribute('aria-label', 'Карта: Улица у таверны')
-  // Герой у входа новой карты — у выхода, ведущего обратно.
-  await expect(hero(page)).toHaveAttribute('data-x', '5')
-  await expect(hero(page)).toHaveAttribute('data-y', '7')
-  // Путь вверху и туман — по новой карте.
-  await expect(page.getByTestId('map-trail').locator('li')).toHaveText(['Таверна «Пьяный грифон»', 'Улица у таверны'])
-  await expect(page.getByTestId('fog-hidden')).toHaveCount(0)
-  await expect(page.getByTestId('npc-beggar')).toBeVisible()
-  await expect(page.getByTestId('exit-east-road')).toHaveAttribute('data-kind', 'edge')
+  await expect(page.locator('.map-panel h2')).toHaveText('Снаружи: Таверна «Пьяный грифон»')
+  await expect(page.locator('.map-svg')).toHaveAttribute('aria-label', 'Карта: Снаружи: Таверна «Пьяный грифон»')
+  // Герой у нарисованной входной двери снаружи; дверь на месте.
+  await expect(page.getByTestId('player-token')).toHaveAttribute('data-x', '30')
+  await expect(page.getByTestId('player-token')).toHaveAttribute('data-y', '28')
+  await expect(page.getByTestId('door-drunken-griffin-door')).toHaveCount(1)
+  // Ведущему — «каркас построен, дополни».
+  await expect(page.locator('.message--master').last()).toContainText('у забора дремлет нищий')
+  expect(lastUser(bodies[0])).toContain('Карту окрестностей построил движок')
+  // Дополнения модели на карте: прохожий, лужа (эффект), повозка, тропа (значок выхода).
+  await expect(page.locator('[data-testid^="npc-"][data-x="36"][data-y="31"]')).toHaveCount(1)
+  await expect(page.locator('[data-testid^="effect-"][data-kind="puddle"]')).toHaveCount(1)
+  await expect(page.locator('[data-testid^="object-"][data-x="24"][data-y="30"]')).toHaveCount(1)
+  await expect(page.locator('[data-testid^="exit-"][data-x="45"][data-y="41"]')).toHaveCount(1)
+  // Путь вверху — по новой карте.
+  await expect(page.getByTestId('map-trail').locator('li')).toHaveText(['Таверна «Пьяный грифон»', 'Снаружи: Таверна «Пьяный грифон»'])
   await expectNoHorizontalScroll(page)
-  await testInfo.attach('улица', { body: await page.locator('.map-panel').screenshot(), contentType: 'image/png' })
+  await testInfo.attach('окрестности таверны', { body: await page.locator('.map-panel').screenshot(), contentType: 'image/png' })
 
-  // Обратно: карта таверны есть — переходит движок, ведущему — событие «опиши новое место».
-  await press('exit-to-tavern')
+  // Обратно — через нарисованную дверь: «Выйти» в её меню; карта таверны есть — переходит движок.
+  await press('door-drunken-griffin-door')
   await menu.getByRole('button', { name: 'Выйти' }).click()
   await expect(page.locator('.message--master').last()).toContainText('снова в шумной таверне')
-  expect(lastUser(bodies.at(-1)!)).toContain('Отряд перешёл через выход «Дверь таверны»')
+  expect(lastUser(bodies.at(-1)!)).toContain('Отряд перешёл через выход «Входная дверь (Таверна «Пьяный грифон»)»')
   await expect(page.locator('.map-panel h2')).toHaveText('Таверна «Пьяный грифон»')
-  await expect(hero(page)).toHaveAttribute('data-x', '10')
-  await expect(hero(page)).toHaveAttribute('data-y', '13')
-  await expect(page.getByTestId('map-trail').locator('li')).toHaveText(['Таверна «Пьяный грифон»', 'Улица у таверны', 'Таверна «Пьяный грифон»'])
+  await expect(page.getByTestId('player-token')).toHaveAttribute('data-x', '10')
+  await expect(page.getByTestId('player-token')).toHaveAttribute('data-y', '13')
+  await expect(page.getByTestId('map-trail').locator('li')).toHaveText(['Таверна «Пьяный грифон»', 'Снаружи: Таверна «Пьяный грифон»', 'Таверна «Пьяный грифон»'])
   // Та же таверна: кладовая по-прежнему под туманом, Гуннар на месте.
   await expect(page.getByTestId('fog-hidden')).toHaveCount(1)
   await expect(page.getByTestId('npc-gunnar')).toBeVisible()

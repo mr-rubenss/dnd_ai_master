@@ -1,5 +1,5 @@
-// Масштаб и сдвиг карты: колесо мыши и перетаскивание на десктопе, щипок и два пальца на телефоне (одним пальцем
-// страница прокручивается как обычно). Во время жеста вид меняется прямо в стиле элемента (transform), без
+// Масштаб и сдвиг карты: колесо мыши и перетаскивание на десктопе, щипок и два пальца на телефоне и планшете; когда
+// карта увеличена — и сдвиг одним пальцем (при масштабе 1 одним пальцем страница прокручивается как обычно). Во время жеста вид меняется прямо в стиле элемента (transform), без
 // перерисовки React, — так быстро и на телефоне; по окончании жеста вид фиксируется в состоянии (для подсказки).
 // Математика — чистые функции в src/game/mapView.ts.
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
@@ -34,10 +34,12 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
       const el = innerRef.current
       if (!el) return
       el.classList.toggle('is-animating', animate)
+      // Карта увеличена — одним пальцем она сдвигается, а не прокручивает страницу (touch-action: none в стилях).
+      boxRef.current?.classList.toggle('is-zoomed', next.scale > 1)
       // Во время жеста слой композитный (без перерастеризации SVG на каждом кадре); после — снова чёткий.
       el.style.transform = next.scale === 1 && next.x === 0 && next.y === 0 ? '' : `translate(${next.x}px, ${next.y}px) scale(${next.scale})`
     },
-    [innerRef],
+    [innerRef, boxRef],
   )
 
   const commit = useCallback(() => {
@@ -71,7 +73,9 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
     let drag: { x: number; y: number; start: MapViewport; moved: boolean; id: number } | null = null
     let suppressClick = false
     const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) return
+      // Мышь — всегда; палец или перо — когда карта увеличена (иначе одним пальцем прокручивается страница).
+      const touchPan = e.pointerType !== 'mouse' && e.isPrimary && view.current.scale > 1
+      if (!touchPan && (e.pointerType !== 'mouse' || e.button !== 0)) return
       // Токен героя перетаскивается сам (LocationMap) — карту в это время не сдвигаем.
       if ((e.target as Element | null)?.closest?.('[data-draggable]')) return
       drag = { x: e.clientX, y: e.clientY, start: view.current, moved: false, id: e.pointerId }
@@ -115,6 +119,11 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
     }
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 2) return
+      // Второй палец — щипок, а не сдвиг одним пальцем.
+      if (drag) {
+        if (drag.moved) box.classList.remove('is-dragging')
+        drag = null
+      }
       const t = touchInfo(e.touches)
       pinch = { d: t.d, mx: t.mx, my: t.my, start: view.current }
       moving()

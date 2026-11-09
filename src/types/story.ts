@@ -9,7 +9,7 @@ import type { Coins } from '../game/coins'
 import type { CharacterMagic } from './spells'
 import type { ArmorType } from './items'
 import type { ChatMessage, CheckCard, RollRecord, TurnChange } from './game'
-import type { CellPosition, DoorState, LocationData, MapEffect, MapObject, Npc, NpcAttitude, NpcPersonality } from './location'
+import type { CellPosition, DoorState, LocationData, MapEffect, MapExit, MapObject, Npc, NpcAttitude, NpcPersonality } from './location'
 
 /** Что меняет npcUpdated: поля личности, описание, отношение. Пустая строка в текстовом поле — убрать его. */
 export type NpcChanges = Partial<NpcPersonality & { description: string; attitude: NpcAttitude }>
@@ -347,6 +347,8 @@ export type StoryEvent =
   | { type: 'areaExplored'; locationId: string; cells: number[] }
   /** Ведущий создал новую локацию (create_location): проверенная, в полной записи; дальше она живёт в мире истории. */
   | { type: 'locationCreated'; location: LocationData }
+  /** Ведущий добавил выход на карту (add_exit): дорога, тропа, лестница, край карты в другое место. */
+  | { type: 'exitAdded'; locationId: string; exit: MapExit }
   /** Выход локации теперь ведёт в локацию `to` (к её входу `toExit`) — движок при переходе (src/game/travel.ts). */
   | { type: 'exitLinked'; locationId: string; exitId: string; to: string; toExit?: string }
   /** Отряд перешёл через выход `exitId` из `from` в `to`; герои — в клетках `positions` у входа `arrivalExitId`. */

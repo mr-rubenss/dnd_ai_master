@@ -6,6 +6,8 @@ import { canStep, doorState, isFloor } from '../engine/movement'
 import { EXIT_KIND_NAMES, type CellPosition, type LocationData, type MapExit } from '../types/location'
 import type { StoryEvent, StoryState } from '../types/story'
 import { cellOccupant } from './mapPlacement'
+import { buildSurroundings, isBuildingDoorExit } from './surroundings'
+import { gameTime } from '../engine/time'
 
 /** Сколько последних локаций помнит путь отряда (строка над картой). */
 export const TRAIL_MAX = 8
@@ -73,6 +75,8 @@ export interface TravelPlan {
   arrival: MapExit | null
   /** Клетка ведущего героя в новой локации. */
   at: CellPosition
+  /** Карту окрестностей построил движок (каркас здания) — модели её дополнить. */
+  built?: boolean
 }
 
 /**
@@ -91,7 +95,24 @@ export function travelPlan(state: StoryState, exitQuery: string, toId?: string):
   if (exit.to && toId && exit.to !== toId && state.world.locations[exit.to])
     return `Выход «${exit.name}» ведёт в «${state.world.locations[exit.to].name}» [${exit.to}], а не в [${toId}].`
   const targetId = toId ?? exit.to
-  const to = targetId ? state.world.locations[targetId] : undefined
+  let to = targetId ? state.world.locations[targetId] : undefined
+  const events: StoryEvent[] = []
+  // Выход из здания через дверь наружу, а карты снаружи ещё нет — каркас окрестностей строит движок.
+  let built = false
+  if (!to && isBuildingDoorExit(from, exit, state.world.locations)) {
+    const door = from.doors.find((d) => d.id === exit.door)!
+    const outside = buildSurroundings(from, exit, {
+      id: freeLocationId(state, targetId ?? `${from.id}-outside`),
+      // Игровое время (как storyTime в storyActions.ts: старые истории без поля — День 1, 8:00).
+      time: state.time ?? gameTime(1, 8),
+      doorState: doorState(door, state.world.doors[from.id]),
+    })
+    if (outside) {
+      events.push({ type: 'locationCreated', location: outside })
+      to = outside
+      built = true
+    }
+  }
   if (!to)
     return (
       `Карты места за выходом «${exit.name}» ещё нет${targetId ? ` ([${targetId}] не создана)` : ''}. Создай её create_location ` +
@@ -104,14 +125,20 @@ export function travelPlan(state: StoryState, exitQuery: string, toId?: string):
   const cells = arrivalCells(to, state.world.doors[to.id] ?? {}, start, heroes.length)
   if (!cells) return `У входа в «${to.name}» нет свободного места для отряда.`
   const positions = Object.fromEntries(heroes.map((m, i) => [m.heroId, cells[i]]))
-  const events: StoryEvent[] = []
   // Выход ещё никуда не вёл — теперь ведёт в новую локацию (и к её входу).
   if (exit.to !== to.id || (arrival && exit.toExit !== arrival.id))
     events.push({ type: 'exitLinked', locationId: from.id, exitId: exit.id, to: to.id, ...(arrival ? { toExit: arrival.id } : {}) })
   // Обратный выход новой локации тоже знает, куда ведёт.
   if (arrival && (arrival.to !== from.id || arrival.toExit !== exit.id)) events.push({ type: 'exitLinked', locationId: to.id, exitId: arrival.id, to: from.id, toExit: exit.id })
   events.push({ type: 'partyTraveled', from: from.id, to: to.id, exitId: exit.id, ...(arrival ? { arrivalExitId: arrival.id } : {}), positions })
-  return { events, from, to, exit, arrival, at: cells[0] }
+  return { events, from, to, exit, arrival, at: cells[0], ...(built ? { built } : {}) }
+}
+
+/** Свободный id локации в мире истории (base, base-2, …). */
+function freeLocationId(state: Pick<StoryState, 'world'>, base: string): string {
+  let id = base
+  for (let n = 2; state.world.locations[id]; n++) id = `${base}-${n}`
+  return id
 }
 
 /** Проверка partyTraveled: из текущей локации через её выход в другую существующую, герои — на свободном полу. */
@@ -136,6 +163,23 @@ export function partyTraveledProblem(state: StoryState, e: Extract<StoryEvent, {
   return null
 }
 
+/** Проверка exitAdded: локация есть, выход — на свободной клетке пола, «край карты» — на краю, дверь — своя. */
+export function exitAddedProblem(state: StoryState, e: Extract<StoryEvent, { type: 'exitAdded' }>): string | null {
+  const location = state.world.locations[e.locationId]
+  if (!location) return 'В мире этой истории нет такой локации.'
+  const x = e.exit
+  if (!x || typeof x.id !== 'string' || !x.id || (location.exits ?? []).some((o) => o.id === x.id)) return 'У выхода нужен новый id.'
+  if (!(EXIT_KIND_NAMES as Record<string, string>)[x.kind]) return `Вид выхода — один из: ${Object.keys(EXIT_KIND_NAMES).join(', ')}.`
+  if (typeof x.name !== 'string' || !x.name.trim()) return 'У выхода нужно название.'
+  if (!Number.isInteger(x.x) || !Number.isInteger(x.y) || !isFloor(location, x.x, x.y)) return `Клетка (${x.x}, ${x.y}) — не пол этой карты.`
+  if (x.kind === 'edge' && x.x !== 0 && x.y !== 0 && x.x !== location.width - 1 && x.y !== location.height - 1)
+    return `«Край карты» — клетка на краю карты (x = 0 или ${location.width - 1}, y = 0 или ${location.height - 1}).`
+  if (x.door !== undefined && !location.doors.some((d) => d.id === x.door)) return `Двери «${x.door}» на этой карте нет.`
+  if ((location.exits ?? []).some((o) => o.x === x.x && o.y === x.y)) return `В клетке (${x.x}, ${x.y}) уже есть выход.`
+  if (x.to !== undefined && x.to === location.id) return 'Выход не может вести в ту же локацию.'
+  return null
+}
+
 /** Проверка exitLinked: выход есть, локация назначения есть, её вход (если указан) — тоже. */
 export function exitLinkedProblem(state: StoryState, e: Extract<StoryEvent, { type: 'exitLinked' }>): string | null {
   const location = state.world.locations[e.locationId]
@@ -156,7 +200,12 @@ export function travelText(plan: Pick<TravelPlan, 'exit' | 'to'>, name: string):
 export function travelNote(plan: TravelPlan, name: string): string {
   return (
     `Отряд перешёл через выход «${plan.exit.name}» (${EXIT_KIND_NAMES[plan.exit.kind]}) из «${plan.from.name}» в «${plan.to.name}» [${plan.to.id}]. ` +
-    `${name} — у ${plan.arrival ? `входа «${plan.arrival.name}»` : 'входа'}, клетка (${plan.at.x}, ${plan.at.y}). Опиши новое место (что видно, кто здесь) — карта в состоянии игры.`
+    `${name} — у ${plan.arrival ? `входа «${plan.arrival.name}»` : 'входа'}, клетка (${plan.at.x}, ${plan.at.y}). ` +
+    (plan.built
+      ? `Карту окрестностей построил движок: контур здания с дверью, двор, дорога, забор по краям. Дополни её в этом ответе — ` +
+        `add_object (повозки, бочки, деревья, камни, ящики), add_effect (лужи, дым), add_npc (прохожие), add_exit (выходы в другие места), ` +
+        `затем опиши место. Контур здания и дверь не трогай.`
+      : 'Опиши новое место (что видно, кто здесь) — карта в состоянии игры.')
   )
 }
 
