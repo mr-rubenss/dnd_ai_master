@@ -9,14 +9,14 @@ import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition
 import { DiceError, roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
-import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type DoorState, type EffectKind, type LocationData, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
+import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type CellPosition, type DoorState, type EffectKind, type LocationData, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
 import { parseCreatedLocation } from './locationCreate'
 import { travelNote, travelPlan, type TravelPlan } from './travel'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
-import { placementProblem } from './mapPlacement'
+import { freeCellNear, freeCellsHint, placementProblem, type PlacementIgnore } from './mapPlacement'
 import { findMapTarget, limitBySpeed, routeToTarget } from './heroTargets'
 import { AREA_SHAPE_NAMES, AREA_SHAPES, areaTemplateProblem, COMPASS, directionBetween, DIRECTED_SHAPES, edgeOrigin, MAX_AREA_FEET, type AreaShape, type AreaTemplate, type CellRect } from '../engine/areas'
 import { areaResultText, mapAreaResult } from './mapAreas'
@@ -225,19 +225,31 @@ export const MASTER_TOOLS: AiTool[] = [
   },
   {
     name: 'move_npc',
-    description: 'Переместить НПС на текущей карте в свободную клетку пола.',
-    parameters: object({ npc: str('id или имя НПС.'), x: int('Столбец клетки.', 0), y: int('Строка клетки.', 0) }, ['npc', 'x', 'y']),
+    description:
+      'Переместить НПС на текущей карте: «Гуннар идёт к столу» — target: id стола (движок сам найдёт свободную клетку рядом). ' +
+      'Каждое передвижение НПС в рассказе — этот вызов, иначе на карте он останется на месте. Можно и клетку: x, y.',
+    parameters: object(
+      {
+        npc: str('id или имя НПС.'),
+        target: str('К чему идёт: id (или название) объекта, двери, НПС или имя героя — встанет в свободную клетку рядом.'),
+        x: int('Столбец клетки (если без target).', 0),
+        y: int('Строка клетки (если без target).', 0),
+      },
+      ['npc'],
+    ),
   },
   {
     name: 'add_npc',
     description:
-      'Добавить на текущую карту нового НПС (вошёл в таверну, вылез из погреба) в свободную клетку пола. ' +
+      'Добавить на текущую карту нового НПС: кто-то вошёл, появился, вылез из погреба — каждое появление в рассказе это вызов, иначе его нет на карте. ' +
+      'Место — target (вошёл с улицы — id входной двери: встанет в свободную клетку рядом) или x, y. ' +
       'Сразу задай ему личность коротко: предыстория, цель, страх или слабость, манера речи, чем занят — так он будет живым, а не справочником.',
     parameters: object(
       {
         name: str('Имя.'),
-        x: int('Столбец клетки.', 0),
-        y: int('Строка клетки.', 0),
+        target: str('Где появляется: id (или название) двери, объекта, НПС или имя героя — в свободной клетке рядом.'),
+        x: int('Столбец клетки (если без target).', 0),
+        y: int('Строка клетки (если без target).', 0),
         attitude: oneOf(NPC_ATTITUDES, 'Отношение к героям.'),
         description: str('Кто это, как выглядит — то, что герой видит с первого взгляда.'),
         backstory: str('Предыстория, 2–3 коротких предложения: откуда, что пережил, почему здесь (до 400 символов).'),
@@ -246,7 +258,7 @@ export const MASTER_TOOLS: AiTool[] = [
         speech: str('Манера речи: 2–3 черты — словечки, темп, как обращается к героям (до 200 символов).'),
         activity: str('Чем занят прямо сейчас (до 160 символов) — это видно и игроку.'),
       },
-      ['name', 'x', 'y'],
+      ['name'],
     ),
   },
   {
@@ -627,6 +639,54 @@ const slugId = (prefix: string, existing: { id: string }[], newId: () => string)
 // ---------- Инструменты ----------
 
 type Handler = (state: StoryState, args: Args, ctx: ToolContext) => { events: ToolEvent[]; result: Record<string, unknown> }
+
+/** Клетка из x, y: свободная, иначе отказ с подсказкой свободных клеток рядом. */
+function cellArgs(state: StoryState, args: Args, ignore: PlacementIgnore): CellPosition {
+  const location = currentLocationOf(state)
+  const x = integer(args, 'x')
+  const y = integer(args, 'y')
+  if (x === undefined || y === undefined) return reject('Укажи target (к чему идёт или где появляется) или x и y.')
+  const problem = placementProblem(location, heroesOnMap(state), { x, y }, ignore)
+  if (problem) reject(problem + freeCellsHint(location, heroesOnMap(state), { x, y }, ignore))
+  return { x, y }
+}
+
+/**
+ * НПС «к цели»: свободная клетка рядом с объектом, дверью, НПС или героем (target). null — target не задан;
+ * already — НПС уже стоит рядом.
+ */
+function placeNear(
+  state: StoryState,
+  args: Args,
+  ignore: PlacementIgnore,
+  npc?: { id: string; x: number; y: number },
+): { cell: CellPosition; name: string } | { already: true; name: string } | null {
+  const query = text(args, 'target')
+  if (!query) return null
+  const location = currentLocationOf(state)
+  const hero = state.party.find((m) => !m.fallen && (m.heroId === query || norm(m.character.name) === norm(query)))
+  let area: { x: number; y: number; w: number; h: number }
+  let name: string
+  // У двери и окна встают в клетки у порога (сама область), у остального — вокруг.
+  let threshold = false
+  if (hero) {
+    area = { ...hero.position, w: 1, h: 1 }
+    name = hero.character.name
+  } else {
+    const target = findMapTarget(location, query)
+    if (typeof target === 'string') return reject(target)
+    if (npc && target.kind === 'npc' && target.id === npc.id) return reject('Цель — сам этот НПС.')
+    area = target.area
+    name = `«${target.name}»`
+    threshold = target.kind === 'door' || target.kind === 'window'
+  }
+  if (npc) {
+    const gap = Math.max(area.x - npc.x, npc.x - (area.x + area.w - 1), area.y - npc.y, npc.y - (area.y + area.h - 1))
+    if (gap === 1 || (threshold && gap <= 0)) return { already: true, name }
+  }
+  const cell = freeCellNear(location, heroesOnMap(state), area, ignore, npc, { inside: threshold })
+  return cell ? { cell, name } : reject(`Рядом с ${name} нет свободной клетки — выбери другую цель или x, y.`)
+}
 
 const HANDLERS: Record<string, Handler> = {
   request_check(state, args, ctx) {
@@ -1094,27 +1154,26 @@ const HANDLERS: Record<string, Handler> = {
   move_npc(state, args) {
     const location = currentLocationOf(state)
     const npc = findByName(location.npcs, text(args, 'npc', true)!, 'НПС')
-    const to = { x: integer(args, 'x', true)!, y: integer(args, 'y', true)! }
-    const problem = placementProblem(location, heroesOnMap(state), to, { npcId: npc.id, creature: true })
-    if (problem) reject(problem)
+    const ignore = { npcId: npc.id, creature: true }
+    const near = placeNear(state, args, ignore, npc)
+    if (near && 'already' in near) return { events: [], result: { message: `${npc.name} уже рядом с ${near.name}: клетка (${npc.x}, ${npc.y}).` } }
+    const to = near ? near.cell : cellArgs(state, args, ignore)
     return {
       events: [{ event: { type: 'npcMoved', locationId: location.id, npcId: npc.id, to }, author: MASTER }],
-      result: { message: `${npc.name} — теперь в клетке (${to.x}, ${to.y}).` },
+      result: { message: `${npc.name} — теперь в клетке (${to.x}, ${to.y})${near ? `, рядом с ${near.name}` : ''}.`, x: to.x, y: to.y },
     }
   },
 
   add_npc(state, args, ctx) {
     const location = currentLocationOf(state)
     const name = text(args, 'name', true)!
-    const x = integer(args, 'x', true)!
-    const y = integer(args, 'y', true)!
+    const near = placeNear(state, args, { creature: true })
+    const { x, y } = near && 'cell' in near ? near.cell : cellArgs(state, args, { creature: true })
     const attitude = choice<NpcAttitude>(args, 'attitude', NPC_ATTITUDES)
     const description = text(args, 'description')
     const personality = personalityArgs(args)
     const tooLong = npcChangesProblem(personality)
     if (tooLong) reject(tooLong)
-    const problem = placementProblem(location, heroesOnMap(state), { x, y }, { creature: true })
-    if (problem) reject(problem)
     const id = slugId('npc', location.npcs, ctx.newId)
     return {
       events: [
@@ -1127,7 +1186,7 @@ const HANDLERS: Record<string, Handler> = {
           author: MASTER,
         },
       ],
-      result: { id, message: `${name} появляется в клетке (${x}, ${y}).` },
+      result: { id, x, y, message: `${name} появляется в клетке (${x}, ${y})${near && 'cell' in near ? `, рядом с ${near.name}` : ''}.` },
     }
   },
 

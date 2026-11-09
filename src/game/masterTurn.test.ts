@@ -50,6 +50,12 @@ describe('системный промт ведущего (src/ai/dm-prompt.md)',
     expect(DM_PROMPT).toContain('`update_npc`')
   })
 
+  it('карта: любое появление, уход или передвижение НПС — вызов add_npc / remove_npc / move_npc с target', () => {
+    expect(DM_PROMPT).toContain('Любое появление, уход или передвижение НПС в рассказе — это вызов инструмента')
+    expect(DM_PROMPT).toMatch(/`add_npc` \(`target` — id двери, через которую вошёл\)/)
+    expect(DM_PROMPT).toMatch(/`move_npc` с `target` — id того, к чему идёт/)
+  })
+
   it('скрытые и пассивные проверки: провал не озвучивать', () => {
     expect(DM_PROMPT).toContain('`hidden: true`')
     expect(DM_PROMPT).toContain('**Провал скрытой проверки не озвучивай**')
