@@ -450,7 +450,8 @@ export const MASTER_TOOLS: AiTool[] = [
       'wallMaterial (stone|wood), rooms [{id, name, x, y, w, h}] — прямоугольники пола, стены по периметру ставятся сами (на улице — одна комната во всю карту), ' +
       'openings [{x1,y1,x2,y2}] — проёмы в стенах, doors [{id, name, state: open|closed|locked, x1,y1,x2,y2}] — только на стенах, windows [{id, x1,y1,x2,y2}]. ' +
       'Отрезки — по узлам сетки (узел (x,y) — левый верхний угол клетки), строго по горизонтали или вертикали. ' +
-      'objects [{id, type, name, description, x, y, w, h}] — на полу, не друг на друге и не поперёк стен (type как в add_object; ковёр и свеча клетку не занимают), ' +
+      'objects [{id, type, name, description, x, y, w, h}] — на полу, не друг на друге и не поперёк стен; type — только table|chair|bar|fireplace|barrel|fire|debris|item|bed|chest|shelf|rug|torch|candle|tree|rock|building ' +
+        '(ковёр и свеча клетку не занимают; лужа, дым, тьма, свечение — не объекты, а effects [{id, kind: puddle|smoke|darkness|glow|fire, x, y, w, h}]), ' +
       'npcs [{id, name, description, attitude: friendly|neutral|hostile, x, y}] — на полу, по одному в клетке, ' +
       'exits [{id, kind: door|road|stairs|edge, name, x, y, door, to}] — хотя бы один: клетка пола у выхода (edge — на краю карты, door — вплотную к двери, door — её id; to — id локации, куда ведёт), ' +
       'playerStart {x, y} — клетка пола. Весь пол должен быть достижим от playerStart. Тексты — на русском, без раскрытия тайн.',
@@ -1533,14 +1534,14 @@ const HANDLERS: Record<string, Handler> = {
     if (typeof id === 'string' && state.world.locations[id])
       reject(`Локация «${id}» уже есть в мире этой истории («${state.world.locations[id].name}») — не создавай заново; новой нужен другой id.`)
     const parsed = parseCreatedLocation(input)
-    if (!parsed.ok) reject(`Локация не создана, исправь и вызови снова:\n- ${parsed.problems.join('\n- ')}\nПример минимальной локации (есть выход, объекты внутри карты): ${MIN_LOCATION_EXAMPLE}`)
+    if (!parsed.ok) reject(`Локация не создана, исправь и вызови снова:\n- ${[...parsed.notes, ...parsed.problems].join('\n- ')}\nПример минимальной локации (есть выход, объекты внутри карты): ${MIN_LOCATION_EXAMPLE}`)
     const location = (parsed as { location: LocationData }).location
     const exits = (location.exits ?? []).map((e) => `${e.name} [${e.id}] (${e.x}, ${e.y})${e.to ? ` → ${e.to}` : ''}`)
     return {
       events: [{ event: { type: 'locationCreated', location }, author: MASTER }],
       result: {
         id: location.id,
-        message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток, выходы: ${exits.join('; ')}. Она сохранена в мире истории — второй раз не создавай.`,
+        message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток, выходы: ${exits.join('; ')}.${parsed.notes.length ? ` ${parsed.notes.join(' ')}` : ''} Она сохранена в мире истории — второй раз не создавай.`,
       },
     }
   },

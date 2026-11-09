@@ -172,6 +172,40 @@ export function schemaProblems(input: unknown): string[] {
   return result.success ? [] : result.error.issues.map((issue) => issueText(issue, input))
 }
 
+/** Виды эффектов, которые модели путают с объектами (лужа, дым, тьма, свечение); fire — и объект, и эффект. */
+const EFFECT_ONLY = EFFECT_KINDS.filter((k) => !(OBJECT_TYPES as readonly string[]).includes(k))
+
+/**
+ * Терпимость к частой ошибке модели: объект с типом эффекта (`type: "puddle"`) переносится в `effects`
+ * (`kind: "puddle"`, та же область). Возвращает исправленный JSON и заметки для модели.
+ */
+export function normalizeCreatedInput(input: unknown): { input: unknown; notes: string[] } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { input, notes: [] }
+  const raw = input as Record<string, unknown>
+  if (!Array.isArray(raw.objects)) return { input, notes: [] }
+  const moved = raw.objects.filter((o) => o && typeof o === 'object' && (EFFECT_ONLY as readonly unknown[]).includes((o as Record<string, unknown>).type))
+  if (moved.length === 0) return { input, notes: [] }
+  const effects = moved.map((o) => {
+    const { type, w, h, id, name, x, y } = o as Record<string, unknown>
+    return { id, kind: type, ...(typeof name === 'string' ? { name } : {}), x, y, w: w ?? 1, h: h ?? 1 }
+  })
+  return {
+    input: { ...raw, objects: raw.objects.filter((o) => !moved.includes(o)), effects: [...(Array.isArray(raw.effects) ? raw.effects : []), ...effects] },
+    notes: [`${effects.map((e) => `«${String(e.name ?? e.id)}»`).join(', ')} — это эффекты (${[...new Set(effects.map((e) => e.kind))].join(', ')}), а не объекты: перенесены в effects.`],
+  }
+}
+
+/** Подсказки к ошибкам, на которых модель застревает. */
+function withHints(problems: string[]): string[] {
+  return problems.map((p) =>
+    /двери "[^"]+" нет в "doors"/.test(p)
+      ? `${p} — добавь эту дверь в doors (на стене карты) или сделай выход без двери: kind: "road" (дорога, проход) или "edge" (край карты), без поля door`
+      : /^objects\[\d+\]\.type: одно из/.test(p)
+        ? `${p} (лужа, дым, тьма, свечение — это effects: {id, kind, x, y, w, h}; вывеска, мешок, ящик — item)`
+        : p,
+  )
+}
+
 /** Правила созданной локации поверх parseLocation: выходы, НПС не в одной клетке. */
 function createdRuleProblems(location: LocationData): string[] {
   const problems: string[] = []
@@ -196,18 +230,21 @@ const limited = (problems: string[]) =>
   problems.length > MAX_REPORTED_PROBLEMS ? [...problems.slice(0, MAX_REPORTED_PROBLEMS), `…и ещё ${problems.length - MAX_REPORTED_PROBLEMS}`] : problems
 
 /** JSON модели → проверенная локация или список ошибок. */
-export function parseCreatedLocation(input: unknown): { ok: true; location: LocationData } | { ok: false; problems: string[] } {
+export function parseCreatedLocation(
+  original: unknown,
+): { ok: true; location: LocationData; notes: string[] } | { ok: false; problems: string[]; notes: string[] } {
+  const { input, notes } = normalizeCreatedInput(original)
   const shape = schemaProblems(input)
-  if (shape.length) return { ok: false, problems: limited(shape) }
+  if (shape.length) return { ok: false, problems: limited(withHints(shape)), notes }
   let location: LocationData
   try {
     location = parseLocation(input)
   } catch (error) {
-    if (error instanceof LocationValidationError) return { ok: false, problems: limited(error.problems) }
+    if (error instanceof LocationValidationError) return { ok: false, problems: limited(withHints(error.problems)), notes }
     throw error
   }
   const rules = createdRuleProblems(location)
-  return rules.length ? { ok: false, problems: limited(rules) } : { ok: true, location }
+  return rules.length ? { ok: false, problems: limited(rules), notes } : { ok: true, location, notes }
 }
 
 /**

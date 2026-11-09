@@ -219,3 +219,66 @@ test('герой дошёл до выхода пешком — подсказк�
   await expect(page.getByTestId('map-notice')).toHaveText('Здесь выход «Входная дверь»: нажмите на дверь → «Выйти».')
   await expect(heading(page)).toHaveText('Таверна «Пьяный грифон»')
 })
+
+/** Карта из живого отчёта (deepseek-chat-v3.1, 2026-11-09): лужи как объекты type "puddle", выход-дверь без двери на карте. */
+const reportStreet = {
+  id: 'outside-tavern',
+  name: 'Улица у таверны',
+  description: 'Грязная дорога перед трактиром «Пьяный грифон». Вечерний дождь моросит по лужам.',
+  cellFeet: 5,
+  width: 15,
+  height: 10,
+  floor: 'dirt',
+  wallMaterial: 'wood',
+  rooms: [{ id: 'street', name: 'Дорога', x: 0, y: 0, w: 15, h: 10 }],
+  openings: [],
+  doors: [],
+  windows: [],
+  objects: [
+    { id: 'tavern-sign', type: 'building', name: 'Вывеска таверны', description: 'Деревянная вывеска с хмельным грифоном.', x: 7, y: 0, w: 1, h: 1 },
+    { id: 'puddle-1', type: 'puddle', name: 'Лужа', description: 'Большая лужа от дождя.', x: 3, y: 5, w: 2, h: 2 },
+    { id: 'puddle-2', type: 'puddle', name: 'Лужа', description: 'Лужа поменьше.', x: 10, y: 7, w: 1, h: 1 },
+  ],
+  npcs: [],
+  exits: [{ id: 'tavern-entrance', kind: 'door', name: 'Дверь в таверну', x: 7, y: 9, door: 'entrance', to: 'drunken-griffin', toExit: 'tavern-door' }],
+  playerStart: { x: 7, y: 8 },
+}
+
+test('ход из живого отчёта: «Выйти из таверны» текстом, лужи как объекты, дверь без двери, рассказ без travel — карта всё равно сменилась', async ({ page }) => {
+  const bodies = await mockMaster(page, [
+    tools(['travel', { exit: 'tavern-door' }]),
+    tools(['create_location', { location: reportStreet }]),
+    tools(['create_location', { location: reportStreet }]),
+    tools(['create_location', { location: { ...reportStreet, exits: [{ ...reportStreet.exits[0], kind: 'road', door: undefined }] } }]),
+    tools(['travel', { exit: 'tavern-door', to: 'outside-tavern' }]),
+    say('Холодный дождь обдаёт лицо; впереди грязная дорога.'),
+  ])
+  await page.goto('./')
+  await startQuickGame(page)
+  await send(page, 'Выйти из таверны')
+  await expect(heading(page)).toHaveText('Улица у таверны')
+  // Лужи — эффекты на карте, а не отказ «type: одно из …».
+  await expect(page.getByTestId('effect-puddle-1')).toHaveCount(1)
+  const errorsSent = bodies
+    .flatMap((b) => b.messages)
+    .filter((m) => m.role === 'tool')
+    .map((m) => String((JSON.parse(m.content ?? '{}') as { error?: string }).error ?? ''))
+    .join('\n')
+  expect(errorsSent).not.toContain('objects[1].type')
+  // Выход-дверь без двери на карте — отказ с подсказкой, как исправить.
+  expect(errorsSent).toContain('двери "entrance" нет в "doors"')
+  expect(errorsSent).toContain('kind: "road"')
+})
+
+test('рассказ «выходите обратно на улицу» без travel — сверка просит переход', async ({ page }) => {
+  const bodies = await mockMaster(page, [
+    say('Вы разворачиваетесь и выходите обратно на улицу. Холодный дождь обдаёт лицо.'),
+    tools(['create_location', { location: street }], ['travel', { exit: 'tavern-door', to: 'griffin-street' }], END),
+    say('Улица.'),
+  ])
+  await page.goto('./')
+  await startQuickGame(page)
+  await send(page, 'Выйти из таверны')
+  await expect(heading(page)).toHaveText('Улица у таверны')
+  expect(lastUser(bodies[1])).toContain('create_location')
+})

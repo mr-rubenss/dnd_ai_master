@@ -401,5 +401,10 @@ describe('сверка: уход в другое место без перехо�
       expect(PARTY_ARRIVES.test(t), t).toBe(false)
     expect(HERO_LEAVES.test('Выхожу на улицу.')).toBe(true)
     expect(HERO_LEAVES.test('Выхожу из-за стола.')).toBe(false)
+    // Фразы из живого отчёта: неопределённая форма и слово между глаголом и местом.
+    expect(HERO_LEAVES.test('Выйти из таверны')).toBe(true)
+    expect(HERO_LEAVES.test('Покидаю таверну.')).toBe(true)
+    expect(PARTY_ARRIVES.test('Вы разворачиваетесь и выходите обратно на улицу.')).toBe(true)
+    expect(PARTY_ARRIVES.test('Вы уже снаружи.')).toBe(true)
   })
 })
