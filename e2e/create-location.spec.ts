@@ -36,7 +36,8 @@ const street = {
   rooms: [{ id: 'street', name: 'Улица', x: 0, y: 0, w: 12, h: 8 }],
   objects: [{ id: 'cart', type: 'debris', name: 'Сломанная телега', x: 3, y: 4, w: 2 }],
   npcs: [{ id: 'beggar', name: 'Нищий', x: 6, y: 6 }],
-  exits: [{ id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 0, to: 'drunken-griffin' }],
+  // Не окрестности таверны (их строит движок при выходе через дверь): выход никуда пока не ведёт.
+  exits: [{ id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 0 }],
   playerStart: { x: 5, y: 1 },
 }
 

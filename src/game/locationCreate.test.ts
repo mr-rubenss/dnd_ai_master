@@ -25,7 +25,10 @@ const created = makeAction('s1', 0, { type: 'storyCreated', seed: newStorySeed({
 const fresh = (): StoryState => applyAction(null, created)
 const call = (args: unknown): AiToolCall => ({ id: 'c1', name: 'create_location', arguments: args, rawArguments: JSON.stringify(args) })
 
-/** Улица у таверны 12×8: одна «комната» во всю карту, дорога на восток (край карты), дверь таверны — выход назад. */
+/**
+ * Улица 12×8: одна «комната» во всю карту, дорога к мельнице и на восток (край карты). Не окрестности таверны (выход
+ * не ведёт в здание) — механика create_location; окрестности здания проверяются в surroundings.test.ts.
+ */
 const street = (extra: Record<string, unknown> = {}) => ({
   id: 'griffin-street',
   name: 'Улица у «Пьяного грифона»',
@@ -42,7 +45,7 @@ const street = (extra: Record<string, unknown> = {}) => ({
   ],
   npcs: [{ id: 'beggar', name: 'Нищий', attitude: 'neutral', x: 6, y: 6 }],
   exits: [
-    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 0, to: tavern.id },
+    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 0, to: 'old-mill' },
     { id: 'east-road', kind: 'edge', name: 'Дорога на восток', x: 11, y: 4 },
   ],
   playerStart: { x: 5, y: 1 },
@@ -60,7 +63,7 @@ describe('схема и проверки созданной локации', () 
     expect(r.ok).toBe(true)
     const loc = (r as { location: LocationData }).location
     expect(loc.exits).toEqual([
-      { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', to: tavern.id, x: 5, y: 0 },
+      { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', to: 'old-mill', x: 5, y: 0 },
       { id: 'east-road', kind: 'edge', name: 'Дорога на восток', x: 11, y: 4 },
     ])
     expect(loc.floorPlan).toHaveLength(8)
@@ -75,7 +78,7 @@ describe('схема и проверки созданной локации', () 
     expect(schemaProblems(street({ floor: 'lava' }))[0]).toBe('floor: одно из wood, stone, tile, dirt, grass')
     const bad = street({ objects: [{ id: 'x', type: 'throne', name: 'Трон', x: 1, y: 1 }] })
     expect(schemaProblems(bad)[0]).toMatch(/^objects\[0\]\.type: одно из table, chair/)
-    expect(schemaProblems(street({ width: 500 }))).toEqual(['width: не больше 60'])
+    expect(schemaProblems(street({ width: 500 }))).toEqual(['width: не больше 100'])
     expect(schemaProblems(street({ npcs: [{ id: 'n', name: '', x: 1, y: 1 }] }))).toEqual(['npcs[0].name: пустая строка'])
   })
 
@@ -183,7 +186,8 @@ describe('create_location: инструмент ведущего', () => {
     const loc = (parseCreatedLocation(street()) as { location: LocationData }).location
     const as = (author: Parameters<typeof makeAction>[3], location = loc) => checkAction(s, makeAction('s1', 1, { type: 'locationCreated', location }, author, 2, 'x'), { catalog: itemCatalog })
     expect(as(MASTER)).toBeNull()
-    expect(as(ENGINE)).toBe('Новые локации создаёт ведущий.')
+    // Движок тоже создаёт локации — каркас окрестностей здания при выходе наружу.
+    expect(as(ENGINE)).toBeNull()
     expect(as(player(ratibor.character.id))).toBe('Новые локации создаёт ведущий.')
     expect(as(MASTER, { ...loc, objects: [...loc.objects, { id: 'x', type: 'chest', name: 'Сундук', x: 30, y: 30 }] })).toContain('за пределами карты')
     expect(as(MASTER, { ...loc, exits: [] })).toContain('хотя бы один выход')

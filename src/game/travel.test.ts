@@ -25,7 +25,10 @@ const ctx: ToolContext = { catalog: itemCatalog, rules: rulesData, prices: price
 const created = makeAction('s1', 0, { type: 'storyCreated', seed: newStorySeed({ id: 's1', title: 'Т', tone: 'detective', adventure, locations, party: [ratibor], now: 1 }) }, ENGINE, 1, 'c')
 const call = (name: string, args: unknown): AiToolCall => ({ id: `c-${name}`, name, arguments: args, rawArguments: JSON.stringify(args) })
 
-/** Улица у таверны: дверь таверны ведёт назад (к выходу tavern-door), на восток — край карты. */
+/**
+ * Улица 12×8 — просто новое место, не окрестности таверны (выход назад не ведёт в здание; окрестности здания строит
+ * движок — тесты каркаса ниже и в surroundings.test.ts).
+ */
 const street = {
   id: 'griffin-street',
   name: 'Улица у таверны',
@@ -39,7 +42,7 @@ const street = {
   objects: [{ id: 'cart', type: 'debris', name: 'Телега', x: 3, y: 4, w: 2 }],
   npcs: [{ id: 'beggar', name: 'Нищий', x: 6, y: 6 }],
   exits: [
-    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7, to: tavern.id },
+    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7 },
     { id: 'east-road', kind: 'edge', name: 'Дорога на восток', x: 11, y: 4 },
   ],
   playerStart: { x: 5, y: 6 },
@@ -61,56 +64,65 @@ function tool(state: StoryState, name: string, args: unknown) {
 }
 
 describe('переход между картами', () => {
-  it('у таверны есть выход — входная дверь; карты за ним нет — travel просит создать её', () => {
+  it('у таверны есть выход — входная дверь; карты снаружи нет — движок сам строит каркас окрестностей', () => {
     const s = applyAction(null, created)
     expect(findExit(tavern, 'tavern-door')).toMatchObject({ kind: 'door', door: 'entrance', x: 10, y: 13 })
     expect(findExit(tavern, 'входная ДВЕРЬ')?.id).toBe('tavern-door')
     const plan = travelPlan(s, 'tavern-door')
-    expect(plan).toContain('Карты места за выходом «Входная дверь» ещё нет')
-    expect(plan).toContain('create_location')
-    const out = executeTool(s, call('travel', { exit: 'tavern-door' }), ctx)
-    expect(out.ok).toBe(false)
-    expect(out.events).toEqual([])
+    if (typeof plan === 'string') throw new Error(plan)
+    expect(plan.built).toBe(true)
+    expect(plan.events.map((e) => e.type)).toEqual(['locationCreated', 'exitLinked', 'partyTraveled'])
+    expect(plan.to).toMatchObject({ id: 'drunken-griffin-outside', width: 60, height: 42 })
+    // Герой — у нарисованной входной двери снаружи.
+    expect(plan.at).toEqual({ x: 30, y: 28 })
+    // Не дверь здания (дорога, край карты) — карту по-прежнему создаёт ведущий.
     expect(missingMapNote(tavern, findExit(tavern, 'tavern-door')!, 'Ратибор')).toContain('toExit: "tavern-door"')
   })
 
-  it('create_location + travel: отряд на новой карте у входа, выходы связаны, путь обновлён; обратно — у двери таверны', () => {
+  it('travel через дверь: каркас, выходы связаны, путь обновлён; обратно — у двери таверны; повторно — та же карта', () => {
     seq = 1
     log.length = 1
     let s = applyAction(null, created)
-    s = tool(s, 'create_location', { location: street }).state
-    const go = tool(s, 'travel', { exit: 'tavern-door', to: 'griffin-street' })
+    const go = tool(s, 'travel', { exit: 'tavern-door' })
     expect(go.out.ok).toBe(true)
-    expect(go.out.result.message).toContain('Отряд перешёл через выход «Входная дверь»')
+    expect(go.out.result.message).toContain('Карту окрестностей построил движок')
     s = go.state
-    expect(s.world.currentLocationId).toBe('griffin-street')
-    // Вход новой карты — выход, ведущий обратно (to-tavern, клетка (5, 7)).
-    expect(s.party[0].position).toEqual({ x: 5, y: 7 })
-    expect(s.world.locations[tavern.id].exits?.[0]).toMatchObject({ to: 'griffin-street', toExit: 'to-tavern' })
-    expect(s.world.locations['griffin-street'].exits?.[0]).toMatchObject({ to: tavern.id, toExit: 'tavern-door' })
-    expect(trailOf(s)).toEqual([tavern.id, 'griffin-street'])
-    expect(gameStateText(s, { catalog: itemCatalog, rules: rulesData })).toContain('### Улица у таверны')
+    const outside = 'drunken-griffin-outside'
+    expect(s.world.currentLocationId).toBe(outside)
+    expect(s.party[0].position).toEqual({ x: 30, y: 28 })
+    expect(s.world.locations[tavern.id].exits?.[0]).toMatchObject({ to: outside, toExit: 'to-drunken-griffin' })
+    expect(s.world.locations[outside].exits?.find((e) => e.to === tavern.id)).toMatchObject({ id: 'to-drunken-griffin', toExit: 'tavern-door', kind: 'door' })
+    expect(trailOf(s)).toEqual([tavern.id, outside])
+    expect(gameStateText(s, { catalog: itemCatalog, rules: rulesData })).toContain('### Снаружи: Таверна «Пьяный грифон»')
 
-    // Обратно: связь уже есть — travel без to; герой у входной двери таверны.
-    s = tool(s, 'travel', { exit: 'Дверь таверны' }).state
+    // Обратно: к нарисованной двери ведёт выход в таверну; герой у входной двери внутри.
+    s = tool(s, 'travel', { exit: 'to-drunken-griffin' }).state
     expect(s.world.currentLocationId).toBe(tavern.id)
     expect(s.party[0].position).toEqual({ x: 10, y: 13 })
-    expect(trailOf(s)).toEqual([tavern.id, 'griffin-street', tavern.id])
+    expect(trailOf(s)).toEqual([tavern.id, outside, tavern.id])
     // Повторный уход — та же карта, без нового создания и без лишних связей.
     const again = tool(s, 'travel', { exit: 'tavern-door' })
     expect(again.out.events.map((e) => e.event.type)).toEqual(['partyTraveled'])
-    expect(again.state.world.locations['griffin-street']).toEqual(go.state.world.locations['griffin-street'])
+    expect(again.state.world.locations[outside]).toEqual(go.state.world.locations[outside])
+    expect(Object.keys(again.state.world.locations)).toEqual([tavern.id, outside])
     // Всё воспроизводится из журнала.
     expect(replay(log)).toEqual(again.state)
+  })
+
+  it('create_location + travel в просто новое место (не окрестности здания): отряд у playerStart', () => {
+    let s = applyAction(null, created)
+    s = tool(s, 'create_location', { location: street }).state
+    s = tool(s, 'travel', { exit: 'tavern-door', to: 'griffin-street' }).state
+    expect(s.world.currentLocationId).toBe('griffin-street')
+    expect(s.party[0].position).toEqual({ x: 5, y: 6 })
   })
 
   it('туман: исследованное — своё у каждой карты; на новой видно новое, старое не теряется', () => {
     let s = applyAction(null, created)
     const seenTavern = newlyExplored(s, tavern, partyVision(tavern, s, rulesData))
     s = applyAction(s, makeAction('s1', 1, { type: 'areaExplored', locationId: tavern.id, cells: seenTavern }, { kind: 'system' }, 2, 'x1'))
-    s = tool(s, 'create_location', { location: street }).state
-    s = tool(s, 'travel', { exit: 'tavern-door', to: 'griffin-street' }).state
-    const streetLoc = s.world.locations['griffin-street']
+    s = tool(s, 'travel', { exit: 'tavern-door' }).state
+    const streetLoc = s.world.locations['drunken-griffin-outside']
     expect(exploredCells(s, streetLoc).size).toBe(0)
     expect(newlyExplored(s, streetLoc, partyVision(streetLoc, s, rulesData)).length).toBeGreaterThan(0)
     expect(exploredCells(s, tavern).size).toBe(seenTavern.length)
@@ -149,7 +161,7 @@ describe('переход между картами', () => {
     s = tool(s, 'create_location', { location: street }).state
     s = tool(s, 'create_location', { location: { ...street, id: 'cellar', name: 'Подвал' } }).state
     s = tool(s, 'travel', { exit: 'tavern-door', to: 'griffin-street' }).state
-    s = tool(s, 'travel', { exit: 'to-tavern' }).state
+    s = tool(s, 'travel', { exit: 'to-tavern', to: tavern.id }).state
     expect(travelPlan(s, 'tavern-door', 'cellar')).toBe('Выход «Входная дверь» ведёт в «Улица у таверны» [griffin-street], а не в [cellar].')
   })
 

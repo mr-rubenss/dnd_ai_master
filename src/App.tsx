@@ -17,6 +17,7 @@ import { MapPanel } from './components/MapPanel'
 import type { HeroMovement, MapActions, MapVision } from './components/LocationMap'
 import type { MarkEditor } from './components/MapMarks'
 import { marksOf } from './game/marks'
+import { isBuildingDoorExit } from './game/surroundings'
 import { EXIT_STUCK_TURNS, exitLockProblem, missingMapNote, trailOf, travelNote, travelPlan, travelText } from './game/travel'
 import { exploredCells, newlyExplored, partyVision } from './game/vision'
 import { useAppearance } from './theme/appearanceStore'
@@ -715,7 +716,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     const name = hero.character.name
     const target = exit.to ? now.world.locations[exit.to] : undefined
     let report: { text: string; note: string }
-    if (!target) {
+    // Карты нет, и это не дверь здания наружу (каркас окрестностей движок строит сам) — карту создаёт ведущий.
+    if (!target && !isBuildingDoorExit(from, exit, now.world.locations)) {
       report = { text: `${name}: уходит через «${exit.name}».`, note: missingMapNote(from, exit, name) }
       exitWatchRef.current = { from: from.id, exitId: exit.id, turns: 0 }
       setTravelStuck(null)

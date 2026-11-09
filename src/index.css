@@ -159,6 +159,8 @@ textarea {
 }
 
 .map-viewport.is-dragging { cursor: grabbing; }
+/* Увеличенная карта: одним пальцем — сдвиг карты (useMapViewport), страница не прокручивается. */
+.map-viewport.is-zoomed { touch-action: none; }
 
 .map-zoom {
   width: 100%;

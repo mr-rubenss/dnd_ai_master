@@ -9,9 +9,11 @@ import { CONDITION_DEFINITIONS, CONDITIONS, MAX_EXHAUSTION, type ActiveCondition
 import { DiceError, roll, type RollMode, type Rng } from '../engine/dice'
 import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
-import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type CellPosition, type DoorState, type EffectKind, type LocationData, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
+import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type CellPosition, type DoorState, type EffectKind, type LocationData, type MapExit, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
-import { MIN_LOCATION_EXAMPLE, parseCreatedLocation } from './locationCreate'
+import { createdLocationProblem, MIN_LOCATION_EXAMPLE, parseCreatedLocation } from './locationCreate'
+import { buildingLinkOf, stampBuilding, surroundingsSizeProblem } from './surroundings'
+import { doorState } from '../engine/movement'
 import { travelNote, travelPlan, type TravelPlan } from './travel'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
@@ -444,9 +446,10 @@ export const MASTER_TOOLS: AiTool[] = [
   {
     name: 'create_location',
     description:
-      'Создать новую локацию (место, куда ведёт выход: улица, подвал, лес) — JSON карты. Создавай, только если её ещё нет в «Локациях мира»: ' +
+      'Создать новую локацию (место, куда ведёт выход: подвал, лес, деревня) — JSON карты. Создавай, только если её ещё нет в «Локациях мира»: ' +
+      'улицу за дверью здания наружу не создавай — travel через эту дверь построит каркас сам. ' +
       'созданная хранится в истории, и при возвращении это та же карта. Движок проверит JSON и вернёт ошибки списком — исправь и вызови снова. ' +
-      'Формат: id (латиница, kebab-case), name, description (1–2 предложения), cellFeet 5, width и height (клетки, 8–30), floor (wood|stone|tile|dirt|grass), ' +
+      'Формат: id (латиница, kebab-case), name, description (1–2 предложения), cellFeet 5, width и height (клетки, 8–60; окрестности здания — не меньше 3 его размеров по каждой стороне), floor (wood|stone|tile|dirt|grass), ' +
       'wallMaterial (stone|wood), rooms [{id, name, x, y, w, h}] — прямоугольники пола, стены по периметру ставятся сами (на улице — одна комната во всю карту), ' +
       'openings [{x1,y1,x2,y2}] — проёмы в стенах, doors [{id, name, state: open|closed|locked, x1,y1,x2,y2}] — только на стенах, windows [{id, x1,y1,x2,y2}]. ' +
       'Отрезки — по узлам сетки (узел (x,y) — левый верхний угол клетки), строго по горизонтали или вертикали. ' +
@@ -456,6 +459,23 @@ export const MASTER_TOOLS: AiTool[] = [
       'exits [{id, kind: door|road|stairs|edge, name, x, y, door, to}] — хотя бы один: клетка пола у выхода (edge — на краю карты, door — вплотную к двери, door — её id; to — id локации, куда ведёт), ' +
       'playerStart {x, y} — клетка пола. Весь пол должен быть достижим от playerStart. Тексты — на русском, без раскрытия тайн.',
     parameters: object({ location: { type: 'object', description: 'JSON локации в формате выше.' } }, ['location']),
+  },
+  {
+    name: 'add_exit',
+    description:
+      'Добавить на текущую карту выход в другое место: тропа в лес, переулок, лестница в подвал, дорога за край карты. ' +
+      'Клетка — пол текущей карты; edge — клетка на краю карты. Куда ведёт (to) — id существующей локации или не указывай: карту создашь при переходе.',
+    parameters: object(
+      {
+        kind: oneOf(['road', 'stairs', 'edge'], 'road — дорога, тропа, проход; stairs — лестница; edge — край карты.'),
+        name: str('Название: «Тропа к мельнице».'),
+        x: int('Столбец клетки выхода.', 0),
+        y: int('Строка клетки выхода.', 0),
+        to: str('id локации, куда ведёт (если она уже есть).'),
+        description: str('Что видно.'),
+      },
+      ['kind', 'name', 'x', 'y'],
+    ),
   },
   {
     name: 'travel',
@@ -1533,9 +1553,35 @@ const HANDLERS: Record<string, Handler> = {
     const id = (input as Args).id
     if (typeof id === 'string' && state.world.locations[id])
       reject(`Локация «${id}» уже есть в мире этой истории («${state.world.locations[id].name}») — не создавай заново; новой нужен другой id.`)
+    // Окрестности здания (выход ведёт в здание с дверью наружу) — сначала размер: главная подсказка — их строит движок.
+    const raw = input as Args
+    const rawExits = Array.isArray(raw.exits) ? (raw.exits as unknown[]).filter((e): e is MapExit => !!e && typeof e === 'object' && !Array.isArray(e)) : []
+    const early = buildingLinkOf(state.world.locations, { id: String(raw.id ?? ''), exits: rawExits })
+    if (early && typeof raw.width === 'number' && typeof raw.height === 'number') {
+      const small = surroundingsSizeProblem(early.building, early.exit, { width: raw.width, height: raw.height })
+      if (small) reject(small)
+    }
     const parsed = parseCreatedLocation(input)
     if (!parsed.ok) reject(`Локация не создана, исправь и вызови снова:\n- ${[...parsed.notes, ...parsed.problems].join('\n- ')}\nПример минимальной локации (есть выход, объекты внутри карты): ${MIN_LOCATION_EXAMPLE}`)
-    const location = (parsed as { location: LocationData }).location
+    let location = (parsed as { location: LocationData }).location
+    // Окрестности здания (выход ведёт в здание с дверью наружу): не меньше 3 размеров здания; контур здания с дверью
+    // вставляет движок — модель его не затрёт.
+    const link = buildingLinkOf(state.world.locations, location)
+    if (link) {
+      const small = surroundingsSizeProblem(link.building, link.exit, location)
+      if (small) reject(small)
+      const door = link.building.doors.find((d) => d.id === link.exit.door)!
+      const stamped = stampBuilding(location, link.building, link.exit, { doorState: doorState(door, state.world.doors[link.building.id]) })
+      if (!stamped) reject(`Не удалось поставить на карту здание «${link.building.name}».`)
+      location = stamped!.location
+      const back = location.exits?.find((e) => e.to === link.building.id)
+      parsed.notes.push(
+        `Контур здания «${link.building.name}» с дверью вставлен движком (выход «${back?.name}» — клетка (${back?.x}, ${back?.y}) у двери; не трогай их).` +
+          (stamped!.removed.length ? ` Убрано с места здания: ${stamped!.removed.join(', ')}.` : ''),
+      )
+      const problem = createdLocationProblem(state, location)
+      if (problem) reject(`${problem} (после вставки здания — сдвинь объекты от здания).`)
+    }
     const exits = (location.exits ?? []).map((e) => `${e.name} [${e.id}] (${e.x}, ${e.y})${e.to ? ` → ${e.to}` : ''}`)
     return {
       events: [{ event: { type: 'locationCreated', location }, author: MASTER }],
@@ -1543,6 +1589,22 @@ const HANDLERS: Record<string, Handler> = {
         id: location.id,
         message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток, выходы: ${exits.join('; ')}.${parsed.notes.length ? ` ${parsed.notes.join(' ')}` : ''} Она сохранена в мире истории — второй раз не создавай.`,
       },
+    }
+  },
+
+  add_exit(state, args, ctx) {
+    const location = currentLocationOf(state)
+    const kind = choice(args, 'kind', ['road', 'stairs', 'edge'] as const, true)!
+    const name = text(args, 'name', true)!
+    const x = integer(args, 'x', true)!
+    const y = integer(args, 'y', true)!
+    const to = text(args, 'to')
+    if (to && !state.world.locations[to]) reject(`Локации [${to}] нет — не указывай to: карту создашь при переходе.`)
+    const description = text(args, 'description')
+    const exit = { id: slugId('exit', location.exits ?? [], ctx.newId), kind, name, x, y, ...(to ? { to } : {}), ...(description ? { description } : {}) }
+    return {
+      events: [{ event: { type: 'exitAdded', locationId: location.id, exit }, author: MASTER }],
+      result: { id: exit.id, message: `На карте выход «${name}» [${exit.id}] (${x}, ${y}).` },
     }
   },
 

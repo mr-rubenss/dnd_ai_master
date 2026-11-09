@@ -277,6 +277,15 @@
   (`puddle`/`smoke`/`darkness`/`glow`) переносится в `effects` (`normalizeCreatedInput`, заметка модели), к отказам
   «двери нет» и «неизвестный type» — подсказки (`withHints`); пока создание места не довело до `travel` — до
   `MAX_PLACE_FOLLOWUPS` раундов сверх `MAX_TOOL_ROUNDS`. e2e — `e2e/travel-failures.spec.ts`, сценарий 47.
+  **Окрестности здания — каркас движка** (`src/game/surroundings.ts`): выход-дверь здания наружу без карты
+  (`isBuildingDoorExit`) → `travelPlan` сам строит карту (`buildSurroundings`: размер `surroundingsSize` — не меньше
+  `SURROUNDINGS_FACTOR` = 3 размеров здания и `SURROUNDINGS_MIN` 32×24; контур здания с дверью по центру, двор, дорога
+  с выходами `edge`, забор) и пишет `locationCreated` от движка; ведущему — «каркас построен, дополни»
+  (`add_object`/`add_effect`/`add_npc`/`add_exit` — новый инструмент, событие `exitAdded`). Своя карта окрестностей
+  в `create_location` (`buildingLinkOf`): меньше размера — отказ с подсказкой (`surroundingsSizeProblem`), иначе контур
+  вставляет `stampBuilding`. Большая карта: при открытии — целиком (масштаб 1), увеличенную на телефоне и планшете
+  можно сдвигать одним пальцем (`is-zoomed`, `touch-action: none`). Тесты — `surroundings.test.ts`,
+  e2e — `e2e/surroundings.spec.ts`, сценарий 48.
   В таверне — выход `tavern-door` (входная дверь). Старые истории: копия таверны в мире без выходов (данные истории
   не трогаем). Правило — «Переходы между картами» в `dm-prompt.md`, сценарий 44; тесты — `travel.test.ts`,
   e2e — `e2e/travel.spec.ts`.

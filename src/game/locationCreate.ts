@@ -23,7 +23,7 @@ import type { StoryState } from '../types/story'
 import { LocationValidationError, parseLocation } from './location'
 
 /** Пределы созданной локации: карта не огромная, обстановки и людей — в меру (всё это идёт ведущему в запрос). */
-export const CREATED_LOCATION_LIMITS = { size: 60, rooms: 30, segments: 80, objects: 120, npcs: 20, exits: 10, text: 400 } as const
+export const CREATED_LOCATION_LIMITS = { size: 100, rooms: 40, segments: 200, objects: 200, npcs: 30, exits: 12, text: 400 } as const
 /** Короткий пример верной минимальной локации — идёт модели вместе с ошибками (есть выход, объекты внутри карты). */
 export const MIN_LOCATION_EXAMPLE = JSON.stringify({
   id: 'village-street',

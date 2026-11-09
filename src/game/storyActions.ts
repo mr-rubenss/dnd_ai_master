@@ -30,7 +30,7 @@ import { mergeMove } from './mapEvents'
 import { mergeExplored } from './vision'
 import { markChangeProblem, markPlaceProblem } from './marks'
 import { createdLocationProblem } from './locationCreate'
-import { exitLinkedProblem, nextTrail, partyTraveledProblem, trailOf } from './travel'
+import { exitAddedProblem, exitLinkedProblem, nextTrail, partyTraveledProblem, trailOf } from './travel'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
 import { invocationShapeProblems, magicShapeProblems, migrateInventory } from './character'
@@ -384,6 +384,8 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
     }
     case 'locationCreated':
       return { ...state, world: { ...state.world, locations: { ...state.world.locations, [action.location.id]: structuredClone(action.location) } } }
+    case 'exitAdded':
+      return updateLocation(state, action.locationId, (l) => ({ ...l, exits: [...(l.exits ?? []), action.exit] }))
     case 'exitLinked':
       return updateLocation(state, action.locationId, (l) => ({
         ...l,
@@ -828,6 +830,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       const size = location.width * location.height
       return action.cells.length > 0 && action.cells.every((i) => Number.isInteger(i) && i >= 0 && i < size) ? null : 'Клетки за пределами карты.'
     }
+    case 'exitAdded':
+      if (action.author.kind !== 'master') return 'Выходы на карту добавляет ведущий.'
+      return exitAddedProblem(state, action)
     case 'exitLinked':
       if (action.author.kind !== 'engine') return 'Выходы связывает движок при переходе.'
       return exitLinkedProblem(state, action)
@@ -835,7 +840,8 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (action.author.kind !== 'engine') return 'Отряд переводит на другую карту движок (инструмент travel или выход на карте).'
       return partyTraveledProblem(state, action)
     case 'locationCreated':
-      if (action.author.kind !== 'master') return 'Новые локации создаёт ведущий.'
+      // Локации создаёт ведущий (create_location) или движок (каркас окрестностей здания при выходе наружу).
+      if (action.author.kind !== 'master' && action.author.kind !== 'engine') return 'Новые локации создаёт ведущий.'
       return createdLocationProblem(state, action.location)
     // Метки — заметки игрока: ставит, правит и убирает только он (ведущий на них лишь откликается).
     case 'markPlaced':

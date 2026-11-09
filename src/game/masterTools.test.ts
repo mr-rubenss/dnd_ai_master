@@ -80,6 +80,7 @@ describe('описания инструментов', () => {
       'remove_effect',
       'reveal',
       'create_location',
+      'add_exit',
       'travel',
       'set_combat',
     ])
