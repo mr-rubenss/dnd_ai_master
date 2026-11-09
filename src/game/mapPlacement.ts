@@ -1,6 +1,6 @@
 // Размещение на карте истории: что занимает клетку, можно ли поставить объект или НПС. Чистые функции —
 // ими пользуются инструменты ведущего (понятные отказы) и проверка действий (checkAction).
-import { edgeBetween, edgeContent, isFloor } from '../engine/movement'
+import { edgeBetween, edgeContent, hasLineOfSight, isFloor } from '../engine/movement'
 import { FLAT_OBJECT_TYPES, type CellPosition, type LocationData, type MapObject } from '../types/location'
 
 /** Клетки, которые занимает объект (с учётом w × h). */
@@ -77,4 +77,50 @@ export function placementProblem(
     if (who) return `Клетка (${c.x}, ${c.y}) занята: ${who}.`
   }
   return null
+}
+
+/**
+ * Ближайшая свободная клетка пола у области (НПС «идёт к столу», новый посетитель «у входа»): сначала вплотную,
+ * потом дальше (до `maxRing` клеток), только в прямой видимости от области — не за стеной в соседней комнате.
+ * При равном расстоянии — ближе к `from` (где НПС стоит сейчас). `inside` — можно и в саму область (у двери —
+ * клетки у порога). null — места рядом нет.
+ */
+export function freeCellNear(
+  location: LocationData,
+  heroes: { name: string; position: CellPosition }[],
+  area: { x: number; y: number; w: number; h: number },
+  ignore: PlacementIgnore = {},
+  from?: CellPosition,
+  { maxRing = 3, inside: allowInside = false }: { maxRing?: number; inside?: boolean } = {},
+): CellPosition | null {
+  const inside = (c: CellPosition) => c.x >= area.x && c.x < area.x + area.w && c.y >= area.y && c.y < area.y + area.h
+  const areaCells = objectCells(area).filter((c) => isFloor(location, c.x, c.y))
+  const anchor = from ?? { x: area.x + (area.w - 1) / 2, y: area.y + (area.h - 1) / 2 }
+  for (let ring = allowInside ? 0 : 1; ring <= maxRing; ring++) {
+    let best: { cell: CellPosition; d: number } | null = null
+    for (let y = area.y - ring; y < area.y + area.h + ring; y++)
+      for (let x = area.x - ring; x < area.x + area.w + ring; x++) {
+        const cell = { x, y }
+        const gap = Math.max(area.x - x, x - (area.x + area.w - 1), area.y - y, y - (area.y + area.h - 1))
+        if (Math.max(gap, 0) !== ring || (inside(cell) && !allowInside)) continue
+        if (placementProblem(location, heroes, cell, ignore)) continue
+        if (areaCells.length && !areaCells.some((c) => hasLineOfSight(location, c, cell))) continue
+        const d = Math.hypot(x - anchor.x, y - anchor.y)
+        if (!best || d < best.d) best = { cell, d }
+      }
+    if (best) return best.cell
+  }
+  return null
+}
+
+/** Подсказка к отказу «клетка занята»: «Свободно рядом: (9, 12), (11, 12).» или пустая строка. */
+export function freeCellsHint(location: LocationData, heroes: { name: string; position: CellPosition }[], cell: CellPosition, ignore: PlacementIgnore = {}): string {
+  const out: CellPosition[] = []
+  for (let ring = 1; ring <= 2 && out.length < 3; ring++)
+    for (let y = cell.y - ring; y <= cell.y + ring; y++)
+      for (let x = cell.x - ring; x <= cell.x + ring; x++) {
+        if (out.length >= 3 || Math.max(Math.abs(x - cell.x), Math.abs(y - cell.y)) !== ring) continue
+        if (!placementProblem(location, heroes, { x, y }, ignore)) out.push({ x, y })
+      }
+  return out.length ? ` Свободно рядом: ${out.map((c) => `(${c.x}, ${c.y})`).join(', ')}. Или укажи target — движок сам найдёт место.` : ''
 }

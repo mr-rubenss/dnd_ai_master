@@ -253,6 +253,43 @@ describe('show_area: области воздействия на карте', () 
   })
 })
 
+describe('move_npc и add_npc: к цели, а не в клетку', () => {
+  it('«Гуннар идёт к столу»: target — свободная клетка рядом со столом, ближе к тому, где он стоял', () => {
+    const { outcome, state } = run(fresh(), 'move_npc', { npc: 'Гуннар', target: 'table-2' })
+    const g = tavern(state).npcs.find((n) => n.id === 'gunnar')!
+    expect(near(g, { x: 9, y: 7, w: 2, h: 2 })).toBe(true)
+    expect(g.y).toBe(6)
+    expect(outcome.result.message).toBe(`Гуннар — теперь в клетке (${g.x}, ${g.y}), рядом с «Центральный стол».`)
+    // Уже рядом — ничего не меняется.
+    const again = run(state, 'move_npc', { npc: 'gunnar', target: 'table-2' })
+    expect(again.outcome.events).toEqual([])
+    expect(again.outcome.result.message).toMatch(/^Гуннар уже рядом с «Центральный стол»/)
+    // К герою и к другому НПС.
+    expect(near(tavern(run(fresh(), 'move_npc', { npc: 'bram', target: 'Ратибор' }).state).npcs.find((n) => n.id === 'bram')!, { x: 10, y: 13 })).toBe(true)
+    expect(near(tavern(run(fresh(), 'move_npc', { npc: 'bram', target: 'tobias' }).state).npcs.find((n) => n.id === 'bram')!, { x: 17, y: 9 })).toBe(true)
+  })
+
+  it('add_npc у входа: клетка героя занята — новый встаёт рядом с дверью, в зале', () => {
+    const { outcome, state } = run(fresh(), 'add_npc', { name: 'Путник', target: 'entrance', description: 'Промокший путник.' })
+    const p = tavern(state).npcs.find((n) => n.name === 'Путник')!
+    expect(p).toMatchObject({ y: 13 })
+    expect([9, 11]).toContain(p.x)
+    expect(outcome.result.message).toMatch(/^Путник появляется в клетке \(\d+, 13\), рядом с «Входная дверь»\.$/)
+  })
+
+  it('отказы: занятая клетка — с подсказкой свободных; без места; без target и x, y; неизвестная цель', () => {
+    expect(rejected(fresh(), 'add_npc', { name: 'Путник', x: 10, y: 13 })).toBe(
+      'Клетка (10, 13) занята: герой Ратибор. Свободно рядом: (9, 12), (10, 12), (11, 12). Или укажи target — движок сам найдёт место.',
+    )
+    expect(rejected(fresh(), 'move_npc', { npc: 'gunnar', x: 9, y: 7 })).toMatch(/^Клетка \(9, 7\) занята: объект «Центральный стол»\. Свободно рядом: /)
+    expect(rejected(fresh(), 'move_npc', { npc: 'gunnar' })).toBe('Укажи target (к чему идёт или где появляется) или x и y.')
+    expect(rejected(fresh(), 'move_npc', { npc: 'gunnar', target: 'дракон' })).toMatch(/^Цели «дракон» на карте нет/)
+    expect(rejected(fresh(), 'move_npc', { npc: 'gunnar', target: 'gunnar' })).toBe('Цель — сам этот НПС.')
+    // Старый вызов с координатами работает как раньше.
+    expect(tavern(run(fresh(), 'move_npc', { npc: 'gunnar', x: 8, y: 8 }).state).npcs.find((n) => n.id === 'gunnar')).toMatchObject({ x: 8, y: 8 })
+  })
+})
+
 describe('сверка рассказа с картой', () => {
   const ok: ToolOutcome = { ok: true, result: { ok: true }, events: [] }
   const said = (text: string, extra = {}) => ({ id: 'p', author: 'player' as const, text, heroId: HERO, ...extra })
@@ -267,8 +304,52 @@ describe('сверка рассказа с картой', () => {
     expect(mapProblems('Тобиас не уходит — сидит и ждёт.', before, before, [])).toEqual([])
     // Скрытого не трогаем; разные падежи имени узнаются.
     expect(mapProblems('Гуннар подходит к тебе с кружкой.', before, before, [])).toEqual([
-      'в рассказе Гуннар подходит или садится, а на карте не сдвинулся — вызови move_npc (npc: gunnar) в свободную клетку рядом',
+      'в рассказе Гуннар идёт, подходит или садится, а на карте не сдвинулся — вызови move_npc (npc: gunnar, target: id того, к чему идёт)',
     ])
+  })
+
+  it('передвижение НПС другими словами: идёт к, пересаживается, шагает, проходит, возвращается; отрицание — нет', () => {
+    const before = fresh()
+    const moves = [
+      'Гуннар идёт к столу.',
+      'Гуннар берёт кружку и пересаживается за центральный стол.',
+      'Гуннар шагает к стойке.',
+      'Гуннар встаёт и проходит к камину.',
+      'Брам возвращается к стойке.',
+      'Гуннар садится за стол у окна.',
+      'Брам заходит за стойку.',
+      'Лиара направляется к двери.',
+    ]
+    for (const text of moves) expect(mapProblems(text, before, before, []), text).toEqual([expect.stringMatching(/^в рассказе (Гуннар|Брам|Лиара) идёт, подходит или садится/)])
+    for (const text of ['Гуннар не идёт к столу.', 'Гуннар сидит за столом.', 'Идёт дождь.', 'Гуннар смотрит, как идёт время.']) expect(mapProblems(text, before, before, []), text).toEqual([])
+    const moved = run(before, 'move_npc', { npc: 'gunnar', target: 'table-2' }).state
+    expect(mapProblems('Гуннар идёт к столу.', before, moved, [])).toEqual([])
+  })
+
+  it('кто-то новый входит или появляется в дверях, а на карте никого не прибавилось — просьба add_npc', () => {
+    const before = fresh()
+    const arrivals = [
+      'Дверь хлопает — в таверну заходит новый посетитель.',
+      'Входит высокая женщина в плаще.',
+      'В дверях появляется стражник.',
+      'На пороге стоит промокший гонец.',
+      'В зал вваливаются трое наёмников.',
+    ]
+    for (const text of arrivals) expect(mapProblems(text, before, before, []), text).toEqual([expect.stringMatching(/^в рассказе появляется кто-то новый .* вызови add_npc \(target: id двери, через которую вошёл, например entrance\)/)])
+    const calm = [
+      'Никто не входит.',
+      'На лице Гуннара появляется улыбка.',
+      'Появляется запах жареного мяса.',
+      'Ты входишь в таверну.',
+      'Ратибор входит в зал.',
+      'Брам заходит за стойку и наливает эль.',
+    ]
+    for (const text of calm) expect(mapProblems(text, before, before, []).filter((p) => p.includes('кто-то новый')), text).toEqual([])
+    // Добавлен или раскрыт — просьбы нет.
+    const added = run(before, 'add_npc', { name: 'Путник', target: 'entrance' }).state
+    expect(mapProblems('В таверну заходит путник.', before, added, [])).toEqual([])
+    const revealed = run(before, 'reveal', { target: 'pickpocket' }).state
+    expect(mapProblems('Из тени у двери появляется щуплый парень.', before, revealed, [])).toEqual([])
   })
 
   it('игрок «подхожу к стойке», а герой не двинулся и move_hero не было — просьба', () => {
