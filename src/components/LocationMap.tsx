@@ -361,9 +361,12 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
       if (typeof plan === 'string') return say(plan)
       if (plan.path.length === 0) return
       const reason = movement.move(to)
-      if (reason) say(reason)
+      if (reason) return say(reason)
+      // Дошёл до выхода — подсказать, как уйти (сам по себе шаг на выход карту не меняет).
+      const exit = location.exits?.find((e) => e.x === to.x && e.y === to.y)
+      if (exit) say(`Здесь выход «${exit.name}»: нажмите на ${exit.door ? 'дверь' : 'значок выхода'} → «Выйти».`)
     },
-    [movement, say],
+    [movement, say, location.exits],
   )
 
   const startDrag = (event: PointerEvent) => {

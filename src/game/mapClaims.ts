@@ -8,6 +8,7 @@ import type { ChatMessage } from '../types/game'
 import type { StoryState } from '../types/story'
 import type { ToolOutcome } from './masterTools'
 import { nameInText } from './spellMatch'
+import { MISSING_MAP_MARK } from './travel'
 
 /** НПС покидает сцену. */
 export const NPC_LEAVES =
@@ -28,6 +29,13 @@ const AT_DOOR = /(?:в\s+дверях|на\s+пороге|у\s+(?:входа|д�
 export const HERO_MOVES =
   /(?<!не\s)(?<!\p{L})(?:подхожу|подойду|иду\s+к|пойду\s+к|направляюсь|сажусь|сяду|подсаживаюсь|пересаживаюсь|отхожу|перехожу|прохожу\s+к|бегу\s+к|возвращаюсь\s+к|встаю\s+(?:у|к|рядом))(?!\p{L})/iu
 
+/** Рассказ: отряд пришёл в другое место («ты выходишь на улицу», «ты уже снаружи»). */
+export const PARTY_ARRIVES =
+  /(?<!не\s)(?<!\p{L})(?:(?:выходишь|выходите|выбираешься|выбираетесь|оказываешься|оказываетесь|спускаешься|спускаетесь|поднимаешься|поднимаетесь)\s+(?:на\s+улиц|наружу|во\s+двор|на\s+двор|на\s+дорог|в\s+подвал|на\s+площад|из\s+(?:таверн|трактир|дом|здани|комнат|подвал))|ты\s+(?:уже\s+)?(?:на\s+улице|снаружи))/iu
+/** Игрок уходит в другое место («выхожу на улицу»). */
+export const HERO_LEAVES =
+  /(?<!не\s)(?<!\p{L})(?:выхожу|выйду|выходим|выйдем)\s+(?:на\s+улиц|наружу|во\s+двор|на\s+двор|на\s+дорог|из\s+(?:таверн|трактир|дом|здани))|(?<!\p{L})(?:спускаюсь|спускаемся)\s+в\s+подвал/iu
+
 const sentences = (text: string) => text.split(/(?<=[.!?…])\s+|\n+/).filter((s) => s.trim())
 
 type Calls = readonly { call: AiToolCall; outcome: ToolOutcome }[]
@@ -42,6 +50,19 @@ export function mapProblems(text: string, before: StoryState, after: StoryState,
   const was = before.world.locations[before.world.currentLocationId]
   const now = after.world.locations[after.world.currentLocationId]
   if (!was || !now || was.id !== now.id) return problems
+  // Уход в другое место: событие «карты за выходом нет», рассказ о прибытии или реплика «выхожу на улицу» —
+  // а локация не сменилась и travel не прошёл.
+  const trigger = [...before.messages].reverse().find((m) => !m.changes)
+  const waitsForMap = Boolean(trigger?.mapEvent?.note.includes(MISSING_MAP_MARK))
+  const leaves = (said && said.author === 'player' && !said.ooc && HERO_LEAVES.test(said.text)) || PARTY_ARRIVES.test(text)
+  const traveled = callsFor(toolCalls, 'travel').some((t) => t.outcome.ok)
+  if ((waitsForMap || leaves) && !traveled && (was.exits?.length ?? 0) > 0) {
+    const exits = (was.exits ?? []).map((e) => `«${e.name}» [${e.id}]${e.to && after.world.locations[e.to] ? ` → [${e.to}]` : ''}`).join(', ')
+    problems.push(
+      `отряд уходит в другое место, а на карте он всё ещё в «${was.name}» — если карты места нет, вызови create_location (выход назад: to "${was.id}"), ` +
+        `затем travel (exit — один из: ${exits}); описание нового места без перехода недопустимо`,
+    )
+  }
   const parts = sentences(text)
   // Кто-то новый вошёл или появился, а на карте никого не прибавилось (ни add_npc, ни раскрытого скрытого).
   const named = (sentence: string) =>

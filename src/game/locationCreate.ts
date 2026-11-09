@@ -24,6 +24,23 @@ import { LocationValidationError, parseLocation } from './location'
 
 /** Пределы созданной локации: карта не огромная, обстановки и людей — в меру (всё это идёт ведущему в запрос). */
 export const CREATED_LOCATION_LIMITS = { size: 60, rooms: 30, segments: 80, objects: 120, npcs: 20, exits: 10, text: 400 } as const
+/** Короткий пример верной минимальной локации — идёт модели вместе с ошибками (есть выход, объекты внутри карты). */
+export const MIN_LOCATION_EXAMPLE = JSON.stringify({
+  id: 'village-street',
+  name: 'Деревенская улица',
+  description: 'Пыльная улица между домами.',
+  cellFeet: 5,
+  width: 10,
+  height: 8,
+  floor: 'dirt',
+  wallMaterial: 'stone',
+  rooms: [{ id: 'street', x: 0, y: 0, w: 10, h: 8 }],
+  objects: [{ id: 'well', type: 'rock', name: 'Колодец', x: 4, y: 3 }],
+  npcs: [],
+  exits: [{ id: 'back', kind: 'edge', name: 'Назад', x: 0, y: 4, to: 'id-места-откуда-пришли' }],
+  playerStart: { x: 1, y: 4 },
+})
+
 /** Сколько ошибок возвращать модели за раз. */
 export const MAX_REPORTED_PROBLEMS = 12
 

@@ -11,7 +11,7 @@ import { SKILL_DEFINITIONS, SKILLS, type SkillId } from '../engine/skills'
 import { isUsable, type ItemCatalog } from '../types/items'
 import { DOOR_STATES, EFFECT_KIND_NAMES, EFFECT_KINDS, FLAT_OBJECT_TYPES, MAP_KIND_OBJECTS, NPC_ATTITUDES, NPC_PERSONALITY_FIELDS, OBJECT_TYPES, type CellPosition, type DoorState, type EffectKind, type LocationData, type MapEffect, type MapObject, type MapObjectType, type NpcAttitude, type NpcPersonality } from '../types/location'
 import { npcChangesProblem } from './npcs'
-import { parseCreatedLocation } from './locationCreate'
+import { MIN_LOCATION_EXAMPLE, parseCreatedLocation } from './locationCreate'
 import { travelNote, travelPlan, type TravelPlan } from './travel'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
@@ -1533,7 +1533,7 @@ const HANDLERS: Record<string, Handler> = {
     if (typeof id === 'string' && state.world.locations[id])
       reject(`Локация «${id}» уже есть в мире этой истории («${state.world.locations[id].name}») — не создавай заново; новой нужен другой id.`)
     const parsed = parseCreatedLocation(input)
-    if (!parsed.ok) reject(`Локация не создана, исправь и вызови снова:\n- ${parsed.problems.join('\n- ')}`)
+    if (!parsed.ok) reject(`Локация не создана, исправь и вызови снова:\n- ${parsed.problems.join('\n- ')}\nПример минимальной локации (есть выход, объекты внутри карты): ${MIN_LOCATION_EXAMPLE}`)
     const location = (parsed as { location: LocationData }).location
     const exits = (location.exits ?? []).map((e) => `${e.name} [${e.id}] (${e.x}, ${e.y})${e.to ? ` → ${e.to}` : ''}`)
     return {

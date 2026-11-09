@@ -11,7 +11,7 @@ import type { StoryState } from '../types/story'
 import { parseAdventure } from './adventure'
 import { parseCharacterSheet } from './character'
 import { parseLocation } from './location'
-import { createdLocationProblem, locationInputOf, parseCreatedLocation, schemaProblems } from './locationCreate'
+import { createdLocationProblem, locationInputOf, MIN_LOCATION_EXAMPLE, parseCreatedLocation, schemaProblems } from './locationCreate'
 import { gameStateText } from './masterState'
 import { executeTool, type ToolContext } from './masterTools'
 import { applyAction, checkAction, ENGINE, makeAction, MASTER, newStorySeed, player, replay } from './storyActions'
@@ -196,5 +196,11 @@ describe('create_location: инструмент ведущего', () => {
     expect(back.doors).toEqual(tavern.doors)
     expect(back.objects).toEqual(tavern.objects)
     expect(back.npcs).toEqual(tavern.npcs)
+  })
+})
+
+describe('пример минимальной локации (идёт модели с ошибками)', () => {
+  it('сам проходит все проверки (ссылка назад — заглушка id)', () => {
+    expect(parseCreatedLocation(JSON.parse(MIN_LOCATION_EXAMPLE)).ok).toBe(true)
   })
 })
