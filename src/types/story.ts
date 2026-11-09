@@ -83,6 +83,34 @@ export interface World {
   quests: Quest[]
   /** Туман войны: исследованные клетки — id локации → строка «0»/«1» по клеткам (строка за строкой). Нет — ничего не исследовано. */
   explored?: Record<string, string>
+  /**
+   * Метки игрока на картах (src/game/marks.ts). Общий список мира, а не поле локации: метка привязана к локации и клетке
+   * её карты, поэтому карта другого масштаба (6.2) сможет показать метки вложенных локаций без переноса данных.
+   * Нет поля — меток ещё не ставили.
+   */
+  marks?: PlayerMark[]
+  /** Путь отряда: локации по порядку прихода (src/game/travel.ts, строка над картой). Нет поля — только текущая. */
+  trail?: string[]
+}
+
+export const MARK_ICONS = ['question', 'danger', 'cache', 'note'] as const
+/** Значок метки: вопрос, опасность, тайник, заметка. */
+export type MarkIcon = (typeof MARK_ICONS)[number]
+
+/** Метка игрока: заметка на клетке карты («тайник?»). Это догадка игрока, а не факт мира. */
+export interface PlayerMark {
+  id: string
+  /** Чей герой поставил (метки правит и удаляет только он). */
+  heroId: string
+  /** Локация и клетка её карты, к которой привязана метка. */
+  locationId: string
+  x: number
+  y: number
+  icon: MarkIcon
+  /** Короткий текст (может быть пустым — тогда только значок). */
+  text: string
+  /** Когда поставлена или изменена. */
+  at: number
 }
 
 export type StoryStatus = 'active' | 'completed'
@@ -317,6 +345,16 @@ export type StoryEvent =
   /** Скрытый НПС или объект обнаружен (проверка героя или решение ведущего) — теперь виден на карте. */
   /** Отряд увидел новые клетки (туман войны): индексы y × ширина + x. */
   | { type: 'areaExplored'; locationId: string; cells: number[] }
+  /** Ведущий создал новую локацию (create_location): проверенная, в полной записи; дальше она живёт в мире истории. */
+  | { type: 'locationCreated'; location: LocationData }
+  /** Выход локации теперь ведёт в локацию `to` (к её входу `toExit`) — движок при переходе (src/game/travel.ts). */
+  | { type: 'exitLinked'; locationId: string; exitId: string; to: string; toExit?: string }
+  /** Отряд перешёл через выход `exitId` из `from` в `to`; герои — в клетках `positions` у входа `arrivalExitId`. */
+  | { type: 'partyTraveled'; from: string; to: string; exitId: string; arrivalExitId?: string; positions: Record<string, CellPosition> }
+  /** Метки игрока на карте: поставить, изменить текст и значок, убрать (src/game/marks.ts). */
+  | { type: 'markPlaced'; mark: PlayerMark }
+  | { type: 'markEdited'; markId: string; icon: MarkIcon; text: string }
+  | { type: 'markRemoved'; markId: string }
   | { type: 'entityRevealed'; locationId: string; kind: 'npc' | 'object'; entityId: string }
   /**
    * Значимое перемещение (вошёл в комнату, вплотную к НПС, скрытая зона, скрылся из виду) — событие ведущему без

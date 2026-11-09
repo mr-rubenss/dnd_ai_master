@@ -113,5 +113,8 @@
       "h": 2
     }
   ],
+  "exits": [
+    {"id": "tavern-door", "kind": "door", "name": "Входная дверь", "description": "Дверь на улицу, к дороге и вывеске с грифоном.", "door": "entrance", "x": 10, "y": 13}
+  ],
   "playerStart": {"x": 10, "y": 13}
 }
