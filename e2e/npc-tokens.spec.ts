@@ -30,6 +30,8 @@ async function mockMaster(page: Page, rounds: string[]) {
 }
 const npc = (page: Page, id: string) => page.getByTestId(`npc-${id}`)
 const send = async (page: Page, text: string) => {
+  // Прошлый ход ведущего (с довызовом после просьбы) должен закончиться — пока он идёт, поле ввода заблокировано.
+  await expect(page.locator('.player-input textarea')).toBeEnabled()
   await page.locator('.player-input textarea').fill(text)
   await page.locator('.player-input textarea').press('Enter')
 }
@@ -76,7 +78,6 @@ test('«Гуннар идёт к столу» без инструмента: с�
   const results = await mockMaster(page, [
     say('Гуннар берёт кружку и пересаживается за центральный стол.'),
     tools(['move_npc', { npc: 'gunnar', target: 'table-2' }]),
-    say(''),
   ])
   await send(page, 'Смотрю, что делает Гуннар.')
   await expect(page.locator('.message--master').last()).toContainText('пересаживается')
@@ -96,7 +97,6 @@ test('«в таверну заходит новый посетитель» бе�
   const results = await mockMaster(page, [
     say('Дверь хлопает — в таверну заходит новый посетитель.'),
     tools(['add_npc', { name: 'Путник', target: 'entrance', description: 'Промокший путник в плаще.' }]),
-    say(''),
   ])
   await send(page, 'Оглядываю зал.')
   await expect(page.locator('.message--master').last()).toContainText('заходит новый посетитель')
@@ -138,5 +138,90 @@ test('регрессия: герой ходил, история перезагр
   const y = Number(await npc(page, 'gunnar').getAttribute('data-y'))
   expect(Math.max(Math.abs(x - 12), Math.abs(y - 10))).toBe(1)
   expect(bodies.at(-1)).toContain('Где герои')
+  expect(errors).toEqual([])
+})
+
+const street = {
+  id: 'griffin-street',
+  name: 'Улица у таверны',
+  description: 'Грязная улица под фонарём.',
+  cellFeet: 5,
+  width: 12,
+  height: 8,
+  floor: 'dirt',
+  wallMaterial: 'stone',
+  rooms: [{ id: 'street', name: 'Улица', x: 0, y: 0, w: 12, h: 8 }],
+  objects: [{ id: 'cart', type: 'debris', name: 'Сломанная телега', x: 3, y: 4, w: 2 }],
+  npcs: [{ id: 'beggar', name: 'Нищий', x: 8, y: 2 }],
+  exits: [
+    { id: 'to-tavern', kind: 'road', name: 'Дверь таверны', x: 5, y: 7, to: 'drunken-griffin', toExit: 'tavern-door' },
+    { id: 'east-road', kind: 'edge', name: 'Дорога на восток', x: 11, y: 4 },
+  ],
+  playerStart: { x: 5, y: 6 },
+}
+const nearArea = (p: { x: number; y: number }, a: { x: number; y: number; w: number; h: number }) =>
+  p.x >= a.x - 1 && p.x <= a.x + a.w && p.y >= a.y - 1 && p.y <= a.y + a.h
+const tokenAt = async (page: Page, testId: string) => ({
+  x: Number(await page.getByTestId(testId).getAttribute('data-x')),
+  y: Number(await page.getByTestId(testId).getAttribute('data-y')),
+})
+
+test('после travel на карту из create_location и обратно: «идёт к» и «заходит» без инструмента → просьба → фишки на месте', async ({ page, isMobile }) => {
+  const errors = collectPageErrors(page)
+  const results = await mockMaster(page, [
+    // После просьбы сверки и довызова инструментов ход заканчивается без ещё одного запроса к модели.
+    // Выход из таверны: карты улицы нет — ведущий создаёт и переводит отряд.
+    tools(['create_location', { location: street }]),
+    tools(['travel', { exit: 'tavern-door', to: 'griffin-street' }]),
+    say('Ты выходишь на грязную улицу.'),
+    // На созданной карте: текст без инструмента → просьба → move_npc к цели.
+    say('Нищий кряхтит и бредёт к сломанной телеге.'),
+    tools(['move_npc', { npc: 'beggar', target: 'cart' }]),
+    // Новый на созданной карте (дверей нет — цель рядом с героем).
+    say('Из-за угла на улицу заходит стражник с фонарём.'),
+    tools(['add_npc', { name: 'Стражник', target: 'Ратибор', description: 'Стражник с фонарём.' }]),
+    // Возврат в таверну — та же карта, правка работает и там.
+    say('Ты снова в шумной таверне.'),
+    say('Гуннар пересаживается за центральный стол.'),
+    tools(['move_npc', { npc: 'gunnar', target: 'table-2' }]),
+  ])
+  const press = async (testId: string) => (isMobile ? page.getByTestId(testId).tap() : page.getByTestId(testId).click())
+  const menu = page.getByTestId('map-actions')
+
+  await press('door-entrance')
+  await menu.getByRole('button', { name: 'Выйти' }).click()
+  await expect(page.locator('.map-panel h2')).toHaveText('Улица у таверны')
+  await expect(npc(page, 'beggar')).toHaveAttribute('data-x', '8')
+
+  await send(page, 'Оглядываю улицу.')
+  await expect.poll(() => results.reminders.length).toBe(1)
+  expect(results.reminders[0]).toContain('Нищий')
+  await expect(npc(page, 'beggar')).not.toHaveAttribute('data-x', '8')
+  await expect(npc(page, 'beggar')).not.toHaveAttribute('data-walking', 'true')
+  expect(nearArea(await tokenAt(page, 'npc-beggar'), { x: 3, y: 4, w: 2, h: 1 })).toBe(true)
+
+  await send(page, 'Жду.')
+  await expect.poll(() => results.reminders.length).toBe(2)
+  expect(results.reminders[1]).toContain('add_npc')
+  const guard = page.locator('[data-testid^="npc-"]').filter({ has: page.locator('text=С') })
+  await expect(guard).toHaveCount(1)
+  const hero = await tokenAt(page, 'player-token')
+  const g = { x: Number(await guard.getAttribute('data-x')), y: Number(await guard.getAttribute('data-y')) }
+  expect(Math.max(Math.abs(g.x - hero.x), Math.abs(g.y - hero.y))).toBe(1)
+
+  await press('exit-to-tavern')
+  await menu.getByRole('button', { name: 'Выйти' }).click()
+  await expect(page.locator('.map-panel h2')).toHaveText('Таверна «Пьяный грифон»')
+  await expect(npc(page, 'gunnar')).toHaveAttribute('data-x', '7')
+  // Стражник остался на улице — в таверне его нет.
+  await expect(page.locator('[data-testid^="npc-"]').filter({ has: page.locator('text=С') })).toHaveCount(0)
+
+  await send(page, 'Смотрю на Гуннара.')
+  await expect.poll(() => results.reminders.length).toBe(3)
+  expect(results.reminders[2]).toContain('Гуннар')
+  await expect(npc(page, 'gunnar')).not.toHaveAttribute('data-y', '1')
+  await expect(npc(page, 'gunnar')).not.toHaveAttribute('data-walking', 'true')
+  expect(nearArea(await tokenAt(page, 'npc-gunnar'), { x: 9, y: 7, w: 2, h: 2 })).toBe(true)
+  await expectNoHorizontalScroll(page)
   expect(errors).toEqual([])
 })
