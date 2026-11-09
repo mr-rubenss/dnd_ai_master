@@ -722,6 +722,23 @@ describe('цикл с инструментами: ответ модели → и
       expect(result.text).toBe('Улица под дождём.')
     })
 
+    it('создание места не уложилось в лимит раундов — ещё раунды, пока travel не пройдёт', async () => {
+      const env = runtimeFor(leaving())
+      const bad = { location: { ...street, exits: [] } }
+      const { master } = fakeMaster([
+        () => aiResponse({ toolCalls: [toolCall('travel', { exit: 'tavern-door' })] }),
+        () => aiResponse({ toolCalls: [toolCall('create_location', bad)] }),
+        () => aiResponse({ toolCalls: [toolCall('create_location', bad)] }),
+        () => aiResponse({ toolCalls: [toolCall('create_location', { location: street })] }),
+        () => aiResponse({ toolCalls: [toolCall('travel', { exit: 'tavern-door', to: 'griffin-street' })] }),
+        () => aiResponse({ text: 'Улица.' }),
+      ])
+      expect(MAX_TOOL_ROUNDS).toBe(4)
+      const result = await runMasterTurn(master, leaving(), { verbosity: 'normal', context, runtime: env.runtime })
+      expect(env.current().world.currentLocationId).toBe('griffin-street')
+      expect(result.text).toBe('Улица.')
+    })
+
     it('обычная реплика без ухода — просьбы о переходе нет', async () => {
       const env = runtimeFor(story())
       const { master, requests } = fakeMaster([() => aiResponse({ text: 'Гуннар протирает кружку.', toolCalls: [endTurn()] })])

@@ -126,7 +126,9 @@ describe('схема и проверки созданной локации', () 
     expect(problemsOf(street({ ...withDoor, exits: [{ id: 'e', kind: 'door', name: 'Ворота', door: 'gate', x: 5, y: 3 }] }))).toEqual([
       'exits[0] "e": клетка выхода (5, 3) должна быть вплотную к двери "gate"',
     ])
-    expect(problemsOf(street({ exits: [{ id: 'e', kind: 'door', name: 'Дверь', door: 'nope', x: 0, y: 0 }] }))).toEqual(['exits[0] "e": двери "nope" нет в "doors"'])
+    expect(problemsOf(street({ exits: [{ id: 'e', kind: 'door', name: 'Дверь', door: 'nope', x: 0, y: 0 }] }))).toEqual([
+      'exits[0] "e": двери "nope" нет в "doors" — добавь эту дверь в doors (на стене карты) или сделай выход без двери: kind: "road" (дорога, проход) или "edge" (край карты), без поля door',
+    ])
   })
 
   it('стены, достижимость и id — те же правила, что у всех локаций', () => {
@@ -202,5 +204,25 @@ describe('create_location: инструмент ведущего', () => {
 describe('пример минимальной локации (идёт модели с ошибками)', () => {
   it('сам проходит все проверки (ссылка назад — заглушка id)', () => {
     expect(parseCreatedLocation(JSON.parse(MIN_LOCATION_EXAMPLE)).ok).toBe(true)
+  })
+})
+
+describe('терпимость к частым ошибкам модели (живой отчёт 2026-11-09)', () => {
+  it('объект с типом эффекта (лужа) переносится в effects, модель получает заметку', () => {
+    const r = parseCreatedLocation(street({ objects: [{ id: 'p1', type: 'puddle', name: 'Лужа', x: 3, y: 5, w: 2, h: 2 }, { id: 'f', type: 'fire', name: 'Костёр', x: 8, y: 1 }] }))
+    expect(r.ok).toBe(true)
+    const loc = (r as { location: LocationData }).location
+    expect(loc.effects).toEqual([{ id: 'p1', kind: 'puddle', name: 'Лужа', x: 3, y: 5, w: 2, h: 2 }])
+    // fire — и объект, и эффект: остаётся объектом.
+    expect(loc.objects.map((o) => o.id)).toEqual(['f'])
+    expect(r.notes[0]).toContain('«Лужа» — это эффекты (puddle)')
+  })
+
+  it('выход-дверь без двери на карте и неизвестный тип объекта — отказ с подсказкой, как исправить', () => {
+    const door = parseCreatedLocation(street({ exits: [{ id: 'e', kind: 'door', name: 'Дверь', door: 'entrance', x: 5, y: 7 }] }))
+    expect(door.ok).toBe(false)
+    expect((door as { problems: string[] }).problems[0]).toContain('kind: "road"')
+    const type = parseCreatedLocation(street({ objects: [{ id: 'x', type: 'sign', name: 'Вывеска', x: 1, y: 1 }] }))
+    expect((type as { problems: string[] }).problems[0]).toContain('вывеска, мешок, ящик — item')
   })
 })

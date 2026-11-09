@@ -239,7 +239,10 @@ export async function runMasterTurn(master: AiMaster, story: StoryState, options
 
   for (let round = 0; ; round++) {
     // Раунд повтора (довызов инструментов) разрешает инструменты даже после лимита раундов.
-    const toolsAllowed = !!runtime && (round < MAX_TOOL_ROUNDS || retryPending)
+    // Начато создание нового места, а перехода ещё нет — ещё до MAX_PLACE_FOLLOWUPS раундов сверх лимита.
+    const placePending =
+      toolCalls.some((t) => PLACE_TOOLS.includes(t.call.name)) && !toolCalls.some((t) => t.call.name === 'travel' && t.outcome.ok)
+    const toolsAllowed = !!runtime && (round < MAX_TOOL_ROUNDS || retryPending || (placePending && round < MAX_TOOL_ROUNDS + MAX_PLACE_FOLLOWUPS))
     retryPending = false
     // Запрос собирается заново на каждый раунд: состояние и факты — свежие (после уже выполненных инструментов),
     // лента — на начало хода, дальше — сообщения этого хода.
