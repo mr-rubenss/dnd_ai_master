@@ -265,7 +265,7 @@
   `leaveVia` в `GameScreen`: герой идёт к выходу; карта за ним есть — переход сразу и событие ведущему «опиши новое
   место» (`heroMoveReported` с `rules: ['exit']`, `travelNote`); карты нет — событие `missingMapNote`, и ведущий
   создаёт её (`create_location`) и переводит отряд инструментом `travel` (`exit`, `to`). Над картой — путь отряда
-  (`MapPanel`, `map-trail`, последние `TRAIL_MAX`); туман — свой у каждой карты (`world.explored[locationId]`).
+  (`MapPanel`, `map-trail`, последние `TRAIL_MAX`; с 6.2 — вместе с уровнями карт, `mapPath`); туман — свой у каждой карты (`world.explored[locationId]`).
   **Защита от тихого сбоя (6.6.1)**: в цикле хода (`runMasterTurn`) отказ `create_location`/`travel` в одном ответе
   с `end_turn` не завершает ход (`PLACE_RETRY_MESSAGE`), удачный `travel` без рассказа — раунд на описание
   (`ARRIVAL_MESSAGE`), после сверки — до `MAX_PLACE_FOLLOWUPS` раундов на создание и переход (`PLACE_CONTINUE_MESSAGE`);
@@ -289,6 +289,22 @@
   В таверне — выход `tavern-door` (входная дверь). Старые истории: копия таверны в мире без выходов (данные истории
   не трогаем). Правило — «Переходы между картами» в `dm-prompt.md`, сценарий 44; тесты — `travel.test.ts`,
   e2e — `e2e/travel.spec.ts`.
+- **Три масштаба карт, вложенные друг в друга** (6.2; `src/game/mapLevels.ts`): у карты `scale` (общая `region` →
+  частичная `area` → клеточная `tactical`, порядок — `MAP_KIND_RANK`), `parent` (карта уровнем выше, крупнее) и места
+  `places` (`MapPlace`: только на общей и частичной; `map` — карта уровнем ниже) — `parseLocation`, схема
+  `CREATED_LOCATION_SCHEMA` (у карты с `parent`/`places` выходы не обязательны), связи с миром — `hierarchyProblems`
+  в `createdLocationProblem`. Связь места с картой — действие движка `placeLinked` (ставит `map` месту и `parent` карте;
+  `create_location` с `place` или местами с `map`). Отряд меняет масштаб только ведущий: `set_map_view(map, reason)` →
+  `levelPlan` → действие движка `mapLevelChanged` (на карту выше — отряд у места, ведущего вниз, `partyPlaceOn`; ниже —
+  у `playerStart`; только по вложенности; в бою — нельзя). Бой начинается только на клеточной (`combatChanged` в
+  `checkAction`; `set_combat` start на общей/частичной — с `map`). Ведущему — раздел «Масштаб карты» (`levelText`).
+  Игрок только смотрит: «Отдалить»/«Приблизить» (`MapPanel`, `map-level-up/down`), путь над картой (`mapPath`: уровни —
+  кнопки `map-level-<id>`, затем путь отряда того же уровня из `world.trail`), щипок «сжать» на карте целиком
+  (`PINCH_LEVEL_UP` в `useMapViewport`), место → «Приблизить» (карта есть) или «Подробнее» (событие ведущему
+  `placeDetailNote`; карты выше нет — `zoomOutNote`); вид — состояние `GameScreen` (`viewRequest`, сбрасывается при смене
+  карты отряда и в бою), на карте выше фишка героя у места отряда. Старые истории: локации без `scale` — клеточные
+  (`migrateStory`, журнал не меняется). Окрестности здания — у того же `parent`. Тесты — `mapLevels.test.ts`,
+  e2e — `e2e/map-levels.spec.ts`, сценарий 49.
 - **Метки игрока** (5.7; `src/game/marks.ts`, UI — `src/components/MapMarks.tsx`): правый щелчок мышью или долгое
   нажатие пальцем (`LONG_PRESS_MS`) по клетке → окно «Поставить метку»: значок (вопрос, опасность, тайник, заметка —
   `MARK_ICONS`) и короткий текст (до `MARK_TEXT_MAX`); нажатие на метку — «Изменить» / «Удалить». Действия `markPlaced`

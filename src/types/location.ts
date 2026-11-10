@@ -35,6 +35,35 @@ export const MAP_KIND_OBJECTS: Record<MapKind, readonly MapObjectType[]> = {
   region: ['tree', 'rock', 'building'],
 }
 
+/** Порядок масштабов сверху вниз: общая → частичная → клеточная. Карта уровнем ниже — с большим номером. */
+export const MAP_KIND_RANK: Record<MapKind, number> = { region: 0, area: 1, tactical: 2 }
+
+/** Виды мест (точек интереса) на общей и частичной карте. */
+export const PLACE_KINDS = ['city', 'village', 'ruins', 'cave', 'tower', 'building', 'site'] as const
+export type PlaceKind = (typeof PLACE_KINDS)[number]
+export const PLACE_KIND_NAMES: Record<PlaceKind, string> = {
+  city: 'город',
+  village: 'деревня',
+  ruins: 'руины',
+  cave: 'пещера',
+  tower: 'башня',
+  building: 'здание',
+  site: 'место',
+}
+
+/**
+ * Место на общей или частичной карте — точка, которая открывает карту уровнем ниже (`map`: место на общей →
+ * частичная или клеточная, место на частичной → клеточная). Нет `map` — карты ещё нет: её по запросу создаёт ведущий.
+ */
+export interface MapPlace extends CellPosition {
+  id: string
+  name: string
+  kind?: PlaceKind
+  description?: string
+  /** id карты уровнем ниже (её `parent` — эта карта). */
+  map?: string
+}
+
 export interface MapScale {
   kind: MapKind
   /** Сколько единиц в одной клетке. */
@@ -247,6 +276,10 @@ export interface LocationData {
   cellFeet: number
   /** Масштаб: вид карты, размер клетки и единицы. Нет поля (старые истории) — клеточная, `cellFeet` футов. */
   scale?: MapScale
+  /** Карта уровнем выше (её масштаб крупнее): клеточная таверна → частичная деревня → общая карта. Нет — верх. */
+  parent?: string
+  /** Места на общей и частичной карте, открывающие карты уровнем ниже. Нет поля — мест нет. */
+  places?: MapPlace[]
   /** Общий свет без источников. Нет поля — по виду карты и источникам (`ambientOf` в src/game/mapView.ts). */
   ambientLight?: AmbientLight
   width: number

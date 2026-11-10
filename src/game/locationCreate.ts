@@ -15,15 +15,17 @@ import {
   NPC_ATTITUDES,
   NPC_PERSONALITY_LIMITS,
   OBJECT_TYPES,
+  PLACE_KINDS,
   WALL_MATERIALS,
   ZONE_KINDS,
   type LocationData,
 } from '../types/location'
 import type { StoryState } from '../types/story'
 import { LocationValidationError, parseLocation } from './location'
+import { hierarchyProblems } from './mapLevels'
 
 /** Пределы созданной локации: карта не огромная, обстановки и людей — в меру (всё это идёт ведущему в запрос). */
-export const CREATED_LOCATION_LIMITS = { size: 100, rooms: 40, segments: 200, objects: 200, npcs: 30, exits: 12, text: 400 } as const
+export const CREATED_LOCATION_LIMITS = { size: 100, rooms: 40, segments: 200, objects: 200, npcs: 30, exits: 12, places: 60, text: 400 } as const
 /** Короткий пример верной минимальной локации — идёт модели вместе с ошибками (есть выход, объекты внутри карты). */
 export const MIN_LOCATION_EXAMPLE = JSON.stringify({
   id: 'village-street',
@@ -60,6 +62,12 @@ export const CREATED_LOCATION_SCHEMA = z.object({
   description: text(),
   cellFeet: z.optional(z.int().check(z.minimum(1))),
   scale: z.optional(z.object({ kind: z.enum(MAP_KINDS), cell: z.number().check(z.positive()), unit: z.enum(DISTANCE_UNITS) })),
+  parent: z.optional(text(60)),
+  places: z.optional(
+    z
+      .array(z.object({ id: text(60), name: text(80), kind: z.optional(z.enum(PLACE_KINDS)), description: optText(), map: z.optional(text(60)), ...cell }))
+      .check(z.maxLength(L.places)),
+  ),
   ambientLight: z.optional(z.enum(AMBIENT_LIGHTS)),
   width: size(),
   height: size(),
@@ -168,8 +176,19 @@ function issueText(issue: z.core.$ZodIssue, input: unknown): string {
 
 /** Ошибки схемы (пусто — форма верная). */
 export function schemaProblems(input: unknown): string[] {
-  const result = CREATED_LOCATION_SCHEMA.safeParse(input)
-  return result.success ? [] : result.error.issues.map((issue) => issueText(issue, input))
+  const prepared = inHierarchy(input) && !(input as Record<string, unknown>).exits ? { ...(input as object), exits: [] } : input
+  const result = CREATED_LOCATION_SCHEMA.safeParse(prepared)
+  if (result.success) return []
+  // Карта в иерархии масштабов (parent или places) покидается через уровни — выход не обязателен.
+  const issues = inHierarchy(input) ? result.error.issues.filter((i) => !(i.code === 'too_small' && pathText(i.path) === 'exits')) : result.error.issues
+  return issues.map((issue) => issueText(issue, prepared))
+}
+
+/** У JSON есть карта уровнем выше или места уровнем ниже. */
+function inHierarchy(input: unknown): boolean {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return false
+  const raw = input as Record<string, unknown>
+  return (typeof raw.parent === 'string' && raw.parent.length > 0) || (Array.isArray(raw.places) && raw.places.length > 0)
 }
 
 /** Виды эффектов, которые модели путают с объектами (лужа, дым, тьма, свечение); fire — и объект, и эффект. */
@@ -209,7 +228,9 @@ function withHints(problems: string[]): string[] {
 /** Правила созданной локации поверх parseLocation: выходы, НПС не в одной клетке. */
 function createdRuleProblems(location: LocationData): string[] {
   const problems: string[] = []
-  if (!location.exits?.length) problems.push('exits: у локации должен быть хотя бы один выход (дверь, дорога, лестница или край карты)')
+  // Карта в иерархии масштабов (есть уровень выше или места уровнем ниже) покидается через уровни — выходы не обязательны.
+  if (!location.exits?.length && !location.parent && !location.places?.length)
+    problems.push('exits: у локации должен быть хотя бы один выход (дверь, дорога, лестница или край карты) — или parent (карта уровнем выше)')
   const npcCells = new Map<string, string>()
   for (const npc of location.npcs) {
     const key = `${npc.x},${npc.y}`
@@ -273,6 +294,6 @@ export function createdLocationProblem(state: Pick<StoryState, 'world'>, locatio
   const rooms = location.rooms ?? []
   const roomOut = rooms.find((r) => !Number.isInteger(r.x + r.y + r.w + r.h) || r.x < 0 || r.y < 0 || r.w < 1 || r.h < 1 || r.x + r.w > parsed.width || r.y + r.h > parsed.height)
   if (roomOut) return `Комната «${roomOut.id}» выходит за пределы карты.`
-  const rules = createdRuleProblems(parsed)
+  const rules = [...createdRuleProblems(parsed), ...hierarchyProblems(state.world.locations, parsed)]
   return rules.length ? `Локация не проходит проверку: ${rules.join('; ')}.` : null
 }

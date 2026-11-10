@@ -353,6 +353,13 @@ export type StoryEvent =
   | { type: 'exitLinked'; locationId: string; exitId: string; to: string; toExit?: string }
   /** Отряд перешёл через выход `exitId` из `from` в `to`; герои — в клетках `positions` у входа `arrivalExitId`. */
   | { type: 'partyTraveled'; from: string; to: string; exitId: string; arrivalExitId?: string; positions: Record<string, CellPosition> }
+  /**
+   * Отряд сменил масштаб (ведущий, set_map_view): с текущей карты на карту выше или ниже по вложенности (6.2);
+   * герои — в клетках `positions` новой карты. Только движок.
+   */
+  | { type: 'mapLevelChanged'; from: string; to: string; reason: string; positions: Record<string, CellPosition> }
+  /** Место `placeId` карты `locationId` теперь открывает карту уровнем ниже `map` (у неё parent — эта карта). Только движок. */
+  | { type: 'placeLinked'; locationId: string; placeId: string; map: string }
   /** Метки игрока на карте: поставить, изменить текст и значок, убрать (src/game/marks.ts). */
   | { type: 'markPlaced'; mark: PlayerMark }
   | { type: 'markEdited'; markId: string; icon: MarkIcon; text: string }

@@ -83,6 +83,7 @@ describe('описания инструментов', () => {
       'add_exit',
       'travel',
       'set_combat',
+      'set_map_view',
     ])
     for (const t of MASTER_TOOLS) expect(t.parameters).toMatchObject({ type: 'object', additionalProperties: false })
   })

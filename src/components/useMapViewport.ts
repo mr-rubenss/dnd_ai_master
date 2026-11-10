@@ -9,6 +9,8 @@ import { centerOn, clampView, FIT_VIEW, zoomAt, type MapViewport } from '../game
 const ZOOM_STEP = 1.5
 /** Сдвиг мышью меньше этого — ещё щелчок, а не перетаскивание. */
 const DRAG_THRESHOLD = 4
+/** Щипок «сжать» на карте, показанной целиком, сильнее этой доли расстояния между пальцами — карта уровнем выше (6.2). */
+export const PINCH_LEVEL_UP = 0.7
 
 /** Положение и размер окна карты на экране. */
 function sizeOf(el: HTMLElement | null) {
@@ -16,13 +18,15 @@ function sizeOf(el: HTMLElement | null) {
   return { left: r?.left ?? 0, top: r?.top ?? 0, width: r?.width ?? 1, height: r?.height ?? 1 }
 }
 
-export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRef: RefObject<HTMLDivElement | null>, onGesture: () => void) {
+export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRef: RefObject<HTMLDivElement | null>, onGesture: () => void, onPinchOut?: () => void) {
   const view = useRef<MapViewport>(FIT_VIEW)
   const [committed, setCommitted] = useState<MapViewport>(FIT_VIEW)
   const gestureRef = useRef(onGesture)
+  const pinchOutRef = useRef(onPinchOut)
   useEffect(() => {
     gestureRef.current = onGesture
-  }, [onGesture])
+    pinchOutRef.current = onPinchOut
+  }, [onGesture, onPinchOut])
   /** Размер окна карты в пикселях — для положения подсказки (сдвиг вида — в пикселях). */
   const [box, setBox] = useState({ w: 1, h: 1 })
 
@@ -111,7 +115,7 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
     }
 
     // Два пальца: щипок — масштаб вокруг середины между пальцами, движение — сдвиг.
-    let pinch: { d: number; mx: number; my: number; start: MapViewport } | null = null
+    let pinch: { d: number; mx: number; my: number; start: MapViewport; levelUp: boolean } | null = null
     const touchInfo = (t: TouchList) => {
       const s = sizeOf(box)
       const [a, b] = [t[0], t[1]]
@@ -125,7 +129,7 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
         drag = null
       }
       const t = touchInfo(e.touches)
-      pinch = { d: t.d, mx: t.mx, my: t.my, start: view.current }
+      pinch = { d: t.d, mx: t.mx, my: t.my, start: view.current, levelUp: false }
       moving()
     }
     const onTouchMove = (e: TouchEvent) => {
@@ -137,13 +141,17 @@ export function useMapViewport(boxRef: RefObject<HTMLDivElement | null>, innerRe
       if (!pinch || e.touches.length !== 2) return
       e.preventDefault()
       const t = touchInfo(e.touches)
+      // Карта и так целиком, а пальцы сводят дальше — после жеста показать карту уровнем выше.
+      pinch.levelUp = pinch.start.scale <= 1 && t.d / pinch.d < PINCH_LEVEL_UP
       const zoomed = zoomAt(pinch.start, pinch.start.scale * (t.d / pinch.d), pinch.mx, pinch.my, t.s.width, t.s.height)
       apply(clampView({ ...zoomed, x: zoomed.x + t.mx - pinch.mx, y: zoomed.y + t.my - pinch.my }, t.s.width, t.s.height))
     }
     const onTouchEnd = (e: TouchEvent) => {
       if (pinch && e.touches.length < 2) {
+        const levelUp = pinch.levelUp
         pinch = null
         commit()
+        if (levelUp) pinchOutRef.current?.()
       }
     }
 
