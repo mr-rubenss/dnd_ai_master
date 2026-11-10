@@ -23,7 +23,7 @@ import { mapAreaResult, type AreaCreature } from '../game/mapAreas'
 import { AreaOverlay, MeasureInfo, MeasureToolbar, RulerOverlay } from './MapMeasure'
 import { rulerText, templateFromDrag, type MeasureTool, type Measurement } from '../game/mapMeasure'
 import { useMapChanges } from './useMapChanges'
-import { EFFECT_KIND_NAMES, EXIT_KIND_NAMES, FLAT_OBJECT_TYPES, type MapEffect, type MapExit, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
+import { EFFECT_KIND_NAMES, EXIT_KIND_NAMES, FLAT_OBJECT_TYPES, PLACE_KIND_NAMES, type MapPlace, type MapEffect, type MapExit, type CellPosition, type DoorState, type LocationData, type MapObject, type MapObjectType, type NpcAttitude } from '../types/location'
 import type { HeroMovePlan } from '../game/heroMove'
 import { entityActions } from '../game/mapActions'
 import { MapDefs } from './MapDefs'
@@ -70,7 +70,10 @@ const OBJECT_ORDER = (o: MapObject) => (o.type === 'rug' ? 0 : o.type === 'candl
 interface MapEntity {
   key: string
   /** Что это — для меню действий. */
-  kind: 'npc' | 'object' | 'door' | 'window' | 'exit'
+  kind: 'npc' | 'object' | 'door' | 'window' | 'exit' | 'place'
+  /** Место общей или частичной карты и есть ли у него карта уровнем ниже. */
+  placeId?: string
+  hasMap?: boolean
   /** Выход в другую локацию (у выхода и у двери, через которую он ведёт). */
   exitId?: string
   /** Вид объекта (для «Взять») или состояние двери (для «Открыть/Закрыть»). */
@@ -111,6 +114,8 @@ export interface MapActions {
   send: (text: string) => void
   /** «Выйти»: герой идёт к выходу, отряд переходит на другую карту (или ведущий создаёт её). */
   leave?: (exitId: string) => string | null
+  /** Место на общей или частичной карте: показать его карту уровнем ниже или попросить ведущего (карты нет). */
+  openPlace?: (placeId: string) => string | null
   /** Ведущий отвечает или история только для чтения — действия недоступны. */
   disabled: boolean
 }
@@ -134,6 +139,10 @@ interface Props {
   marks?: readonly PlayerMark[]
   /** Команды меток; нет — метки только видны (история только для чтения). */
   markEditor?: MarkEditor
+  /** Фишка героя на этой карте (нет — смотрят карту другого масштаба, где отряда не отметить). По умолчанию — да. */
+  heroShown?: boolean
+  /** Щипок «сжать» на карте, показанной целиком, — карта уровнем выше. */
+  onPinchOut?: () => void
 }
 
 export interface MapVision {
@@ -159,13 +168,13 @@ interface DragState {
   reachable: Set<string>
 }
 
-export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision, shownArea, companions, marks = [], markEditor }: Props) {
+export function LocationMap({ location, player, doors = {}, movement, actions, ping, vision, shownArea, companions, marks = [], markEditor, heroShown = true, onPinchOut }: Props) {
   const { width, height } = location
   const [active, setActive] = useState<ActiveEntity | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const zoomRef = useRef<HTMLDivElement>(null)
   // Начался жест (сдвиг, масштаб) — подсказка закрывается, чтобы не отставать от карты.
-  const viewport = useMapViewport(boxRef, zoomRef, () => setActive((cur) => (cur ? null : cur)))
+  const viewport = useMapViewport(boxRef, zoomRef, () => setActive((cur) => (cur ? null : cur)), onPinchOut)
   const scale = scaleOf(location)
   const profile = profileOf(location)
   const cols = width + MAP_PAD * 2
@@ -205,6 +214,8 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
     () => (location.exits ?? []).filter((e) => !(e.door && location.doors.some((d) => d.id === e.door)) && (!vision || vision.explored.has(`${e.x},${e.y}`))),
     [location.exits, location.doors, vision],
   )
+  // Места общей и частичной карты — как выходы: в исследованных клетках.
+  const placesShown = useMemo(() => (location.places ?? []).filter((p) => !vision || vision.explored.has(`${p.x},${p.y}`)), [location.places, vision])
   const spawned = changes.spawned
   const spawn = useCallback((id: string) => (spawned.has(id) ? exit : null), [spawned, exit])
   const targets = useMemo(() => {
@@ -273,6 +284,21 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
         ...EXIT_BADGE_BOX(exit),
       })
     }
+    for (const place of placesShown) {
+      map.set(`place:${place.id}`, {
+        key: `place:${place.id}`,
+        kind: 'place',
+        placeId: place.id,
+        hasMap: !!place.map,
+        name: place.name,
+        kindLabel: `Место · ${place.kind ? PLACE_KIND_NAMES[place.kind] : 'на карте'}`,
+        description: place.description,
+        x: place.x,
+        y: place.y,
+        w: 1,
+        h: 1,
+      })
+    }
     for (const npc of npcsShown) {
       map.set(`npc:${npc.id}`, {
         key: `npc:${npc.id}`,
@@ -288,7 +314,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
       })
     }
     return map
-  }, [location, doors, objectsShown, npcsShown, exitsShown])
+  }, [location, doors, objectsShown, npcsShown, exitsShown, placesShown])
 
   // Закрыть подсказку по Escape.
   useEffect(() => {
@@ -566,6 +592,11 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
   const runAction = (entity: MapEntity, action: { id: string; text: string }) => {
     setActive(null)
     if (!actions || actions.disabled) return
+    if (action.id === 'open-place' && entity.placeId) {
+      const reason = actions.openPlace?.(entity.placeId)
+      if (reason) say(reason)
+      return
+    }
     if (action.id === 'leave' && entity.exitId) {
       const reason = actions.leave?.(entity.exitId)
       if (reason) say(reason)
@@ -652,6 +683,13 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                 </g>
 
                 <g className="map-layer map-layer--tokens">
+                  {/* Места общей и частичной карты: значок под фишками (отряд на карте выше стоит у места). */}
+                  {placesShown.map((place) => (
+                    <g key={place.id} {...interactiveProps(`place:${place.id}`)} data-testid={`place-${place.id}`} data-x={place.x} data-y={place.y} data-has-map={place.map ? 'true' : undefined}>
+                      <rect x={place.x} y={place.y} width={1} height={1} className="hit-area" />
+                      <PlaceBadge place={place} />
+                    </g>
+                  ))}
                   {leavingShown.map((npc) => {
                     const pos = walks.pos[npc.id] ?? npc
                     return (
@@ -688,6 +726,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                       </g>
                     )
                   })}
+                  {heroShown && (
                   <g
                     className={`player-token${movement ? ' is-draggable' : ''}${drag ? ' is-dragging' : ''}`}
                     aria-label="Вы"
@@ -698,6 +737,8 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                     data-draggable={movement ? 'true' : undefined}
                     onPointerDown={movement ? startDrag : undefined}
                     onClick={(e) => e.stopPropagation()}
+                    // Героя не двигают (карта другого масштаба, история только для чтения) — нажатие проходит к месту под ним.
+                    pointerEvents={movement ? undefined : 'none'}
                   >
                     <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
                       <ellipse cx={0.56} cy={0.64} rx={0.44} ry={0.36} className="token-shadow" />
@@ -705,6 +746,7 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                       <circle cx={0.5} cy={0.5} r={0.36} fill="url(#player-fill)" className="player-core" />
                     </g>
                   </g>
+                  )}
                   {/* Выходы (кроме дверей — у двери «Выйти» в её меню): значок в углу клетки, поверх фишек. */}
                   {exitsShown.map((exit) => (
                     <g key={exit.id} {...interactiveProps(`exit:${exit.id}`)} data-testid={`exit-${exit.id}`} data-kind={exit.kind} data-x={exit.x} data-y={exit.y}>
@@ -740,11 +782,18 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
                         </g>
                       )
                     })}
-                  <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
-                    <text x={0.5} y={0.53} className="player-label">
-                      Вы
+                  {placesShown.map((place) => (
+                    <text key={place.id} x={place.x + 0.5} y={place.y + 1.35} className="place-label">
+                      {place.name}
                     </text>
-                  </g>
+                  ))}
+                  {heroShown && (
+                    <g className="map-token" style={{ transform: `translate(${heroPos.x}px, ${heroPos.y}px)` }}>
+                      <text x={0.5} y={0.53} className="player-label">
+                        Вы
+                      </text>
+                    </g>
+                  )}
                 </g>
 
                 {/* Пока выбран инструмент измерения, нажатия и жесты по карте идут ему (не меню и не шагам героя). */}
@@ -777,20 +826,22 @@ export function LocationMap({ location, player, doors = {}, movement, actions, p
           )}
 
           <div className="map-controls" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="map-control" onClick={viewport.zoomIn} aria-label="Приблизить" title="Приблизить" data-testid="map-zoom-in">
+            <button type="button" className="map-control" onClick={viewport.zoomIn} aria-label="Увеличить" title="Увеличить" data-testid="map-zoom-in">
               +
             </button>
-            <button type="button" className="map-control" onClick={viewport.zoomOut} aria-label="Отдалить" title="Отдалить" disabled={viewport.view.scale <= 1} data-testid="map-zoom-out">
+            <button type="button" className="map-control" onClick={viewport.zoomOut} aria-label="Уменьшить" title="Уменьшить" disabled={viewport.view.scale <= 1} data-testid="map-zoom-out">
               −
             </button>
-            <button
-              type="button"
-              className="map-control map-control--wide"
-              onClick={() => viewport.centerOn(heroPos.x + 0.5 + MAP_PAD, heroPos.y + 0.5 + MAP_PAD, cols, rows)}
-              data-testid="map-center-hero"
-            >
-              К герою
-            </button>
+            {heroShown && (
+              <button
+                type="button"
+                className="map-control map-control--wide"
+                onClick={() => viewport.centerOn(heroPos.x + 0.5 + MAP_PAD, heroPos.y + 0.5 + MAP_PAD, cols, rows)}
+                data-testid="map-center-hero"
+              >
+                К герою
+              </button>
+            )}
             {viewport.view.scale > 1 && (
               <button type="button" className="map-control map-control--wide" onClick={viewport.reset} data-testid="map-reset">
                 Вся карта
@@ -940,6 +991,16 @@ function ExitBadge({ exit }: { exit: MapExit }) {
       ) : (
         <path d="M-0.12 0h0.22M0.03 -0.09l0.09 0.09l-0.09 0.09" className="map-exit-glyph" />
       )}
+    </g>
+  )
+}
+
+/** Значок места общей или частичной карты: ромб (у места без карты — пунктир: подробностей пока нет). */
+function PlaceBadge({ place }: { place: MapPlace }) {
+  return (
+    <g className={`map-place${place.map ? ' has-map' : ''}`} transform={`translate(${place.x + 0.5} ${place.y + 0.5})`} pointerEvents="none">
+      <path d="M0 -0.42L0.42 0L0 0.42L-0.42 0Z" className="map-place-badge" />
+      <circle r={0.1} className="map-place-dot" />
     </g>
   )
 }

@@ -18,6 +18,8 @@ import { npcDigest } from './npcs'
 import { MAP_REACTIONS, positionsText } from './mapEvents'
 import { visionText } from './vision'
 import { marksText } from './marks'
+import { kindLabel, kindOf, levelText } from './mapLevels'
+import { MAP_PROFILES, scaleLabel } from './mapView'
 import { outdoorLight, partOfDay, timeText, type PartOfDay } from '../engine/time'
 import { checkSubjectOf, classOrderOf, weaponTraining } from './classOrder'
 import { featureResources, hitDiceOf, REST_NAMES } from './rest'
@@ -215,7 +217,9 @@ export function locationText(story: StoryState): string {
   return [
     `### ${location.name}`,
     location.description,
-    `Карта ${location.width}×${location.height} клеток, клетка — ${location.cellFeet} фт.`,
+    kindOf(location) === 'tactical'
+      ? `Карта ${location.width}×${location.height} клеток, клетка — ${location.cellFeet} фт.`
+      : `${MAP_PROFILES[kindOf(location)].label} ${location.width}×${location.height} клеток, ${scaleLabel(location)}.`,
     rooms.length ? `Помещения: ${rooms.join('; ')}.` : '',
     objects.length ? `Объекты:\n${objects.join('\n')}` : '',
     doors.length ? `Двери:\n${doors.join('\n')}` : '',
@@ -237,7 +241,7 @@ export function worldLocationsText(story: StoryState): string {
   const others = Object.values(story.world.locations).filter((l) => l.id !== story.world.currentLocationId)
   return [
     '## Локации мира',
-    `Уже есть в этой истории (не создавай их заново — при возвращении это те же карты): ${[currentLocation(story), ...others].map((l) => `«${l.name}» [${l.id}]`).join(', ')}.`,
+    `Уже есть в этой истории (не создавай их заново — при возвращении это те же карты): ${[currentLocation(story), ...others].map((l) => `«${l.name}» [${l.id}]${kindOf(l) === 'tactical' ? '' : ` (${kindLabel(kindOf(l))})`}`).join(', ')}.`,
     'Новое место, которого здесь нет, — create_location.',
   ].join('\n')
 }
@@ -280,6 +284,7 @@ export function gameStateText(story: StoryState, ctx: MasterStateContext): strin
     timeSectionText(story),
     `## Отряд (лист персонажа и инвентарь)\n\n${heroes}`,
     `## Текущая локация\n\n${locationText(story)}`,
+    `## Масштаб карты\n${levelText(story)}\nУровень выше или ниже по сюжету — set_map_view; игрок сам может лишь посмотреть другие масштабы, отряд при этом не переходит.`,
     worldLocationsText(story),
     positionsText(story, currentLocation(story), MAP_REACTIONS),
     marksText(story, currentLocation(story)),

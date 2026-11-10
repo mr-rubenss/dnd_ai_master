@@ -22,6 +22,7 @@ import {
   NPC_PERSONALITY_FIELDS,
   NPC_PERSONALITY_LIMITS,
   OBJECT_TYPES,
+  PLACE_KINDS,
   TILE_FLOOR,
   TILE_VOID,
   WALL_MATERIALS,
@@ -32,6 +33,8 @@ import {
   type ExitKind,
   type MapExit,
   type MapEffect,
+  type MapPlace,
+  type PlaceKind,
   type GridSegment,
   type LocationData,
   type MapObject,
@@ -419,6 +422,36 @@ export function parseLocation(input: unknown): LocationData {
     })
   })
 
+  // ---------- Места (общая и частичная карта) и карта уровнем выше ----------
+  if (raw.parent !== undefined) {
+    if (!isNonEmptyString(raw.parent)) fail('"parent" — id карты уровнем выше (непустая строка)')
+    else if (raw.parent === raw.id) fail('"parent": карта не может быть родителем самой себе')
+  }
+  if (raw.places !== undefined && !Array.isArray(raw.places)) fail('"places" должно быть массивом')
+  const places: MapPlace[] = []
+  if (kind === 'tactical' && list('places').length) fail('"places": места бывают только на общей и частичной карте (scale.kind region или area); на клеточной — выходы exits')
+  else
+    list('places').forEach((place, i) => {
+      if (!isObject(place)) return fail(`places[${i}]: должно быть объектом`)
+      const where = label(place, `places[${i}]`)
+      checkId(place.id, where)
+      if (!isNonEmptyString(place.name)) fail(`${where}: "name" должно быть непустой строкой`)
+      if (place.kind !== undefined && !isOneOf(PLACE_KINDS, place.kind)) fail(`${where}: "kind" должно быть одним из: ${PLACE_KINDS.join(', ')}`)
+      for (const key of ['description', 'map'] as const) checkOptionalText(place, key, where)
+      if (place.map !== undefined && place.map === raw.id) fail(`${where}: место не может открывать ту же карту`)
+      if (!checkCell(place, where)) return
+      if (!isFloorCell(place.x, place.y)) return fail(`${where}: клетка места (${place.x}, ${place.y}) должна быть на карте (пол)`)
+      places.push({
+        id: place.id as string,
+        name: place.name as string,
+        ...(isOneOf(PLACE_KINDS, place.kind) ? { kind: place.kind as PlaceKind } : {}),
+        ...(typeof place.description === 'string' ? { description: place.description } : {}),
+        ...(typeof place.map === 'string' ? { map: place.map } : {}),
+        x: place.x,
+        y: place.y,
+      })
+    })
+
   // ---------- Эффекты ----------
   if (raw.effects !== undefined && !Array.isArray(raw.effects)) fail('"effects" должно быть массивом')
   const effects: MapEffect[] = []
@@ -516,6 +549,8 @@ export function parseLocation(input: unknown): LocationData {
     description: raw.description as string,
     cellFeet: raw.cellFeet as number,
     scale: scale ?? { kind: 'tactical', cell: raw.cellFeet as number, unit: 'ft' },
+    ...(isNonEmptyString(raw.parent) ? { parent: raw.parent } : {}),
+    ...(places.length ? { places } : {}),
     ...(isOneOf(AMBIENT_LIGHTS, raw.ambientLight) ? { ambientLight: raw.ambientLight } : {}),
     width,
     height,

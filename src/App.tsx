@@ -13,12 +13,13 @@ import { changeList, ledgerOf, turnDelta } from './game/turnChanges'
 import type { RestKind } from './types/story'
 import { needsSheetCompletion } from './game/sheetCompletion'
 import { GameClock } from './components/GameClock'
-import { MapPanel } from './components/MapPanel'
+import { MapPanel, type LevelButton } from './components/MapPanel'
+import { isAncestor, mapPath, partyPlaceOn, placeDetailNote, zoomInTarget, zoomOutNote } from './game/mapLevels'
 import type { HeroMovement, MapActions, MapVision } from './components/LocationMap'
 import type { MarkEditor } from './components/MapMarks'
 import { marksOf } from './game/marks'
 import { isBuildingDoorExit } from './game/surroundings'
-import { EXIT_STUCK_TURNS, exitLockProblem, missingMapNote, trailOf, travelNote, travelPlan, travelText } from './game/travel'
+import { EXIT_STUCK_TURNS, exitLockProblem, missingMapNote, travelNote, travelPlan, travelText } from './game/travel'
 import { exploredCells, newlyExplored, partyVision } from './game/vision'
 import { useAppearance } from './theme/appearanceStore'
 import { approachCell, heroBlocker, heroMovePlan, heroReachable } from './game/heroMove'
@@ -755,7 +756,8 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     exitWatchRef.current = { from: from.id, exitId: exit.id, turns: 0 }
     void askMaster()
   }
-  const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), leave: leaveVia, disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
+  const openPlaceRef = useRef<(id: string) => string | null>(() => null)
+  const mapActions = useMemo<MapActions>(() => ({ send: (text) => handleSend(text), leave: leaveVia, openPlace: (id) => openPlaceRef.current(id), disabled: waiting || readOnly }), [waiting, readOnly]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Видимость: что отряд видит сейчас (линия видимости, свет, тёмное зрение) и туман войны (исследованное копится
   // действием areaExplored — и при выключенном тумане, чтобы включить его можно было в любой момент).
@@ -773,8 +775,72 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     return { visible: seenNow, explored }
   }, [appearance.settings.fogOfWar, story, location, seenNow])
 
-  // Путь отряда над картой: локации по порядку прихода.
-  const trailNames = useMemo(() => trailOf(story).map((id) => story.world.locations[id]?.name ?? id), [story])
+  // Масштабы карт (6.2): игрок может посмотреть карту выше или ниже (только вид — отряд остаётся на месте; в бою карта
+  // закреплена на клеточной). Отряд меняет масштаб только ведущий (set_map_view).
+  const [viewRequest, setViewRequest] = useState<{ id: string; party: string } | null>(null)
+  const partyMapId = location.id
+  const viewed =
+    viewRequest && viewRequest.party === partyMapId && viewRequest.id !== partyMapId && !story.combat ? (story.world.locations[viewRequest.id] ?? location) : location
+  const onPartyMap = viewed.id === partyMapId
+  const showMap = (id: string) => setViewRequest({ id, party: partyMapId })
+  const partyMarker = useMemo(() => (onPartyMap ? null : partyPlaceOn(story.world.locations, viewed.id, partyMapId)), [onPartyMap, story.world.locations, viewed.id, partyMapId])
+  const mapPathItems = useMemo(() => mapPath(story, viewed.id), [story, viewed.id])
+  /** Просьба ведущему (карты нужного уровня нет): событие карты от имени героя и ход ведущего. */
+  const askLevel = (text: string, note: string): string | null => {
+    if (waiting || readOnly) return 'Подождите: ведущий отвечает.'
+    const reason = appStore.dispatch({ type: 'heroMoveReported', heroId: lead.heroId, messageId: crypto.randomUUID(), rules: ['map-level'], text, note: note.slice(0, MAX_MOVE_TEXT) }, ENGINE)
+    if (reason) return reason
+    void askMaster()
+    return null
+  }
+  const openPlace = (placeId: string): string | null => {
+    const place = viewed.places?.find((p) => p.id === placeId)
+    if (!place) return 'Такого места на карте нет.'
+    if (place.map && story.world.locations[place.map]) {
+      showMap(place.map === partyMapId ? partyMapId : place.map)
+      return null
+    }
+    const name = lead.character.name
+    return askLevel(`${name}: хочет рассмотреть подробнее «${place.name}».`, placeDetailNote(viewed, place, name))
+  }
+  const inCombat = !!story.combat
+  const combatTitle = 'Идёт бой: карта закреплена на клеточной.'
+  const upMap = viewed.parent ? story.world.locations[viewed.parent] : undefined
+  const levelUp: LevelButton = {
+    run: () => {
+      if (upMap) return showMap(upMap.id)
+      const reason = askLevel(`${lead.character.name}: хочет взглянуть на окрестности шире.`, zoomOutNote(viewed, lead.character.name))
+      if (reason) setAiNotice(reason)
+    },
+    disabled: inCombat || (!upMap && (waiting || readOnly || !onPartyMap)),
+    title: inCombat ? combatTitle : upMap ? `Карта «${upMap.name}»` : 'Карты уровнем выше нет — спросить ведущего',
+    pinch: !!upMap,
+  }
+  // «Приблизить»: на карте над отрядом — на уровень ниже к нему; на карте отряда — место под героем.
+  const downTarget = onPartyMap ? undefined : zoomInTarget(story.world.locations, viewed.id, partyMapId)
+  const placeHere = (viewed.places ?? []).find((p) => onPartyMap && p.x === lead.position.x && p.y === lead.position.y)
+  const levelDown: LevelButton = {
+    run: () => {
+      if (downTarget) return showMap(downTarget)
+      if (placeHere) {
+        const reason = openPlace(placeHere.id)
+        if (reason) setAiNotice(reason)
+      }
+    },
+    disabled: inCombat || (!downTarget && !placeHere),
+    title: inCombat ? combatTitle : downTarget ? `Карта «${story.world.locations[downTarget]?.name}»` : placeHere ? `Место «${placeHere.name}»` : 'Подробнее — нажмите на место на карте',
+  }
+  useEffect(() => {
+    openPlaceRef.current = openPlace
+  })
+  // Туман на карте другого масштаба: над отрядом — карта видна целиком (общий вид местности); остальные — только
+  // исследованное отрядом раньше.
+  const viewVision = useMemo<MapVision | undefined>(() => {
+    if (onPartyMap || !appearance.settings.fogOfWar || isAncestor(story.world.locations, viewed.id, partyMapId)) return undefined
+    return { visible: new Set<string>(), explored: exploredCells(story, viewed) }
+  }, [onPartyMap, appearance.settings.fogOfWar, story, viewed, partyMapId])
+  const viewMarks = useMemo(() => marksOf(story.world, viewed.id), [story.world, viewed.id])
+  const viewActions = useMemo<MapActions>(() => ({ send: () => undefined, openPlace, disabled: waiting || readOnly }), [waiting, readOnly, viewed, story]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Метки игрока: ставит, правит и убирает игрок своего героя (действия хранилища; проверки — src/game/marks.ts).
   const mapMarks = useMemo(() => marksOf(story.world, location.id), [story.world, location.id])
@@ -807,7 +873,41 @@ function GameScreen({ story, onShowEpilogue }: { story: StoryState; onShowEpilog
     <>
       <div className="layout">
         <main className="main-column">
-          <MapPanel location={location} player={lead.position} doors={story.world.doors[location.id] ?? {}} movement={movement} actions={mapActions} ping={story.ping} vision={vision} shownArea={story.shownArea} companions={companions} marks={mapMarks} markEditor={markEditor} trail={trailNames} />
+          {onPartyMap ? (
+            <MapPanel
+              location={location}
+              player={lead.position}
+              doors={story.world.doors[location.id] ?? {}}
+              movement={movement}
+              actions={mapActions}
+              ping={story.ping}
+              vision={vision}
+              shownArea={story.shownArea}
+              companions={companions}
+              marks={mapMarks}
+              markEditor={markEditor}
+              path={mapPathItems}
+              onLevel={showMap}
+              levelUp={levelUp}
+              levelDown={levelDown}
+            />
+          ) : (
+            // Карта другого масштаба — только посмотреть: отряд у своего места (на карте выше) или не отмечен.
+            <MapPanel
+              location={viewed}
+              player={partyMarker ? { x: partyMarker.x, y: partyMarker.y } : viewed.playerStart}
+              heroShown={!!partyMarker}
+              doors={story.world.doors[viewed.id] ?? {}}
+              actions={viewActions}
+              vision={viewVision}
+              marks={viewMarks}
+              path={mapPathItems}
+              onLevel={showMap}
+              levelUp={levelUp}
+              levelDown={levelDown}
+              partyMap={{ name: location.name, back: () => setViewRequest(null) }}
+            />
+          )}
           <section className="panel story-panel">
             <NarrationLog
               messages={story.messages}

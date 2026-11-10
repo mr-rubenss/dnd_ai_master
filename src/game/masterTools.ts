@@ -15,6 +15,8 @@ import { createdLocationProblem, MIN_LOCATION_EXAMPLE, parseCreatedLocation } fr
 import { buildingLinkOf, stampBuilding, surroundingsSizeProblem } from './surroundings'
 import { doorState } from '../engine/movement'
 import { travelNote, travelPlan, type TravelPlan } from './travel'
+import { kindOf, levelNote, levelPlan, type LevelPlan } from './mapLevels'
+import { scaleLabel } from './mapView'
 import type { ActionAuthor, NpcChanges, PartyMember, StoryEvent, StoryState } from '../types/story'
 import { changeCoins, COIN_LABELS, COIN_UNITS, formatCoins, formatCp, priceToCp, type CoinUnit } from './coins'
 import { factProblem, sameFact } from './facts'
@@ -457,8 +459,17 @@ export const MASTER_TOOLS: AiTool[] = [
         '(ковёр и свеча клетку не занимают; лужа, дым, тьма, свечение — не объекты, а effects [{id, kind: puddle|smoke|darkness|glow|fire, x, y, w, h}]), ' +
       'npcs [{id, name, description, attitude: friendly|neutral|hostile, x, y}] — на полу, по одному в клетке, ' +
       'exits [{id, kind: door|road|stairs|edge, name, x, y, door, to}] — хотя бы один: клетка пола у выхода (edge — на краю карты, door — вплотную к двери, door — её id; to — id локации, куда ведёт), ' +
-      'playerStart {x, y} — клетка пола. Весь пол должен быть достижим от playerStart. Тексты — на русском, без раскрытия тайн.',
-    parameters: object({ location: { type: 'object', description: 'JSON локации в формате выше.' } }, ['location']),
+      'playerStart {x, y} — клетка пола. Весь пол должен быть достижим от playerStart. Тексты — на русском, без раскрытия тайн. ' +
+      'Масштаб: scale {kind: region (общая: регион, город целиком; клетка 1–6 миль, unit mi) | area (частичная: лес, район, окрестности; клетка 10–100 фт.) | tactical (клеточная, 5 фт.), cell, unit: ft|mi}; ' +
+      'parent — id карты уровнем выше; places [{id, name, kind: city|village|ruins|cave|tower|building|site, x, y, map}] — места на общей и частичной карте, открывающие карты уровнем ниже ' +
+      '(map — id уже существующей карты ниже, иначе не указывай). У карты с parent или places выходы exits не обязательны.',
+    parameters: object(
+      {
+        location: { type: 'object', description: 'JSON локации в формате выше.' },
+        place: str('id места на карте parent, которое открывает новую карту (место без карты: «подробнее о месте»).'),
+      },
+      ['location'],
+    ),
   },
   {
     name: 'add_exit',
@@ -496,7 +507,21 @@ export const MASTER_TOOLS: AiTool[] = [
     description:
       'Бой (заготовка: раунды и скорость передвижения; атак боевой системы пока нет). start — бой начался, next_round — новый раунд ' +
       '(скорость героев восстановлена), end — бой окончен. В бою перемещения героя тратят его скорость.',
-    parameters: object({ state: oneOf(['start', 'next_round', 'end'], 'start, next_round или end.') }, ['state']),
+    parameters: object(
+      {
+        state: oneOf(['start', 'next_round', 'end'], 'start, next_round или end.'),
+        map: str('Только для start на общей или частичной карте: id клеточной карты места боя (ниже текущей) — отряд переходит на неё.'),
+      },
+      ['state'],
+    ),
+  },
+  {
+    name: 'set_map_view',
+    description:
+      'Сменить масштаб карты для отряда по сюжету: на карту уровнем выше (отряд вышел из города → общая карта; встанет у места, откуда пришёл) ' +
+      'или ниже (засада в пути → клеточная карта места; встанет у входа). Масштабы: общая (регион) → частичная (окрестности, район) → клеточная (5 фт., бой). ' +
+      'Карты того же масштаба — через выходы (travel). Карты нет — сначала create_location (scale, parent, place). В бою масштаб не меняется. После смены опиши, что видно.',
+    parameters: object({ map: str('id карты (раздел «Масштаб карты» и «Локации мира»).'), reason: str('Причина по сюжету: «отряд вышел из города».') }, ['map', 'reason']),
   },
 ]
 
@@ -1582,12 +1607,24 @@ const HANDLERS: Record<string, Handler> = {
       const problem = createdLocationProblem(state, location)
       if (problem) reject(`${problem} (после вставки здания — сдвинь объекты от здания).`)
     }
+    // Место карты уровнем выше, которое открывает новую карту (place), и места новой карты, ведущие в уже созданные.
+    const placeId = text(args, 'place')
+    const links: ToolEvent[] = []
+    if (placeId) {
+      const parentId = location.parent ?? state.world.currentLocationId
+      const parent = state.world.locations[parentId]
+      if (!parent?.places?.some((p) => p.id === placeId)) reject(`На карте [${parentId}] нет места [${placeId}] — укажи parent карты с этим местом.`)
+      if (!location.parent) location = { ...location, parent: parentId }
+      links.push({ event: { type: 'placeLinked', locationId: parentId, placeId, map: location.id }, author: ENGINE })
+    }
+    for (const p of location.places ?? []) if (p.map) links.push({ event: { type: 'placeLinked', locationId: location.id, placeId: p.id, map: p.map }, author: ENGINE })
     const exits = (location.exits ?? []).map((e) => `${e.name} [${e.id}] (${e.x}, ${e.y})${e.to ? ` → ${e.to}` : ''}`)
+    const level = location.parent ? ` Уровнем выше — [${location.parent}]; отряд перейдёт сюда только через set_map_view.` : ''
     return {
-      events: [{ event: { type: 'locationCreated', location }, author: MASTER }],
+      events: [{ event: { type: 'locationCreated', location }, author: MASTER }, ...links],
       result: {
         id: location.id,
-        message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток, выходы: ${exits.join('; ')}.${parsed.notes.length ? ` ${parsed.notes.join(' ')}` : ''} Она сохранена в мире истории — второй раз не создавай.`,
+        message: `Локация «${location.name}» создана: ${location.width}×${location.height} клеток (${scaleLabel(location)}), выходы: ${exits.join('; ') || 'нет'}.${level}${parsed.notes.length ? ` ${parsed.notes.join(' ')}` : ''} Она сохранена в мире истории — второй раз не создавай.`,
       },
     }
   },
@@ -1628,10 +1665,29 @@ const HANDLERS: Record<string, Handler> = {
       state.party.filter((m) => !m.fallen).map((m) => [m.heroId, ctx.rules?.species?.[m.character.speciesId]?.speed ?? DEFAULT_SPEED]),
     )
     const round = what === 'start' ? 1 : state.combat!.round + 1
+    // Начало боя — всегда на клеточной карте: с общей или частичной отряд сначала переходит на карту места.
+    const move: ToolEvent[] = []
+    if (what === 'start' && kindOf(currentLocationOf(state)) !== 'tactical') {
+      const mapId = text(args, 'map')
+      if (!mapId) reject('Бой — только на клеточной карте. Укажи map — клеточную карту места (нет — create_location со scale tactical и place), или сначала set_map_view.')
+      const target = state.world.locations[mapId!]
+      if (target && kindOf(target) !== 'tactical') reject(`«${target.name}» — не клеточная карта: бой идёт на клеточной.`)
+      const plan = levelPlan(state, mapId!, 'начался бой')
+      if (typeof plan === 'string') reject(plan)
+      move.push(...(plan as LevelPlan).events.map((event) => ({ event, author: ENGINE })))
+    }
     return {
-      events: [{ event: { type: 'combatChanged', combat: { round, speed, moved: {} } }, author: MASTER }],
+      events: [...move, { event: { type: 'combatChanged', combat: { round, speed, moved: {} } }, author: MASTER }],
       result: { message: `Раунд ${round}. Скорость: ${state.party.filter((m) => !m.fallen).map((m) => `${m.character.name} ${speed[m.heroId]} фт.`).join(', ')}.` },
     }
+  },
+
+  set_map_view(state, args) {
+    const plan = levelPlan(state, text(args, 'map', true)!, text(args, 'reason', true)!)
+    if (typeof plan === 'string') reject(plan)
+    const p = plan as LevelPlan
+    const lead = state.party.find((m) => !m.fallen)?.character.name ?? 'Отряд'
+    return { events: p.events.map((event) => ({ event, author: ENGINE })), result: { location: p.to.id, message: levelNote(p, lead) } }
   },
 }
 

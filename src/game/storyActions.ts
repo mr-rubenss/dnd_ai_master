@@ -30,6 +30,7 @@ import { mergeMove } from './mapEvents'
 import { mergeExplored } from './vision'
 import { markChangeProblem, markPlaceProblem } from './marks'
 import { createdLocationProblem } from './locationCreate'
+import { kindOf, levelChangedProblem, placeLinkedProblem } from './mapLevels'
 import { exitAddedProblem, exitLinkedProblem, nextTrail, partyTraveledProblem, trailOf } from './travel'
 import { factProblem, lostNames } from './facts'
 import { rewritableMessageId, suggestionsProblem } from './masterSuggestions'
@@ -148,9 +149,18 @@ const updateLocation = (state: StoryState, locationId: string, change: (l: Locat
   return { ...state, world: { ...state.world, locations: { ...state.world.locations, [locationId]: change(location) } } }
 }
 
-/** Старое состояние (золото числом) → кошельки монетами. */
+/**
+ * Старое состояние при загрузке (журнал действий не меняется — он и есть резервная копия): золото числом → кошельки
+ * монетами; локации без масштаба (до 6.2) → клеточные карты (`scale` tactical, клетка — `cellFeet` футов).
+ */
 export function migrateStory(state: StoryState): StoryState {
-  return { ...state, party: state.party.map((m) => ({ ...m, inventory: migrateInventory(m.inventory) })) }
+  const party = state.party.map((m) => ({ ...m, inventory: migrateInventory(m.inventory) }))
+  const locations = state.world?.locations
+  if (!locations || Object.values(locations).every((l) => l.scale)) return { ...state, party }
+  const migrated = Object.fromEntries(
+    Object.entries(locations).map(([id, l]) => [id, l.scale ? l : { ...l, scale: { kind: 'tactical' as const, cell: l.cellFeet, unit: 'ft' as const } }]),
+  )
+  return { ...state, party, world: { ...state.world, locations: migrated } }
 }
 
 /** Применяет действие к состоянию. Действие должно быть проверено (checkAction) до записи в журнал. */
@@ -403,6 +413,22 @@ function applyEvent(state: StoryState, action: StoryAction): StoryState {
         party: state.party.map((m) => (action.positions[m.heroId] ? { ...m, position: { ...action.positions[m.heroId] } } : m)),
         world: { ...state.world, currentLocationId: action.to, trail: nextTrail(trailOf(state), action.to) },
       }
+    }
+    case 'mapLevelChanged': {
+      // Новый масштаб: текущая карта, герои на ней, путь отряда; перемещения по старой карте уже не рассказать.
+      const { pendingMoves: _p, ...rest } = state
+      return {
+        ...rest,
+        party: state.party.map((m) => (action.positions[m.heroId] ? { ...m, position: { ...action.positions[m.heroId] } } : m)),
+        world: { ...state.world, currentLocationId: action.to, trail: nextTrail(trailOf(state), action.to) },
+      }
+    }
+    case 'placeLinked': {
+      const linked = updateLocation(state, action.locationId, (l) => ({
+        ...l,
+        places: (l.places ?? []).map((p) => (p.id === action.placeId ? { ...p, map: action.map } : p)),
+      }))
+      return updateLocation(linked, action.map, (l) => ({ ...l, parent: action.locationId }))
     }
     case 'markPlaced':
       return { ...state, world: { ...state.world, marks: [...(state.world.marks ?? []), action.mark] } }
@@ -789,6 +815,9 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
       if (action.author.kind === 'player') return 'Бой начинает и ведёт ведущий.'
       const c = action.combat
       if (!c) return state.combat ? null : 'Боя и так нет.'
+      // Начало боя — только на клеточной карте (с общей или частичной сначала set_map_view на клеточную карту места).
+      if (!state.combat && kindOf(state.world.locations[state.world.currentLocationId]) !== 'tactical')
+        return 'Бой идёт только на клеточной карте: сначала переведи отряд на клеточную карту места (set_map_view).'
       if (!Number.isInteger(c.round) || c.round < 1) return 'Раунд — целое от 1.'
       const bad = Object.values({ ...c.speed, ...c.moved }).some((v) => !Number.isInteger(v) || v < 0)
       return bad ? 'Скорость и пройденное — целые футы не меньше 0.' : null
@@ -839,6 +868,12 @@ export function checkAction(state: StoryState | null, action: StoryAction, { cat
     case 'partyTraveled':
       if (action.author.kind !== 'engine') return 'Отряд переводит на другую карту движок (инструмент travel или выход на карте).'
       return partyTraveledProblem(state, action)
+    case 'mapLevelChanged':
+      if (action.author.kind !== 'engine') return 'Масштаб карты для отряда меняет движок (инструмент ведущего set_map_view).'
+      return levelChangedProblem(state, action)
+    case 'placeLinked':
+      if (action.author.kind !== 'engine') return 'Места с картами связывает движок.'
+      return placeLinkedProblem(state, action)
     case 'locationCreated':
       // Локации создаёт ведущий (create_location) или движок (каркас окрестностей здания при выходе наружу).
       if (action.author.kind !== 'master' && action.author.kind !== 'engine') return 'Новые локации создаёт ведущий.'

@@ -5165,4 +5165,54 @@ textarea {
   overflow-wrap: anywhere;
 }
 .map-trail li + li::before { content: '›'; margin-right: var(--space-4); }
+/* После уровня карты (общая → частичная → клеточная) — стрелка, между картами одного уровня — «›». */
+.map-trail li[data-kind='level'] + li::before { content: '→'; }
 .map-trail li[aria-current='location'] { color: var(--color-accent-bright); }
+
+/* Три масштаба карт (6.2): путь по уровням, «Отдалить» / «Приблизить», места на общей и частичной карте. */
+.map-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-6);
+}
+.map-title-row h2 { min-width: 0; }
+.map-level-actions { display: flex; gap: var(--space-4); margin-left: auto; }
+.map-level-button {
+  padding: var(--space-2) var(--space-6);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-scale-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: var(--text-75);
+  cursor: pointer;
+}
+.map-level-button:disabled { opacity: 0.5; cursor: default; }
+.map-trail-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.map-viewing { margin: var(--space-2) 0 0; font-size: var(--text-75); color: var(--color-muted); }
+.map-scale-label { color: var(--color-muted); }
+.map-place-badge { fill: var(--map-npc-label-outline); stroke: var(--map-selection); stroke-width: 0.06; stroke-dasharray: 0.12 0.08; }
+.map-place.has-map .map-place-badge { stroke-dasharray: none; }
+.map-place-dot { fill: var(--map-selection); }
+.place-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-map-label);
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke-linejoin: round;
+  fill: var(--map-npc-label);
+  stroke: var(--map-npc-label-outline);
+  stroke-width: 0.14px;
+}

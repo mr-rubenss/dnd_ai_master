@@ -279,6 +279,8 @@ export function buildSurroundings(building: LocationData, buildingExit: MapExit,
     description: `Двор и дорога у входа в «${building.name}», вокруг — трава и ограда.`,
     cellFeet: building.cellFeet,
     scale: { kind: 'tactical', cell: building.cellFeet, unit: 'ft' },
+    // Окрестности — на том же уровне, что и здание (у той же карты уровнем выше).
+    ...(building.parent ? { parent: building.parent } : {}),
     ambientLight: outdoorAmbient(options.time),
     width,
     height,
