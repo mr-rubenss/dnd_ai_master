@@ -111,6 +111,18 @@ describe('поток: терпимость к вариантам формата'
     expect(result.stats.skipped).toBe(0)
   })
 
+  it('сервер на связи: onAlive — при заголовках ответа и на каждой строке, в том числе служебной (до первого куска)', async () => {
+    const seen: string[] = []
+    const { result } = await run(
+      stream([': OPENROUTER PROCESSING\n\n', ': OPENROUTER PROCESSING\n\n', sse(delta({ content: 'Да' }, 'stop')), 'data: [DONE]\n\n']),
+      { ...ask, onAlive: () => seen.push('alive'), onProgress: () => seen.push('chunk') },
+    )
+    expect(result.text).toBe('Да')
+    // Заголовки, две служебные строки и пустые строки после них — до первого куска ответа.
+    expect(seen.indexOf('chunk')).toBeGreaterThan(2)
+    expect(seen.slice(0, 3)).toEqual(['alive', 'alive', 'alive'])
+  })
+
   it('[DONE] с пробелами; конец потока без [DONE] и без завершающей пустой строки', async () => {
     expect((await run(stream([sse(delta({ content: 'А' })), 'data:  [DONE] \n\n', sse(delta({ content: 'лишнее' }))]))).result.text).toBe('А')
     const noDone = await run(stream([sse(delta({ content: 'Б' })), `data: ${JSON.stringify(delta({ content: 'В' }, 'stop'))}`]))

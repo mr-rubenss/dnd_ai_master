@@ -410,6 +410,24 @@ test('«Мастер думает…»: «Отменить» обрывает о
   await expect(page.locator('.message--player', { hasText: 'Подхожу к стойке' })).toHaveCount(1)
 })
 
+test('большой запрос: модель долго читает и начинает отвечать позже паузы простоя — ответ доходит (первый кусок ждём дольше)', async ({ page }) => {
+  await withKey(page)
+  // Как в живом отчёте: deepseek-chat-v3.1 через посредника на запрос ~26 тыс. токенов молчит дольше простоя.
+  await page.addInitScript(() => Object.assign(window, { __aiMasterTimeouts: { turn: { totalMs: 10_000, firstMs: 6000, idleMs: 1500 } } }))
+  await mockApi(page, DEEPSEEK, async (_, route) => {
+    await new Promise((r) => setTimeout(r, 3000))
+    await fulfillSse(route, textStream(['Гуннар ', 'кивает.']))
+  })
+  await page.goto('./')
+  await startQuickGame(page)
+  const input = page.locator('.player-input textarea')
+  await input.fill('Осматриваю зал')
+  await input.press('Enter')
+  await expect(page.getByTestId('master-thinking')).toBeVisible()
+  await expect(page.locator('.message--master').last()).toHaveText(/Гуннар кивает\./, { timeout: 8_000 })
+  await expect(page.getByTestId('master-error')).toHaveCount(0)
+})
+
 test('проверка подключения: индикатор с этапом и секундами, «Отменить»', async ({ page }) => {
   await withKey(page)
   await mockApi(page, DEEPSEEK, () => new Promise<void>(() => {}))

@@ -53,6 +53,43 @@ describe('запрос со сроками и отменой', () => {
     expect(m.request().signal?.aborted).toBe(true)
   })
 
+  it('первый кусок ждём дольше простоя (firstMs): большой запрос модель сначала читает', async () => {
+    const m = slowMaster()
+    const p = timedMaster(m.master, { totalMs: 150_000, firstMs: 60_000, idleMs: 20_000 }).complete(ask)
+    await vi.advanceTimersByTimeAsync(45_000)
+    m.chunk()
+    m.finish()
+    expect((await p).text).toBe('Готово')
+  })
+
+  it('без кусков дольше firstMs — простой с этим сроком; после первого куска — простой idleMs', async () => {
+    const m = slowMaster()
+    const first = timedMaster(m.master, { totalMs: 150_000, firstMs: 60_000, idleMs: 20_000 }).complete(ask).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(((await first) as AiError).message).toBe('Модель молчит: за 60 с не пришло ни одного куска ответа. Запрос остановлен.')
+    const m2 = slowMaster()
+    const second = timedMaster(m2.master, { totalMs: 150_000, firstMs: 60_000, idleMs: 20_000 }).complete(ask).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(5_000)
+    m2.chunk()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(((await second) as AiError).message).toBe('Модель молчит: за 20 с не пришло ни одного куска ответа. Запрос остановлен.')
+  })
+
+  it('сервер на связи (keep-alive) — ожидание начинается заново, но не дольше общего срока', async () => {
+    const m = slowMaster()
+    const p = timedMaster(m.master, { totalMs: 90_000, firstMs: 20_000, idleMs: 20_000 }).complete(ask)
+    const caught = p.catch((e: unknown) => e)
+    for (let t = 0; t < 4; t++) {
+      await vi.advanceTimersByTimeAsync(15_000)
+      m.request().onAlive?.()
+    }
+    m.chunk()
+    await vi.advanceTimersByTimeAsync(15_000)
+    m.request().onAlive?.()
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(((await caught) as AiError).message).toBe('Модель не ответила за 90 с. Запрос остановлен.')
+  })
+
   it('куски идут, но ответа нет 60 с — общий срок', async () => {
     const m = slowMaster()
     const p = timedMaster(m.master, { totalMs: 60_000, idleMs: 20_000 }).complete(ask)

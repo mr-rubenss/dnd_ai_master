@@ -215,8 +215,10 @@ async function* sseFromText(text: string): AsyncGenerator<SseEvent> {
 /** Ответ сервера: поток SSE или обычный JSON — по типу содержимого, а если он не указан или неверен — по самому тексту. */
 async function parseBody(response: Response, request: AiRequest, apiKey: string): Promise<AiResponse> {
   const contentType = response.headers.get('content-type') ?? ''
+  // Заголовки пришли — сервер принял запрос и работает (модель может ещё читать большой запрос).
+  request.onAlive?.()
   if (contentType.includes('text/event-stream') && response.body)
-    return parseEvents(readSse(response.body, request.signal), request, apiKey, contentType)
+    return parseEvents(readSse(response.body, request.signal, request.onAlive), request, apiKey, contentType)
   const text = await response.text()
   const trimmed = text.trimStart()
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {

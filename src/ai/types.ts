@@ -39,6 +39,8 @@ export interface AiRequest {
   onText?: (delta: string) => void
   /** После каждого куска ответа (текст, размышления, вызовы инструментов) — для индикатора и тайм-аута простоя. */
   onProgress?: (progress: AiProgress) => void
+  /** Сервер на связи, но ответа ещё нет: пришли заголовки или служебная строка потока (keep-alive) — продлить ожидание. */
+  onAlive?: () => void
   /** Перед автоматическим повтором (превышен лимит запросов, сервер перегружен). */
   onRetry?: (info: { attempt: number; delayMs: number; reason: string }) => void
   signal?: AbortSignal
