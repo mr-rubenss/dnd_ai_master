@@ -55,11 +55,13 @@ export async function* readLines(body: ReadableStream<Uint8Array>, signal?: Abor
   }
 }
 
-/** Читает поток и отдаёт события по одному. */
-export async function* readSse(body: ReadableStream<Uint8Array>, signal?: AbortSignal): AsyncGenerator<SseEvent> {
+/** Читает поток и отдаёт события по одному; `onLine` — после каждой прочитанной строки, в том числе служебной. */
+export async function* readSse(body: ReadableStream<Uint8Array>, signal?: AbortSignal, onLine?: () => void): AsyncGenerator<SseEvent> {
   const queue: SseEvent[] = []
   const parser = sseParser((e) => queue.push(e))
   for await (const line of readLines(body, signal)) {
+    // Любая строка (и комментарий «: OPENROUTER PROCESSING») — сервер на связи.
+    onLine?.()
     parser.line(line)
     while (queue.length) yield queue.shift()!
   }

@@ -1,4 +1,5 @@
-// Запрос к модели со сроками и отменой: общий срок, срок простоя (нет кусков потока), отмена извне.
+// Запрос к модели со сроками и отменой: общий срок, ожидание первого куска, срок простоя (нет кусков потока), отмена
+// извне. Сервер на связи (заголовки, служебные строки потока) — ожидание начинается заново.
 // Отмена и тайм-аут обрывают сам запрос (fetch) и сразу возвращают ошибку, даже если адаптер ждёт паузу перед повтором.
 // Обёртка над любым AiMaster — игра и адаптеры о ней не знают.
 import { AiError } from './errors'
@@ -65,12 +66,23 @@ export function timedMaster(master: AiMaster, options: TimedOptions): AiMaster {
         else s.addEventListener('abort', onOuterAbort, { once: true })
       }
       const total = setTimeout(() => stop(new AiError('timeout', { message: timeoutMessage('total', options.totalMs) })), options.totalMs)
-      let idle = setTimeout(() => stop(new AiError('timeout', { message: timeoutMessage('idle', options.idleMs) })), options.idleMs)
+      // Ожидание: до первого куска — firstMs, дальше — простой между кусками. Сервер на связи — ждём заново.
+      const firstMs = options.firstMs ?? options.idleMs
+      let idle: ReturnType<typeof setTimeout> | undefined
+      const wait = () => {
+        clearTimeout(idle)
+        const ms = firstChunk === null ? firstMs : options.idleMs
+        idle = setTimeout(() => stop(new AiError('timeout', { message: timeoutMessage('idle', ms) })), ms)
+      }
+      wait()
+      const onAlive = () => {
+        if (!reason) wait()
+        request.onAlive?.()
+      }
       const onProgress = (p: AiProgress) => {
         firstChunk ??= now() - started
         last = p
-        clearTimeout(idle)
-        idle = setTimeout(() => stop(new AiError('timeout', { message: timeoutMessage('idle', options.idleMs) })), options.idleMs)
+        wait()
         request.onProgress?.(p)
         options.onProgress?.(p)
       }
@@ -85,7 +97,7 @@ export function timedMaster(master: AiMaster, options: TimedOptions): AiMaster {
           ...(error instanceof Error ? { error: error.message } : {}),
         })
       try {
-        const response = await Promise.race([master.complete({ ...request, signal: controller.signal, onProgress }), stopped])
+        const response = await Promise.race([master.complete({ ...request, signal: controller.signal, onProgress, onAlive }), stopped])
         report('ok', response)
         return response
       } catch (error) {
